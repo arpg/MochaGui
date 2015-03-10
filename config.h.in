@@ -1,0 +1,13 @@
+#ifndef MOCHAGUI_CONFIG_H
+#define MOCHAGUI_CONFIG_H
+
+/// Platform
+#cmakedefine _UNIX_
+#cmakedefine _WIN_
+#cmakedefine _OSX_
+#cmakedefine _LINUX_
+
+/// Configured libraries
+#cmakedefine HAVE_SDL
+
+#endif //SCENEGRAPH_CONFIG_H

@@ -1,0 +1,96 @@
+<cvars>
+    <console.VerbosePaddingWidth>  30    </console.VerbosePaddingWidth>
+    <console.VertMargin>  8    </console.VertMargin>
+    <console.CVarIndent>  0    </console.CVarIndent>
+    <console.CVarIndentIncr>  4    </console.CVarIndentIncr>
+    <console.BlinkRate>  4    </console.BlinkRate>
+    <console.AnimTime>  0.1    </console.AnimTime>
+    <console.history.MaxHistory>  100    </console.history.MaxHistory>
+    <console.history.HistoryFileName>  .cvar_history    </console.history.HistoryFileName>
+    <console.LineSpacing>  2    </console.LineSpacing>
+    <console.LeftMargin>  5    </console.LeftMargin>
+    <console.MaxLines>  200    </console.MaxLines>
+    <console.OverlayPercent>  0.75    </console.OverlayPercent>
+    <console.settings.SettingsFileName>  .glconsole_settings    </console.settings.SettingsFileName>
+    <console.InitialScriptFileName>  initial.script    </console.InitialScriptFileName>
+    <console.colors.LogColor>  [ 255,  255,  64,  255 ]    </console.colors.LogColor>
+    <console.colors.CommandColor>  [ 255,  255,  255,  255 ]    </console.colors.CommandColor>
+    <console.colors.ConsoleColor>  [ 25,  60,  130,  120 ]    </console.colors.ConsoleColor>
+    <console.colors.FunctionColor>  [ 64,  255,  64,  255 ]    </console.colors.FunctionColor>
+    <console.colors.ErrorColor>  [ 255,  128,  64,  255 ]    </console.colors.ErrorColor>
+    <console.colors.HelpColor>  [ 110,  130,  200,  255 ]    </console.colors.HelpColor>
+    <controller.MaxControlPlanTime>  0.311321    </controller.MaxControlPlanTime>
+    <controller.LookaheadTime>  0.17    </controller.LookaheadTime>
+    <controller.ControlTarget>  1    </controller.ControlTarget>
+    <controller.Params.DynamicFrictionCoef>  0.19    </controller.Params.DynamicFrictionCoef>
+    <controller.Params.ControlDelay>  0.086    </controller.Params.ControlDelay>
+    <controller.Params.CompDamping>  2    </controller.Params.CompDamping>
+    <controller.Params.SteeringCoef>  -1.1    </controller.Params.SteeringCoef>
+    <controller.Params.SteeringOffset>  0.487    </controller.Params.SteeringOffset>
+    <controller.Params.StallTorqueCoef>  0.098    </controller.Params.StallTorqueCoef>
+    <controller.Params.StaticSideFrictionCoef>  0.818    </controller.Params.StaticSideFrictionCoef>
+    <controller.Params.Stiffness>  60    </controller.Params.Stiffness>
+    <controller.Params.SlipCoefficient>  1    </controller.Params.SlipCoefficient>
+    <controller.Params.SuspRestLength>  0.04    </controller.Params.SuspRestLength>
+    <controller.Params.AccelOffset>  0.465    </controller.Params.AccelOffset>
+    <controller.Params.MaxSteering>  0.67    </controller.Params.MaxSteering>
+    <controller.Params.MaxSteeringRate>  13    </controller.Params.MaxSteeringRate>
+    <controller.Params.ExpDamping>  1    </controller.Params.ExpDamping>
+    <debug.ContinuousPathPlanning>  0    </debug.ContinuousPathPlanning>
+    <debug.flatten2Dcurves>  0    </debug.flatten2Dcurves>
+    <planner.Epsilon>  0.0001    </planner.Epsilon>
+    <planner.PointCostWeights>  [ 2; 2; 1; 1.5; 1 ]    </planner.PointCostWeights>
+    <planner.PlannerOn>  0    </planner.PlannerOn>
+    <planner.PathSegments>  20    </planner.PathSegments>
+    <planner.Params.DynamicFrictionCoef>  0.19    </planner.Params.DynamicFrictionCoef>
+    <planner.Params.ControlDelay>  0.086    </planner.Params.ControlDelay>
+    <planner.Params.CompDamping>  2    </planner.Params.CompDamping>
+    <planner.Params.SteeringCoef>  -1.1    </planner.Params.SteeringCoef>
+    <planner.Params.SteeringOffset>  0.487    </planner.Params.SteeringOffset>
+    <planner.Params.StallTorqueCoef>  0.098    </planner.Params.StallTorqueCoef>
+    <planner.Params.StaticSideFrictionCoef>  0.818    </planner.Params.StaticSideFrictionCoef>
+    <planner.Params.Stiffness>  60    </planner.Params.Stiffness>
+    <planner.Params.SlipCoefficient>  1    </planner.Params.SlipCoefficient>
+    <planner.Params.SuspRestLength>  0.04    </planner.Params.SuspRestLength>
+    <planner.Params.AccelOffset>  0.465    </planner.Params.AccelOffset>
+    <planner.Params.MaxSteering>  0.67    </planner.Params.MaxSteering>
+    <planner.Params.MaxSteeringRate>  13    </planner.Params.MaxSteeringRate>
+    <planner.Params.ExpDamping>  1    </planner.Params.ExpDamping>
+    <planner.TrajCostWeights>  [ 2; 2; 1; 1.5; 1; 1 ]    </planner.TrajCostWeights>
+    <planner.TimeInteval>  0.01    </planner.TimeInteval>
+    <planner.ShowProjected2dPath>  1    </planner.ShowProjected2dPath>
+    <planner.Simulate3DPath>  0    </planner.Simulate3DPath>
+    <planner.Compute3DPath>  1    </planner.Compute3DPath>
+    <planner.Control3DPath>  0    </planner.Control3DPath>
+    <planner.Learn>  0    </planner.Learn>
+    <planner.FuseImu>  1    </planner.FuseImu>
+    <path>  [ 0 1 2 3 4 5 6 0 ]    </path>
+    <logger.Enabled>  0    </logger.Enabled>
+    <script.ScriptFileName>  default.script    </script.ScriptFileName>
+    <sim.Params.DynamicFrictionCoef>  0.19    </sim.Params.DynamicFrictionCoef>
+    <sim.Params.ControlDelay>  0.086    </sim.Params.ControlDelay>
+    <sim.Params.CompDamping>  2    </sim.Params.CompDamping>
+    <sim.Params.SteeringCoef>  -1.1    </sim.Params.SteeringCoef>
+    <sim.Params.SteeringOffset>  0.487    </sim.Params.SteeringOffset>
+    <sim.Params.StallTorqueCoef>  0.098    </sim.Params.StallTorqueCoef>
+    <sim.Params.StaticSideFrictionCoef>  0.818    </sim.Params.StaticSideFrictionCoef>
+    <sim.Params.Stiffness>  60    </sim.Params.Stiffness>
+    <sim.Params.SlipCoefficient>  1    </sim.Params.SlipCoefficient>
+    <sim.Params.SuspRestLength>  0.04    </sim.Params.SuspRestLength>
+    <sim.Params.AccelOffset>  0.465    </sim.Params.AccelOffset>
+    <sim.Params.MaxSteering>  0.67    </sim.Params.MaxSteering>
+    <sim.Params.MaxSteeringRate>  13    </sim.Params.MaxSteeringRate>
+    <sim.Params.ExpDamping>  1    </sim.Params.ExpDamping>
+    <waypnt.0>  [ -0.754234; 0.038858; 0.0197921; 0.00389251; -0.0218389; -1.29091; 3.70103; 0 ]    </waypnt.0>
+    <waypnt.1>  [ 2.36285; -2.24438; 0.0556448; -0.0097873; 0.0354732; 0.847295; 3.33737; 0 ]    </waypnt.1>
+    <waypnt.10>  [ 5; 0; 0.0965938; 0; 0; 0; 1; 0 ]    </waypnt.10>
+    <waypnt.11>  [ 5.5; 0; -0.218326; 0; 0; 0; 1; 0 ]    </waypnt.11>
+    <waypnt.2>  [ 2.85056; -0.36861; 0.00734123; -0.0268069; 0.0107297; 1.98767; 3.24506; 0 ]    </waypnt.2>
+    <waypnt.3>  [ 0.950299; 0.499494; 0.0150637; -0.00161403; 0.018753; -2.84817; 4.05028; 0 ]    </waypnt.3>
+    <waypnt.4>  [ -2.0859; -0.348951; -0.0203864; 0.0100111; -0.146619; -2.8486; 4.22605; 0 ]    </waypnt.4>
+    <waypnt.5>  [ -3.62229; 1.01557; -0.32014; -0.635982; 0.0465032; 1.65122; 2.46987; 0 ]    </waypnt.5>
+    <waypnt.6>  [ -2.29308; 2.38202; 0.00349271; 0.0102318; -0.0108891; -0.113419; 2.11438; 0 ]    </waypnt.6>
+    <waypnt.7>  [ 3.5; 0; 0.0566962; 0; 0; 0; 1; 0 ]    </waypnt.7>
+    <waypnt.8>  [ 4; 0; 0.0729167; 0; 0; 0; 1; 0 ]    </waypnt.8>
+    <waypnt.9>  [ 4.5; 0; 0.0875866; 0; 0; 0; 1; 0 ]    </waypnt.9>
+</cvars>

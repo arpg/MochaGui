@@ -1,0 +1,66 @@
+<cvars>
+    <console.VerbosePaddingWidth>  30    </console.VerbosePaddingWidth>
+    <console.VertMargin>  8    </console.VertMargin>
+    <console.CVarIndent>  0    </console.CVarIndent>
+    <console.CVarIndentIncr>  4    </console.CVarIndentIncr>
+    <console.BlinkRate>  4    </console.BlinkRate>
+    <console.AnimTime>  0.1    </console.AnimTime>
+    <console.history.MaxHistory>  100    </console.history.MaxHistory>
+    <console.history.HistoryFileName>  .cvar_history    </console.history.HistoryFileName>
+    <console.LineSpacing>  2    </console.LineSpacing>
+    <console.LeftMargin>  5    </console.LeftMargin>
+    <console.MaxLines>  200    </console.MaxLines>
+    <console.OverlayPercent>  0.75    </console.OverlayPercent>
+    <console.settings.SettingsFileName>  .glconsole_settings    </console.settings.SettingsFileName>
+    <console.InitialScriptFileName>  initial.script    </console.InitialScriptFileName>
+    <console.colors.LogColor>  [ 255,  255,  64,  255 ]    </console.colors.LogColor>
+    <console.colors.CommandColor>  [ 255,  255,  255,  255 ]    </console.colors.CommandColor>
+    <console.colors.ConsoleColor>  [ 25,  60,  130,  120 ]    </console.colors.ConsoleColor>
+    <console.colors.FunctionColor>  [ 64,  255,  64,  255 ]    </console.colors.FunctionColor>
+    <console.colors.ErrorColor>  [ 255,  128,  64,  255 ]    </console.colors.ErrorColor>
+    <console.colors.HelpColor>  [ 110,  130,  200,  255 ]    </console.colors.HelpColor>
+    <controller.MaxControlPlanTime>  0.2    </controller.MaxControlPlanTime>
+    <controller.LookaheadTime>  0.2    </controller.LookaheadTime>
+    <controller.DriveParams>  [ 1.49167e-154 ]    </controller.DriveParams>
+    <controller.PlanParams>  [ 1.49167e-154 ]    </controller.PlanParams>
+    <controller.ControlParams>  [ 1.49167e-154 ]    </controller.ControlParams>
+    <controller.ControlTarget>  0    </controller.ControlTarget>
+    <debug.UseCentralDifferences>  0    </debug.UseCentralDifferences>
+    <debug.UseGoalPoseStepping>  0    </debug.UseGoalPoseStepping>
+    <debug.DisableDamping>  0    </debug.DisableDamping>
+    <debug.Show2DResult>  0    </debug.Show2DResult>
+    <debug.ShowJacobianPaths>  0    </debug.ShowJacobianPaths>
+    <debug.Optimize2DOnly>  0    </debug.Optimize2DOnly>
+    <debug.forceZeroStartingCurvature>  0    </debug.forceZeroStartingCurvature>
+    <debug.flatten2Dcurves>  0    </debug.flatten2Dcurves>
+    <debug.ContinuousPathPlanning>  0    </debug.ContinuousPathPlanning>
+    <debug.ImuIntegrationOnly>  0    </debug.ImuIntegrationOnly>
+    <planner.MaxSteeringDegrees>  45    </planner.MaxSteeringDegrees>
+    <planner.Epsilon>  0.0001    </planner.Epsilon>
+    <planner.PlannerOn>  0    </planner.PlannerOn>
+    <planner.PathSegments>  20    </planner.PathSegments>
+    <planner.ShowProjected2dPath>  1    </planner.ShowProjected2dPath>
+    <planner.Simulate3DPath>  0    </planner.Simulate3DPath>
+    <planner.Compute3DPath>  1    </planner.Compute3DPath>
+    <planner.Control3DPath>  0    </planner.Control3DPath>
+    <planner.Learn>  0    </planner.Learn>
+    <planner.FuseImu>  1    </planner.FuseImu>
+    <planner.TimeInteval>  0.01    </planner.TimeInteval>
+    <path>  [ 0 1 2 3 4 0 ]    </path>
+    <logger.Enabled>  0    </logger.Enabled>
+    <map.sculpt>  0    </map.sculpt>
+    <map.sculptBrush>  1    </map.sculptBrush>
+    <script.ScriptFileName>  default.script    </script.ScriptFileName>
+    <waypnt.0>  [ -0.417832; -0.779967; 0.00252176; -0.00379362; 0.0114509; -1.04818; 2.39491; 0 ]    </waypnt.0>
+    <waypnt.1>  [ 1.30425; -1.61062; 0.0189242; -0.0168519; -0.0170271; -0.1418; 1.84231; 0 ]    </waypnt.1>
+    <waypnt.10>  [ 5; 0; 0; 0; 0; 0; 1; 0 ]    </waypnt.10>
+    <waypnt.11>  [ 5.5; 0; 0; 0; 0; 0; 1; 0 ]    </waypnt.11>
+    <waypnt.2>  [ 2.41363; -0.105891; 0.00716379; 0.0258773; 0.0259426; 1.5697; 1.3673; 0 ]    </waypnt.2>
+    <waypnt.3>  [ 1.46265; 1.42688; 0.00475818; 0.0177203; 0.00400154; 2.85531; 1.84726; 0 ]    </waypnt.3>
+    <waypnt.4>  [ -0.344003; 1.52235; -0.013525; -0.0196354; 0.0216077; -2.66591; 2.08457; 0 ]    </waypnt.4>
+    <waypnt.5>  [ 2.5; 0; -0.0221246; 0; 0; 0; 1; 0 ]    </waypnt.5>
+    <waypnt.6>  [ 3; 0; -0.0289449; 0; 0; 0; 1; 0 ]    </waypnt.6>
+    <waypnt.7>  [ 3.5; 0; -0.0351612; 0; 0; 0; 1; 0 ]    </waypnt.7>
+    <waypnt.8>  [ 4; 0; -0.0489976; 0; 0; 0; 1; 0 ]    </waypnt.8>
+    <waypnt.9>  [ 4.5; 0; -0.0585269; 0; 0; 0; 1; 0 ]    </waypnt.9>
+</cvars>
