@@ -1,9 +1,11 @@
-#include "MochaGui.h"
 #include <stdio.h>
+#include "MochaGui.h"
 
 //car control variables
 float g_fTurnrate = 0;
 float g_fSpeed = 0;
+std::atomic<bool> m_StillControl(true);
+std::atomic<bool> m_StillRun(true);
 using namespace SceneGraph;
 using namespace pangolin;
 #define WINDOW_WIDTH 1024
@@ -412,7 +414,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
         std::stringstream stream(sRefPlane);
         std::vector<double> vals;
         while( getline(stream, word, ',') ){
-            vals.push_back(std::lexical_cast<double>(word));
+            vals.push_back(std::stod(word));
         }
         if(vals.size() != 16){
             std::cout << "Attempted to read in reference plane position, but incorrect number of matrix entries provided. Must be 16 numbers" << std::endl;
@@ -492,12 +494,12 @@ void MochaGui::_StartThreads()
     }
     if(m_eControlTarget == eTargetSimulation){
         if(m_pImuThread != NULL){
-            m_pImuThread->interrupt();
+            // m_pImuThread->interrupt(); //don't know what eTargetSim does yet -crh
             m_pImuThread->join();
         }
 
         if(m_pViconThread) {
-            m_pViconThread->interrupt();
+            // m_pViconThread->interrupt(); //same as above -crh
             m_pViconThread->join();
         }
     }else{
@@ -517,9 +519,10 @@ void MochaGui::_StartThreads()
 
 void MochaGui::_KillController()
 {
+  m_StillControl = false;
+
     //reset the threads
     if(m_pControlThread) {
-        m_pControlThread->interrupt();
         m_pControlThread->join();
     }
     m_bControl3dPath = false;
@@ -531,33 +534,29 @@ void MochaGui::_KillThreads()
 {
     _KillController();
 
+    m_StillRun = false;
+
     if(m_pPhysicsThread) {
-        m_pPhysicsThread->interrupt();
         m_pPhysicsThread->join();
     }
 
     if(m_pPlannerThread) {
-        m_pPlannerThread->interrupt();
         m_pPlannerThread->join();
     }
 
     if(m_pLearningThread){
-        m_pLearningThread->interrupt();
         m_pLearningThread->join();
     }
 
     if(m_pImuThread) {
-        m_pImuThread->interrupt();
         m_pImuThread->join();
     }
 
     if(m_pViconThread) {
-        m_pViconThread->interrupt();
         m_pViconThread->join();
     }
 
     if(m_pCommandThread) {
-        m_pCommandThread->interrupt();
         m_pCommandThread->join();
     }
 
@@ -1022,15 +1021,13 @@ void MochaGui::_ControlFunc()
     {
         m_bControllerRunning = false;
 
-        while(1) {
-            std::this_thread::interruption_point();
+        while(m_StillControl) {
 
             m_ControlLine.ClearLines();
             for (GLLineStrip*& pStrip: m_lPlanLineSegments) {
                 pStrip->ClearLines();
             }
             m_bControllerRunning = false;
-            std::this_thread::interruption_point();
 
             //unlock waypoints
             //lock all the waypoints
@@ -1082,14 +1079,13 @@ void MochaGui::_ControlFunc()
             //m_ControlCommand = ControlCommand();
             m_bControllerRunning = true;
             VehicleState currentState;
-            while(1)
+            while(m_StillControl)
             {
-                while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false)){
+                while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false
+                       && m_StillControl )){
                     usleep(1000);
-                    std::this_thread::interruption_point();
                 }
 
-                std::this_thread::interruption_point();
 
 
                 if(m_bSimulate3dPath ){
@@ -1198,20 +1194,17 @@ void MochaGui::_PhysicsFunc()
     double dCurrentTic = -1;
     double dPlanTimer = 0;
 
-    while(1){
-        std::this_thread::interruption_point();
+    while(m_StillRun){
 
-        while(m_bSimulate3dPath == false){
+        while(m_bSimulate3dPath == false && m_StillRun){
             dCurrentTic = Tic();
-            std::this_thread::interruption_point();
             usleep(10000);
         }
 
         //this is so pausing doesn't shoot the car in the air
         double pauseStartTime = Tic();
-        while(m_bPause == true && m_bSimulate3dPath == true) {
+        while(m_bPause == true && m_bSimulate3dPath == true && m_StillRun) {
             usleep(1000);
-            std::this_thread::interruption_point();
 
             //This section will play back control paths, if the user has elected to do so
             if(g_bPlaybackControlPaths){
@@ -1366,7 +1359,7 @@ void MochaGui::_PlannerFunc() {
     // now add line segments
     bool previousOpenLoopSetting = m_bPlannerOn;
     while (1) {
-        std::this_thread::interruption_point();
+        //std::this_thread::interruption_point();
 
         //if the use has changed the openloop setting, dirty all
         //the waypoints
@@ -1461,18 +1454,16 @@ void MochaGui::_PlannerFunc() {
                 //problem.m_lPreviousCommands = previousCommands;
 
                 bool success = false;
-                while(success == false ){
+                while(success == false && m_StillRun){
                     //if we are paused, then wait
-                    while(m_bPause == true) {
+                    while(m_bPause == true && m_StillRun) {
                         usleep(1000);
-                        std::this_thread::interruption_point();
                         if(m_bStep == true){
                             m_bStep = false;
                             break;
                         }
                     }
 
-                    std::this_thread::interruption_point();
                     Eigen::Vector3dAlignedVec vActualTrajectory, vControlTrajectory;
                     bool res;
                     if(numInterations > g_nIterationLimit){

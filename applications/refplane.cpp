@@ -4,10 +4,10 @@
 #include <boost/date_time/posix_time/posix_time_io.hpp>
 #include <boost/lexical_cast.hpp>
 #include <Node/Node.h>
+#include <CarPlanner/Vicon.h>
 
 #include "config.h"
 #include "GetPot"
-#include "Vicon.h"
 #include "Messages.pb.h"
 #include "SE3.h"
 

@@ -10,10 +10,14 @@
 
 #include <sys/types.h>
 #include <dirent.h>
+#include <atomic>
+#include <thread>
 
 #include <CarPlanner/CarController.h>
 #include <CarPlanner/LocalPlanner.h>
 #include <CarPlanner/CarRegressor.h>
+#include <CarPlanner/Vicon.h>
+#include <CarPlanner/CVarHelpers.h>
 #include <Node/Node.h>
 
 #include "GLCar.h"
@@ -21,15 +25,12 @@
 #include "GLBulletDebugDrawer.h"
 
 
-#include "Vicon.h"
 #include "Messages.pb.h"
 #include "SensorFusion/SensorFusionCeres.h"
 #include "GLGuiPanel.h"
-#include "CVarHelpers.h"
 #include "assimp/DefaultLogger.hpp"
 #include "EventLogger.h"
 #include "ProcessModelFusion.h"
-#include <atomic>
 
 using namespace CVarUtils;
 using namespace std;
@@ -147,6 +148,8 @@ protected:
 
 
     //flags
+    std::atomic<bool> m_StillRun;
+    std::atomic<bool> m_StillControl;
     bool& m_bPlannerOn;
     bool& m_bShowProjectedPath;
     bool& m_bCompute3dPath;

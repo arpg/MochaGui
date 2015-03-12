@@ -127,10 +127,10 @@ int main( int argc, char** argv )
     pangolin::RegisterKeyPressCallback( '\r', [&bStep] {bStep = true;} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [&] {pCarWaypoint->SetPose(pWaypoint0->GetPose()); pCarWaypoint->SetDirty(true);} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', [&] { pWaypoint0->SetPose(wp0Pose); pWaypoint0->SetDirty(true); pWaypoint1->SetPose(wp1Pose); pWaypoint1->SetDirty(true); pCarWaypoint->SetPose(wp2Pose); pCarWaypoint->SetDirty(true);} );
-    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+GLUT_KEY_RIGHT, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0],pCarWaypoint->GetPose()[1]+0.01,pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
-    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+GLUT_KEY_LEFT, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0],pCarWaypoint->GetPose()[1]-0.01,pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
-    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+GLUT_KEY_UP, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0]+0.01,pCarWaypoint->GetPose()[1],pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
-    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+GLUT_KEY_DOWN, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0]-0.01,pCarWaypoint->GetPose()[1],pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
+    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+PANGO_KEY_RIGHT, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0],pCarWaypoint->GetPose()[1]+0.01,pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
+    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+PANGO_KEY_LEFT, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0],pCarWaypoint->GetPose()[1]-0.01,pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
+    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+PANGO_KEY_UP, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0]+0.01,pCarWaypoint->GetPose()[1],pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
+    pangolin::RegisterKeyPressCallback( PANGO_SPECIAL+PANGO_KEY_DOWN, [&] {pCarWaypoint->SetPose(pCarWaypoint->GetPose()[0]-0.01,pCarWaypoint->GetPose()[1],pCarWaypoint->GetPose()[2],pCarWaypoint->GetPose()[3],pCarWaypoint->GetPose()[4],pCarWaypoint->GetPose()[5]); pCarWaypoint->SetDirty(true);} );
 
     CarParameterMap params;
     //load te parameters

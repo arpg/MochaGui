@@ -13,6 +13,7 @@
 #include <CVars/CVar.h>
 #include <CarPlanner/CarPlannerCommon.h>
 #include <CarPlanner/BulletCarModel.h>
+#include <CarPlanner/Vicon.h>
 #include <CarPlanner/CarRegressor.h>
 #include <Node/Node.h>
 #include <SensorFusion/SensorFusionCeres.h>
@@ -20,7 +21,6 @@
 #include "JoystickHandler.h"
 #include "PlannerGui.h"
 #include "GLBulletDebugDrawer.h"
-#include "Vicon.h"
 #include "Messages.pb.h"
 #include "GLLearningPanel.h"
 #include "ProcessModelFusion.h"
