@@ -1,21 +1,22 @@
-#include "config.h"
 #include <fenv.h>
-#include "GetPot"
-#include "Vicon.h"
-#include "../Hermes1.0/Node.h"
-#include "Messages.pb.h"
 #include <iostream>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_io.hpp>
 #include <boost/lexical_cast.hpp>
-#include "Mvlpp/SE3.h"
+#include <Node/Node.h>
+#include <CarPlanner/BulletCarModel.h>
+
+#include "config.h"
+#include "GetPot"
+#include "Vicon.h"
+#include "Messages.pb.h"
+#include "SE3.h"
 #include "JoystickHandler.h"
-#include "BulletCarModel.h"
 #include "EventLogger.h"
 
 double g_dStartTime = Tic();
 Vicon g_vicon;
-rpg::Node g_node(5001);
+node::node g_node;
 EventLogger logger;
 bool g_bLog = false;
 JoystickHandler joystick;
@@ -51,7 +52,7 @@ void JoystickFunc()
 
         Req.set_accel(command.m_dForce);
         Req.set_phi(command.m_dPhi);
-        g_node.Call("localhost:5002","ProgramControlRpc",Req,Rep);
+        g_node.call_rpc("herbie","ProgramControlRpc",Req,Rep);
 
         usleep(2000);
     }
@@ -62,7 +63,7 @@ void ImuReadFunc()
     while(1){
         boost::this_thread::interruption_point();
         Imu_Accel_Gyro Msg;
-        if(g_node.Read("Imu",Msg)){
+        if(g_node.receive("herbie/Imu",Msg)){
             double time = (double)Msg.timer()/62500.0;
             if(g_bLog ){
                 std::cout << "IMU pose received at:" << time << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << "]" << std::endl;
@@ -121,7 +122,9 @@ int main( int argc, char** argv )
         }
     }
 
-    g_node.Subscribe("Imu", "herbie:5002");
+    g_node.init("logger");
+
+    g_node.subscribe("herbie/Imu");
     g_vicon.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
     g_vicon.Start();
 

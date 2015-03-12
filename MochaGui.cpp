@@ -1,4 +1,5 @@
 #include "MochaGui.h"
+#include <stdio.h>
 
 //car control variables
 float g_fTurnrate = 0;
@@ -51,10 +52,10 @@ MochaGui::MochaGui() :
     m_nNumControlSignals(0),
     m_nNumPoseUpdates(0),
     m_dPlaybackTimer(-1),
-    m_Node(5001),
     m_Fusion(30,&m_DriveCarModel),
     m_dPlanTime(Tic())//the size of the fusion sensor
-    {
+{
+    m_Node.init("MochaGui");
 }
 
 ////////////////////////////////////////////////////////////////
@@ -95,7 +96,7 @@ void MochaGui::Run() {
     {
 
         {
-            boost::mutex::scoped_lock lock(m_DrawMutex);
+            std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock);
             m_Gui.Render();
         }
 
@@ -241,28 +242,33 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     m_sPlaybackLogFile = sLogFile;
 
     dout ("Initializing MochaGui");
-    m_Node.Subscribe("Imu", "herbie:5002");
+    m_Node.subscribe("herbie/Imu");
 
     m_dStartTime = Tic();
     m_bAllClean = false;
     m_bPause = false;
     m_bStep = false;
 
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', boost::bind(CommandHandler, eMochaClear ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + '1', boost::bind(CommandHandler, eMochaToggleTrajectory ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + '2', boost::bind(CommandHandler, eMochaTogglePlans ) );
+    printf("****************\nall keyboard is disabled until you fix boost::bind issues with pangolin! MocahGui.cpp line 251\n");
+
+    /*
+
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(CommandHandler, eMochaClear ) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + '1', std::bind(CommandHandler, eMochaToggleTrajectory ) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + '2', std::bind(CommandHandler, eMochaTogglePlans ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters);} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters);} );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', boost::bind(CommandHandler, eMochaRestart ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 't', boost::bind(CommandHandler, eMochaSolve ) );
-    //pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'v', boost::bind(CommandHandler, eMochaPpmControl ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'b', boost::bind(CommandHandler, eMochaSimulationControl ) );
-    pangolin::RegisterKeyPressCallback( '\r', boost::bind(CommandHandler, eMochaStep ) );
-    pangolin::RegisterKeyPressCallback( ' ', boost::bind(CommandHandler, eMochaPause ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'd', boost::bind(&MochaGui::_LoadDefaultParams, this ) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(CommandHandler, eMochaRestart ) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 't', std::bind(CommandHandler, eMochaSolve ) );
+    //pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'v', std::bind(CommandHandler, eMochaPpmControl ) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'b', std::bind(CommandHandler, eMochaSimulationControl ) );
+    pangolin::RegisterKeyPressCallback( '\r', std::bind(CommandHandler, eMochaStep ) );
+    pangolin::RegisterKeyPressCallback( ' ', std::bind(CommandHandler, eMochaPause ) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'd', std::bind(&MochaGui::_LoadDefaultParams, this ) );
     pangolin::RegisterKeyPressCallback( 'G', [this] {this->m_pGraphView->Show(!this->m_pGraphView->IsShown());} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'f', [] {g_bFreezeControl = !g_bFreezeControl;} );
 
+    */
 
 
     //create CVars
@@ -367,7 +373,9 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
 
     int numWaypoints = 12;
     for(int ii = 0; ii < numWaypoints ; ii++){
-        m_vWayPoints.push_back(&CreateGetCVar(boost::str(boost::format("waypnt.%d") % ii), MatrixXd(8,1)));
+        char buf[100];
+        snprintf( buf, 100, "waypnt.%d", ii );
+        m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
         (*m_vWayPoints.back()) << ii*0.5,0,0,0,0,0, 1,0;
         m_Path.push_back(ii);
     }
@@ -382,7 +390,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     m_TerrainMesh.SetAlpha(1.0);
     m_Gui.Init(&m_TerrainMesh);
 
-    m_pGraphView = &pangolin::CreatePlotter("plot", &m_Log)
+    m_pGraphView = &pangolin::Plotter(&m_Log)
             .SetBounds(0.0, 0.3, 0.6, 1.0);
     pangolin::DisplayBase().AddDisplay(*m_pGraphView);
 
@@ -404,7 +412,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
         std::stringstream stream(sRefPlane);
         std::vector<double> vals;
         while( getline(stream, word, ',') ){
-            vals.push_back(boost::lexical_cast<double>(word));
+            vals.push_back(std::lexical_cast<double>(word));
         }
         if(vals.size() != 16){
             std::cout << "Attempted to read in reference plane position, but incorrect number of matrix entries provided. Must be 16 numbers" << std::endl;
@@ -476,11 +484,11 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
 void MochaGui::_StartThreads()
 {
     //recreate the threads
-    m_pPlannerThread = new boost::thread(boost::bind(&MochaGui::_PlannerFunc,this));
-    m_pPhysicsThread = new boost::thread(boost::bind(&MochaGui::_PhysicsFunc,this));
-    m_pControlThread = new boost::thread(boost::bind(&MochaGui::_ControlFunc,this));
+    m_pPlannerThread = new std::thread(std::bind(&MochaGui::_PlannerFunc,this));
+    m_pPhysicsThread = new std::thread(std::bind(&MochaGui::_PhysicsFunc,this));
+    m_pControlThread = new std::thread(std::bind(&MochaGui::_ControlFunc,this));
     if(m_eControlTarget == eTargetExperiment){
-        m_pCommandThread = new boost::thread(boost::bind(&MochaGui::_ControlCommandFunc,this));
+        m_pCommandThread = new std::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
     }
     if(m_eControlTarget == eTargetSimulation){
         if(m_pImuThread != NULL){
@@ -496,11 +504,11 @@ void MochaGui::_StartThreads()
         m_Vicon.Start();
 
         if(m_pImuThread == NULL){
-            m_pImuThread = new boost::thread(boost::bind(&MochaGui::_ImuReadFunc,this));
+            m_pImuThread = new std::thread(std::bind(&MochaGui::_ImuReadFunc,this));
         }
 
         if(m_pViconThread == NULL){
-            m_pViconThread = new boost::thread(boost::bind(&MochaGui::_ViconReadFunc,this));
+            m_pViconThread = new std::thread(std::bind(&MochaGui::_ViconReadFunc,this));
         }
     }
 
@@ -666,7 +674,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
             usleep(1000);
         }
         {
-            //boost::mutex::scoped_lock lock(m_DrawMutex);
+            //std::unique_lock<std::mutex> lock(m_DrawMutex);
             m_ControlLine.ClearLines();
             for (list<GLLineStrip*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
                 (*iter)->ClearLines();
@@ -684,7 +692,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
     case eMochaTogglePlans:
         {
-            //boost::mutex::scoped_lock lock(m_DrawMutex);
+            //std::unique_lock<std::mutex> lock(m_DrawMutex);
             for (list<GLLineStrip*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
                 (*iter)->SetVisible(!(*iter)->IsVisible());
             }
@@ -693,7 +701,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
     case eMochaClear:
         {
-            //boost::mutex::scoped_lock lock(m_DrawMutex);
+            //std::unique_lock<std::mutex> lock(m_DrawMutex);
             m_Gui.ClearCarTrajectory(m_nDriveCarId);
             m_ControlLine.ClearLines();
             for (GLLineStrip*& strip: m_lPlanLineSegments) {
@@ -774,7 +782,7 @@ void MochaGui::_UpdateVisuals()
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 {
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
+    //std::unique_lock<std::mutex> lock(m_DrawMutex);
     //get the current plans and draw them
     Sophus::SE3d dTwv1,dTwv2;
     *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
@@ -820,7 +828,7 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
 {
     if(m_bFuseImu == true){
         if(g_bProcessModelActive == false){
-            Fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
+            fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
             currentState.m_dTwv = currentPose.m_dPose;
             currentState.m_dV = currentPose.m_dV;
             currentState.m_dW = currentPose.m_dW;
@@ -886,7 +894,7 @@ void MochaGui::_ViconReadFunc()
             if(g_bProcessModelActive){
                 ControlCommand command;
                 {
-                    boost::mutex::scoped_lock lock(m_ControlMutex);
+                    std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
                     command = m_ControlCommand;
                 }
                 m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
@@ -916,8 +924,8 @@ void MochaGui::_ImuReadFunc()
 
     while(1){
         Imu_Accel_Gyro Msg;
-        //this needs to be a blocking call
-        if(m_Node.Read("Imu",Msg,true)){
+        //this needs to be a blocking call .. not sure it is!!!
+        if(m_Node.receive("herbie/Imu",Msg)){
             double dImuTime = (double)Msg.timer()/62500.0;
             double sysTime = Tic();
             m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
@@ -955,7 +963,7 @@ void MochaGui::_ControlCommandFunc()
             //get commands from the controller, apply to the car and update the position
             //of the car in the controller
             {
-                boost::mutex::scoped_lock lock(m_ControlMutex);
+                std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
                 double dCurrentTime = Tic();
                 m_Controller.GetCurrentCommands(dCurrentTime,
                                                 m_ControlCommand,
@@ -989,9 +997,8 @@ void MochaGui::_ControlCommandFunc()
             Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
             Req.set_phi(m_ControlCommand.m_dPhi);
             double time = Tic();
-            m_Node.Call("localhost:5002","ProgramControlRpc",Req,Rep,100);
+            m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
             m_dControlDelay = Toc(time);
-
         }
 
         //about 100 commands/sec
@@ -1016,14 +1023,14 @@ void MochaGui::_ControlFunc()
         m_bControllerRunning = false;
 
         while(1) {
-            boost::this_thread::interruption_point();
+            std::this_thread::interruption_point();
 
             m_ControlLine.ClearLines();
             for (GLLineStrip*& pStrip: m_lPlanLineSegments) {
                 pStrip->ClearLines();
             }
             m_bControllerRunning = false;
-            boost::this_thread::interruption_point();
+            std::this_thread::interruption_point();
 
             //unlock waypoints
             //lock all the waypoints
@@ -1079,10 +1086,10 @@ void MochaGui::_ControlFunc()
             {
                 while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false)){
                     usleep(1000);
-                    boost::this_thread::interruption_point();
+                    std::this_thread::interruption_point();
                 }
 
-                boost::this_thread::interruption_point();
+                std::this_thread::interruption_point();
 
 
                 if(m_bSimulate3dPath ){
@@ -1094,7 +1101,7 @@ void MochaGui::_ControlFunc()
                     _UpdateVehicleStateFromFusion(currentState);
                     //set the command history and current pose on the controller
                     {
-                        boost::mutex::scoped_lock lock(m_ControlMutex);
+                        std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
                         m_Controller.SetCurrentPose(currentState,&m_DriveCarModel.GetCommandHistoryRef(0));
                     }
                 }else{
@@ -1192,11 +1199,11 @@ void MochaGui::_PhysicsFunc()
     double dPlanTimer = 0;
 
     while(1){
-        boost::this_thread::interruption_point();
+        std::this_thread::interruption_point();
 
         while(m_bSimulate3dPath == false){
             dCurrentTic = Tic();
-            boost::this_thread::interruption_point();
+            std::this_thread::interruption_point();
             usleep(10000);
         }
 
@@ -1204,7 +1211,7 @@ void MochaGui::_PhysicsFunc()
         double pauseStartTime = Tic();
         while(m_bPause == true && m_bSimulate3dPath == true) {
             usleep(1000);
-            boost::this_thread::interruption_point();
+            std::this_thread::interruption_point();
 
             //This section will play back control paths, if the user has elected to do so
             if(g_bPlaybackControlPaths){
@@ -1277,7 +1284,7 @@ void MochaGui::_PhysicsFunc()
 
                     //get the current commands
                     {
-                        boost::mutex::scoped_lock lock(m_ControlMutex);
+                        std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
 
                         if(m_bPause == false && g_bInfiniteTime == false){
                             m_dPlanTime = Tic();
@@ -1359,7 +1366,7 @@ void MochaGui::_PlannerFunc() {
     // now add line segments
     bool previousOpenLoopSetting = m_bPlannerOn;
     while (1) {
-        boost::this_thread::interruption_point();
+        std::this_thread::interruption_point();
 
         //if the use has changed the openloop setting, dirty all
         //the waypoints
@@ -1398,7 +1405,7 @@ void MochaGui::_PlannerFunc() {
 
                 {
                     //lock the drawing look as we will be modifying things here
-                    boost::mutex::scoped_lock lock(m_DrawMutex);
+                    std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock);
                     if(a->GetDirty()) {
                         Sophus::SE3d pose(a->GetPose4x4_po());
                         if(m_DriveCarModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
@@ -1458,14 +1465,14 @@ void MochaGui::_PlannerFunc() {
                     //if we are paused, then wait
                     while(m_bPause == true) {
                         usleep(1000);
-                        boost::this_thread::interruption_point();
+                        std::this_thread::interruption_point();
                         if(m_bStep == true){
                             m_bStep = false;
                             break;
                         }
                     }
 
-                    boost::this_thread::interruption_point();
+                    std::this_thread::interruption_point();
                     Eigen::Vector3dAlignedVec vActualTrajectory, vControlTrajectory;
                     bool res;
                     if(numInterations > g_nIterationLimit){
@@ -1478,7 +1485,7 @@ void MochaGui::_PlannerFunc() {
                         numInterations++;
 
                         //lock the mutex as this next bit will modify object
-                        boost::mutex::scoped_lock lock(m_DrawMutex);
+                        std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock );
 
                         if (m_bCompute3dPath == true ) {
                             success =  res;

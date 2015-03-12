@@ -2,8 +2,8 @@
 #define GLWIDGETPANEL_H
 
 
-#include <Mvlpp/SE3.h>
-#include "RigidBody.h"
+#include <CarPlanner/RigidBody.h>
+#include "SE3.h"
 
 
 /*

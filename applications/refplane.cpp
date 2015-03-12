@@ -1,14 +1,15 @@
-#include "config.h"
 #include <fenv.h>
-#include "GetPot"
-#include "Vicon.h"
-#include "../Hermes1.0/Node.h"
-#include "Messages.pb.h"
 #include <iostream>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_io.hpp>
 #include <boost/lexical_cast.hpp>
-#include <Mvlpp/Mvl.h>
+#include <Node/Node.h>
+
+#include "config.h"
+#include "GetPot"
+#include "Vicon.h"
+#include "Messages.pb.h"
+#include "SE3.h"
 
 Vicon g_vicon;
 

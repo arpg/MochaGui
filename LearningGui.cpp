@@ -5,7 +5,6 @@ LearningGui *g_pLearningGuiInstance = NULL;
 //static int& g_nViconDownsampler = CVarUtils::CreateGetCVar("debug.ViconDownsampler",0);
 /////////////////////////////////////////////////////////////////////////////////////////
 LearningGui::LearningGui() :
-    m_Node(5001),
     m_sCarObjectName("CAR"),
     m_dT(CreateCVar("learning.TimeInteval", 0.005, "")),
     m_dImuRate(0),
@@ -28,6 +27,7 @@ LearningGui::LearningGui() :
     m_bRefresh(false),
     m_bRegress(false)
 {
+    m_Node.init("LearningGui");
     m_bPlayback = false;
 }
 
@@ -136,7 +136,7 @@ void LearningGui::_JoystickReadFunc()
 
             Req.set_accel(command.m_dForce);
             Req.set_phi(command.m_dPhi);
-            m_Node.Call("localhost:5002","ProgramControlRpc",Req,Rep);
+            m_Node.call_rpc("herbie/ProgramControlRpc",Req,Rep);
         }
 
         {
@@ -160,7 +160,7 @@ void LearningGui::_SetPoseFromFusion()
     //update state from vicon
     VehicleState state;
     if(m_bProcessModelEnabled == false){
-        Fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
+        fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
         state.m_dTwv = currentPose.m_dPose;
         state.m_dV = currentPose.m_dV;
         state.m_dW = currentPose.m_dW;
@@ -204,7 +204,7 @@ void LearningGui::_ImuReadFunc()
     double lastTime = -1;
     while(1){
         Imu_Accel_Gyro Msg;
-        if(m_Node.Read("Imu",Msg)){
+        if(m_Node.receive("herbie/Imu",Msg)){ // TODO we do NOT need the IMU anymore -- Juan will use that on the ninja car.
             //double time = (double)Msg.timer()/62500.0;
             double sysTime = Tic();
             m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
@@ -413,7 +413,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
         m_Fusion.SetCalibrationPose(Sophus::SE3d(mvl::Cart2T(T_ic)));
         m_Fusion.SetCalibrationActive(false);
 
-        m_Node.Subscribe("Imu", "herbie:5002");
+        m_Node.subscribe("herbie/Imu");
         //dT_vicon_ref.block<3,3>(0,0).transposeInPlace();
         m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
         m_Vicon.Start();

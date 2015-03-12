@@ -4,23 +4,25 @@
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
 
-#include "CVars/CVar.h"
-#include "CarPlannerCommon.h"
-#include "BulletCarModel.h"
-#include "pangolin/pangolin.h"
-#include "SceneGraph/SceneGraph.h"
+#include <boost/lexical_cast.hpp>
+#include <tuple>
+
+#include <pangolin/pangolin.h>
+#include <SceneGraph/SceneGraph.h>
+#include <SceneGraph/GLMesh.h>
+#include <CVars/CVar.h>
+#include <CarPlanner/CarPlannerCommon.h>
+#include <CarPlanner/BulletCarModel.h>
+#include <CarPlanner/CarRegressor.h>
+#include <Node/Node.h>
+#include <SensorFusion/SensorFusionCeres.h>
+
 #include "JoystickHandler.h"
-#include "SceneGraph/GLMesh.h"
 #include "PlannerGui.h"
 #include "GLBulletDebugDrawer.h"
-#include "CarRegressor.h"
 #include "Vicon.h"
-#include "../Hermes1.0/Node.h"
 #include "Messages.pb.h"
 #include "GLLearningPanel.h"
-#include "SensorFusion/SensorFusionCeres.h"
-#include "boost/lexical_cast.hpp"
-#include <tuple>
 #include "ProcessModelFusion.h"
 #include "EventLogger.h"
 
@@ -77,7 +79,7 @@ private:
     /// vicon reader
     Vicon m_Vicon;
     /// node for capturing IMU data from the car
-    rpg::Node m_Node;
+    node::node m_Node;
     /// name of the car used for vicon tracking
     std::string m_sCarObjectName;
 

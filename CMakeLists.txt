@@ -22,8 +22,9 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
    SET(_LINUX_ 1)
 ENDIF()
 
+# TODO fix all these warnings instead of suppressing them!!
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
 add_definitions(-DBT_USE_DOUBLE_PRECISION)
 add_definitions(-DBT_NO_PROFILE)
 
@@ -36,12 +37,10 @@ set(BOOST_LIBS regex thread date_time system timer  )
 
 #this dependency is required for newer versions of the boost library. unfortunately
 #boost doesn't seem to link to it..
-find_package(ICU COMPONENTS data uc i18n io le lx REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
-find_package( MVL REQUIRED )
 find_package( CVARS REQUIRED )
 find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
 find_package( Protobuf REQUIRED )
@@ -49,7 +48,9 @@ find_package( Bullet REQUIRED )
 find_package( SensorFusion REQUIRED )
 find_package( LibAO REQUIRED )
 find_package( IOKit REQUIRED )
-find_package(Sophus REQUIRED)
+find_package( Sophus REQUIRED )
+find_package( Node REQUIRED )
+find_package( VRPN REQUIRED )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
@@ -64,12 +65,13 @@ PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
 set( _INCLUDE_DIRS
+            ${VRPN_INCLUDE_DIRS}
+            ${Node_INCLUDE_DIRS}
             ${Sophus_INCLUDE_DIR}
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
             ${BOOST_INCLUDE_DIR} 
-            ${CAR_PLANNER_INCLUDE_DIRS} 
-            ${MVL_INCLUDE_DIRS} 
+            ${CarPlanner_INCLUDE_DIRS}
             ${CVARS_INCLUDE_DIR} 
             ${ZeroMQ_INCLUDE_DIRS} 
             ${PROTOBUF_INCLUDE_DIRS} 
@@ -80,13 +82,15 @@ set( _INCLUDE_DIRS
             ${CMAKE_BINARY_DIR}
        )
 
-set( LIBRARIES ${ICU_LIBRARIES}
+set( LIBRARIES
+               ${VRPN_LIBRARY}
+               ${VRPN_LIBRARIES}
+               ${Node_LIBRARIES}
                ${SENSORFUSION_LIBRARIES}
                ${Pangolin_LIBRARIES}
                ${LIBAO_LIBRARY}
                ${SceneGraph_LIBRARIES}
-               ${MVL_LIBRARIES}
-               ${CAR_PLANNER_LIBRARIES}
+               ${CarPlanner_LIBRARIES}
                ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
                ${CVARS_LIBRARIES}
@@ -102,6 +106,7 @@ set( SHARED_HDRS PlannerGui.h
                  ProcessModelFusion.h
                 GLCar.h
                 EventLogger.h
+                Vicon.h
                 )
 
 set( SHARED_SRC PlannerGui.cpp
@@ -110,6 +115,7 @@ set( SHARED_SRC PlannerGui.cpp
                 JoystickHandler.cpp
                 EventLogger.cpp
                 Messages.pb.cc
+                Vicon.cpp
                 )
 
 

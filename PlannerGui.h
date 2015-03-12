@@ -8,8 +8,8 @@
 #define UI_PANEL_HEIGHT WINDOW_HEIGHT
 
 #include <stdio.h>
-#include "CarPlannerCommon.h"
-#include "BulletCarModel.h"
+#include "CarPlanner/CarPlannerCommon.h"
+#include "CarPlanner/BulletCarModel.h"
 #include "boost/thread.hpp"
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"

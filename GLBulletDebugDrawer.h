@@ -1,7 +1,7 @@
 #ifndef GLBULLETDEBUGDRAWER_H
 #define GLBULLETDEBUGDRAWER_H
 
-#include "LocalPlanner.h"
+#include <CarPlanner/LocalPlanner.h>
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"
 

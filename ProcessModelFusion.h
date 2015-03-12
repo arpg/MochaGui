@@ -1,10 +1,11 @@
 #ifndef PROCESSMODELFUSION_H
 #define PROCESSMODELFUSION_H
 
-#include "CarPlannerCommon.h"
+#include <CarPlanner/CarPlannerCommon.h>
+#include <CarPlanner/BulletCarModel.h>
+
 #include "SensorFusionCeres.h"
-#include "BulletCarModel.h"
-#include "Mvlpp/SE3.h"
+#include "SE3.h"
 
 class ProcessModelFusion : public fusion::SensorFusionCeres
 {

@@ -1,8 +1,8 @@
 #include "Messages.pb.h"
-#include "../Hermes1.0/Node.h"
+#include <Node/Node.h>
 #include "JoystickHandler.h"
-#include "CarPlannerCommon.h"
-#include "BulletCarModel.h"
+#include <CarPlanner/CarPlannerCommon.h>
+#include <CarPlanner/BulletCarModel.h>
 #include <atomic>
 
 #define DEFAULT_ACCEL_COEF 5.65
@@ -19,7 +19,7 @@ enum ControlMaster
 
 bool g_bError =false;
 ControlMaster g_eMaster = eJoystickControl;
-rpg::Node g_CommandRpcNode(5002);
+node::node g_CommandRpcNode;
 int g_nRpcControlCount = 0;
 
 //atomic variables for the accelerations and steering values given by the RPC
@@ -64,8 +64,9 @@ int main()
 
     joystick.InitializeJoystick();
 
+    g_CommandRpcNode.init( "ninja_commander" );
 
-    g_CommandRpcNode.Register("ProgramControlRpc",&ProgramControlRpc,NULL);
+    g_CommandRpcNode.provide_rpc( "ProgramControlRpc", &ProgramControlRpc, NULL );
 
     CommandMsg Req;
     CommandReply Rep;
@@ -104,13 +105,15 @@ int main()
                     m_gLastAccel = joystickAccel;
                     Req.set_accel(g_bError ? DEFAULT_ACCEL_OFFSET : joystickAccel);
                     Req.set_phi(g_bError ? DEFAULT_STEERING_OFFSET : joystickPhi);
-                    g_CommandRpcNode.Call("herbie:5001","ControlRpc",Req,Rep,100);
+                    g_CommandRpcNode.call_rpc("herbie","ControlRpc",Req,Rep,100);
+                    printf("Please come fix me: Line 109 control-daemon.cpp\n");
                     g_nRpcControlCount++;
                 //}
             }else{
                 Req.set_accel(g_bError ? DEFAULT_ACCEL_OFFSET : (double)m_gLastAccel);
                 Req.set_phi(g_bError ? DEFAULT_STEERING_OFFSET : (double)m_gLastPhi);
-                g_CommandRpcNode.Call("herbie:5001","ControlRpc",Req,Rep,100);
+                g_CommandRpcNode.call_rpc("herbie","ControlRpc",Req,Rep,100);
+                printf("Please come fix me: Line 116 control-daemon.cpp\n");
                 g_nRpcControlCount++;
             }
         }catch(...){

@@ -1,10 +1,11 @@
 #ifndef GLGUIPANEL_H
 #define GLGUIPANEL_H
 
+#include <CarPlanner/CarParameters.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "GLWidgetPanel.h"
-#include "CarParameters.h"
 #include "Eigen/Eigen"
 
 

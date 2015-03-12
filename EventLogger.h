@@ -1,9 +1,9 @@
 #ifndef EVENTLOGGER_H
 #define EVENTLOGGER_H
 
-#include "CarPlannerCommon.h"
-#include "BulletCarModel.h"
-#include "CarController.h"
+#include "CarPlanner/CarPlannerCommon.h"
+#include "CarPlanner/BulletCarModel.h"
+#include "CarPlanner/CarController.h"
 #include "Messages.pb.h"
 
 

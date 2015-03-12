@@ -3,8 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <CarPlanner/CarParameters.h>
 #include "GLWidgetPanel.h"
-#include "CarParameters.h"
 
 
 class GLLearningPanel : public GLWidgetPanel {

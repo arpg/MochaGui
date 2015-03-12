@@ -1,4 +1,4 @@
-#include "CarPlannerCommon.h"
+#include "CarPlanner/CarPlannerCommon.h"
 #include "SensorFusionCeres.h"
 #include<fstream>
 #include <fenv.h>
@@ -28,7 +28,7 @@ int m_nFilterSize = 50;
 int m_bCalibrateActive = false;
 pangolin::DataLog m_Log;
 EventLogger m_Logger;
-fusion::SensorFusionCeres fusion(m_nFilterSize);
+fusion::SensorFusionCeres g_fusion(m_nFilterSize);
 int m_nImuSkip = 0;
 static int& g_nGlobalSkip = CVarUtils::CreateGetCVar("debug.GlobalSkip",0);
 
@@ -68,23 +68,23 @@ void DoFusion()
 {
     //now that we've loaded all the poses, add them to the sensor fusion
 
-    fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
-    fusion.SetCalibrationActive(m_bCalibrateActive);
+    g_fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
+    g_fusion.SetCalibrationActive(m_bCalibrateActive);
     Eigen::Vector6d T_ic;
     if(m_bCalibrateActive){
         T_ic.setZero();
     }else{
         T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523;
     }
-    fusion.SetCalibrationPose(Sophus::SE3d(mvl::Cart2T(T_ic)));
-    Sophus::SE3d dT_ic = fusion.GetCalibrationPose();
+    g_fusion.SetCalibrationPose(Sophus::SE3d(mvl::Cart2T(T_ic)));
+    Sophus::SE3d dT_ic = g_fusion.GetCalibrationPose();
 
     int imuIndex = 0, globalIndex = globalStartIndex;
     msg_Log msg;
 
     double time = -1;
-    //fusion.m_bTimeCalibrated = true;
-    //fusion.ResetCurrentPose(globalData[globalIndex].tail(6),Eigen::Vector3d(0,0,0),Eigen::Vector2d::Zero());
+    //g_fusion.m_bTimeCalibrated = true;
+    //g_fusion.ResetCurrentPose(globalData[globalIndex].tail(6),Eigen::Vector3d(0,0,0),Eigen::Vector2d::Zero());
     while(1)
     {       
         if(m_bPaused){
@@ -116,9 +116,9 @@ void DoFusion()
                     Eigen::MatrixXd accel,gyro;
                     m_Logger.ReadMatrix(accel,imuMsg.accel());
                     m_Logger.ReadMatrix(gyro,imuMsg.gyro());
-                    fusion.RegisterImuPose(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL,gyro(0),gyro(1),gyro(2),imuMsg.devicetime(),imuMsg.systemtime());
+                    g_fusion.RegisterImuPose(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL,gyro(0),gyro(1),gyro(2),imuMsg.devicetime(),imuMsg.systemtime());
                     m_Log.Log(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL);
-                    //PoseParameter param = fusion.GetCurrentPose();
+                    //PoseParameter param = g_fusion.GetCurrentPose();
                     //std::cout << "Imu data at time " << imuMsg.systemtime() << " is [" << accel.transpose() << "] [" << gyro.transpose() << "] vel " << param.m_dV.norm() << std::endl;
                     imuIndex = 0;
                 }
@@ -145,25 +145,25 @@ void DoFusion()
                     //std::cout << "Global pose found at time " << t << ": " << globalData[globalIndex].tail(6).transpose().format(CleanFmt) << std::endl;
                     Eigen::MatrixXd pose7d;
                     m_Logger.ReadMatrix(pose7d,viconMsg.pose_7d());
-                    fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),viconMsg.devicetime(),viconMsg.systemtime());
+                    g_fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),viconMsg.devicetime(),viconMsg.systemtime());
 
                     //print the calibration if needed
                     if(m_bCalibrateActive){
-                        dT_ic = fusion.GetCalibrationPose();
+                        dT_ic = g_fusion.GetCalibrationPose();
                         std::cout << "Calibration: " << mvl::T2Cart(dT_ic.matrix()).transpose().format(CleanFmt) << std::endl;
                     }
 
                     //add an axis for this pose
                     std::list<PoseParameter>::iterator currentParam;
                     int count = 0;
-                    for( currentParam = fusion.m_lParams.begin() ; currentParam != fusion.m_lParams.end() ; currentParam++ )
+                    for( currentParam = g_fusion.m_lParams.begin() ; currentParam != g_fusion.m_lParams.end() ; currentParam++ )
                     {
                         m_DrawMutex.lock();
                         std::list<PoseParameter>::iterator nextParam = currentParam;
                         std::vector<Sophus::SE3d> posesOut;
                         nextParam++;
-                        if(nextParam != fusion.m_lParams.end()){
-                            fusion._IntegrateImu(*currentParam,(*currentParam).m_dTime,(*nextParam).m_dTime,fusion.GetGravityVector(fusion.m_dG), &posesOut);
+                        if(nextParam != g_fusion.m_lParams.end()){
+                            g_fusion._IntegrateImu(*currentParam,(*currentParam).m_dTime,(*nextParam).m_dTime,g_fusion.GetGravityVector(g_fusion.m_dG), &posesOut);
 
 
                             if((int)vImuStrips.size() == count){
@@ -204,15 +204,15 @@ void DoFusion()
                         m_DrawMutex.unlock();
                     }
 
-                    if(fusion.m_lParams.size() > 2){
-                        currentParam = fusion.m_lParams.end();
+                    if(g_fusion.m_lParams.size() > 2){
+                        currentParam = g_fusion.m_lParams.end();
                         currentParam--;currentParam--;currentParam--;
                     }
 
-                //poseData.push_back(fusion.GetCurrentPose().m_dPose);
-                    std::cout << " Gravity: " << fusion.GetGravityVector(fusion.m_dG).transpose().format(CleanFmt) <<
-                                 " G: " << fusion.m_dG.transpose().format(CleanFmt) <<
-                                 "Vel: " << fusion.GetCurrentPose().m_dV.transpose().format(CleanFmt) <<
+                //poseData.push_back(g_fusion.GetCurrentPose().m_dPose);
+                    std::cout << " Gravity: " << g_fusion.GetGravityVector(g_fusion.m_dG).transpose().format(CleanFmt) <<
+                                 " G: " << g_fusion.m_dG.transpose().format(CleanFmt) <<
+                                 "Vel: " << g_fusion.GetCurrentPose().m_dV.transpose().format(CleanFmt) <<
                                  "LastVel: " << (*currentParam).m_dV.transpose().format(CleanFmt) << std::endl;
                 }
             }
@@ -233,7 +233,7 @@ void DoFusion()
         }
 
         m_DrawMutex.lock();
-        glpos.SetPose((fusion.m_CurrentPose.m_dPose*fusion.m_dTic).matrix());
+        glpos.SetPose((g_fusion.m_CurrentPose.m_dPose*g_fusion.m_dTic).matrix());
         m_DrawMutex.unlock();
 
         time += 0.001;
@@ -252,10 +252,10 @@ int main( int argc, char** argv )
     m_nFilterSize = cl.follow(50,1,"-length");
     m_bCalibrateActive = (bool)cl.follow(0,1,"-calib");
 
-    fusion.SetFilterSize(m_nFilterSize);
+    g_fusion.SetFilterSize(m_nFilterSize);
 
-    CVarUtils::AttachCVar("debug.FilterSize",fusion.GetFilterSizePtr(),"");
-    CVarUtils::AttachCVar("debug.MaxIterations",fusion.GetIterationNumPtr(),"");
+    CVarUtils::AttachCVar("debug.FilterSize",g_fusion.GetFilterSizePtr(),"");
+    CVarUtils::AttachCVar("debug.MaxIterations",g_fusion.GetIterationNumPtr(),"");
 
 
     //load the csv files for the IMU and Global poses (timestamped)
@@ -282,7 +282,7 @@ int main( int argc, char** argv )
           .SetHandler(new SceneGraph::HandlerSceneGraph(glGraph,stacks3d,pangolin::AxisNegZ))
           .SetDrawFunction(SceneGraph::ActivateDrawFunctor(glGraph, stacks3d));
 
-    pangolin::View& graphView = pangolin::CreatePlotter("plot", &m_Log)
+    pangolin::View& graphView = pangolin::Plotter( &m_Log)
             .SetBounds(0.0, 0.3, 0.6, 1.0);
 
     pangolin::RegisterKeyPressCallback( '\r' , boost::bind(CommandHandler, Step ) );
