@@ -5,7 +5,7 @@
 #include "SceneGraph/SceneGraph.h"
 #include "GLWidgetPanel.h"
 #include "CVars/CVar.h"
-#include "CVarHelpers.h"
+#include <CarPlanner/CVarHelpers.h>
 
 struct PlannerHandler : public SceneGraph::HandlerSceneGraph
 {

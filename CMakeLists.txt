@@ -24,7 +24,7 @@ ENDIF()
 
 # TODO fix all these warnings instead of suppressing them!!
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Werror -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
 add_definitions(-DBT_USE_DOUBLE_PRECISION)
 add_definitions(-DBT_NO_PROFILE)
 
@@ -37,7 +37,9 @@ set(BOOST_LIBS regex thread date_time system timer  )
 
 #this dependency is required for newer versions of the boost library. unfortunately
 #boost doesn't seem to link to it..
+
 find_package(Pangolin REQUIRED)
+find_package(MINIGLOG REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
@@ -50,7 +52,7 @@ find_package( LibAO REQUIRED )
 find_package( IOKit REQUIRED )
 find_package( Sophus REQUIRED )
 find_package( Node REQUIRED )
-find_package( VRPN REQUIRED )
+#find_package( VRPN REQUIRED )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
@@ -65,7 +67,8 @@ PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
 set( _INCLUDE_DIRS
-            ${VRPN_INCLUDE_DIRS}
+#            ${VRPN_INCLUDE_DIRS}i
+	    ${MINIGLOG_INCLUDE_DIRS}
             ${Node_INCLUDE_DIRS}
             ${Sophus_INCLUDE_DIR}
             ${LIBAO_INCLUDE_DIR}
@@ -83,8 +86,8 @@ set( _INCLUDE_DIRS
        )
 
 set( LIBRARIES
-               ${VRPN_LIBRARY}
-               ${VRPN_LIBRARIES}
+#               ${VRPN_LIBRARY}
+#               ${VRPN_LIBRARIES}
                ${Node_LIBRARIES}
                ${SENSORFUSION_LIBRARIES}
                ${Pangolin_LIBRARIES}
@@ -106,7 +109,7 @@ set( SHARED_HDRS PlannerGui.h
                  ProcessModelFusion.h
                 GLCar.h
                 EventLogger.h
-                Vicon.h
+                #Vicon.h
                 )
 
 set( SHARED_SRC PlannerGui.cpp
@@ -115,7 +118,7 @@ set( SHARED_SRC PlannerGui.cpp
                 JoystickHandler.cpp
                 EventLogger.cpp
                 Messages.pb.cc
-                Vicon.cpp
+                #Vicon.cpp
                 )
 
 
