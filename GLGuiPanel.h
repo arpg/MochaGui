@@ -44,7 +44,7 @@ public:
                         m_Ui.doLabel(m_Rect, "Paused:");
                         m_Ui.doLabel(m_Rect, (*GetVar<bool*>("interface:Paused")) ? "Yes" : "No", 0,0.1,0.8,0.8);
                         m_Ui.doLabel(m_Rect, "FPS:");
-                        m_Ui.doLabel(m_Rect,  (boost::format("%.2f") % (*GetVar<double*>("interface:Fps"))).str().c_str(), 0,0.1,0.8,0.8);
+                        //m_Ui.doLabel(m_Rect,  (boost::format("%.2f") % (*GetVar<double*>("interface:Fps"))).str().c_str(), 0,0.1,0.8,0.8); //crh
                     m_Ui.endGroup();
                 m_Ui.endFrame();
                 // Filter parameters panel
@@ -52,23 +52,23 @@ public:
                     m_Ui.doLabel(m_Rect, "Filter Parameters");
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect,"Size:");
-                        m_Ui.doLabel(m_Rect, (boost::format("%d") % *GetVar<int*>("fusion:FilterSize")).str().c_str() ,0,0.1,0.8,0.8);
+                        //m_Ui.doLabel(m_Rect, (boost::format("%d") % *GetVar<int*>("fusion:FilterSize")).str().c_str() ,0,0.1,0.8,0.8); //crh
                         m_Ui.doLabel(m_Rect,"RMSE:");
-                        m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:RMSE")).str().c_str() ,0,0.1,0.8,0.8 );
+                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:RMSE")).str().c_str() ,0,0.1,0.8,0.8 ); //crh
                     m_Ui.endGroup();
 
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect,"Freq: IMU:");
-                        m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ImuFreq")).str().c_str() ,0,0.1,0.8,0.8);
+                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ImuFreq")).str().c_str() ,0,0.1,0.8,0.8); //crh
                         m_Ui.doLabel(m_Rect,"Vicon:");
-                        m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ViconFreq")).str().c_str() ,0,0.1,0.8,0.8 );
+                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ViconFreq")).str().c_str() ,0,0.1,0.8,0.8 ); //crh
                     m_Ui.endGroup();
 
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect,"V:");
-                        m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:Vel")).str().c_str() ,0,0.1,0.8,0.8);
+                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:Vel")).str().c_str() ,0,0.1,0.8,0.8); //crh
                         m_Ui.doLabel(m_Rect,"X:");
-                        m_Ui.doLabel(m_Rect, (boost::format("%s") % GetVar<Eigen::Vector3d*>("fusion:Pos")->transpose().format(CleanFmt)).str().c_str() ,0,0.1,0.8,0.8 );
+                        //m_Ui.doLabel(m_Rect, (boost::format("%s") % GetVar<Eigen::Vector3d*>("fusion:Pos")->transpose().format(CleanFmt)).str().c_str() ,0,0.1,0.8,0.8 ); //crh
                     m_Ui.endGroup();
                 m_Ui.endFrame();
 
@@ -94,9 +94,9 @@ public:
 
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect, "Plans/S:");
-                        m_Ui.doLabel(m_Rect,(boost::format("%.2f") % (*GetVar<double*>("control:PlansPerS"))).str().c_str(), 0,0.1,0.8,0.8);
+                        //m_Ui.doLabel(m_Rect,(boost::format("%.2f") % (*GetVar<double*>("control:PlansPerS"))).str().c_str(), 0,0.1,0.8,0.8); //crh
                         m_Ui.doLabel(m_Rect, "V error:");
-                        m_Ui.doLabel(m_Rect,(boost::format("%.2f") % (*GetVar<double*>("control:VelocityError"))).str().c_str(), 0,0.1,0.8,0.8);
+                        //m_Ui.doLabel(m_Rect,(boost::format("%.2f") % (*GetVar<double*>("control:VelocityError"))).str().c_str(), 0,0.1,0.8,0.8); //crh
                     m_Ui.endGroup();
 
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);

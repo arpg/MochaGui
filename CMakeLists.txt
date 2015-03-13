@@ -67,27 +67,27 @@ PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
 set( _INCLUDE_DIRS
-#            ${VRPN_INCLUDE_DIRS}i
+    #            ${VRPN_INCLUDE_DIRS}
 	    ${MINIGLOG_INCLUDE_DIRS}
             ${Node_INCLUDE_DIRS}
             ${Sophus_INCLUDE_DIR}
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
-            ${BOOST_INCLUDE_DIR} 
+            ${BOOST_INCLUDE_DIR}
             ${CarPlanner_INCLUDE_DIRS}
-            ${CVARS_INCLUDE_DIR} 
-            ${ZeroMQ_INCLUDE_DIRS} 
-            ${PROTOBUF_INCLUDE_DIRS} 
-            ${SceneGraph_INCLUDE_DIRS} 
-            ${BULLET_INCLUDE_DIR} 
+            ${CVARS_INCLUDE_DIR}
+            ${ZeroMQ_INCLUDE_DIRS}
+            ${PROTOBUF_INCLUDE_DIRS}
+            ${SceneGraph_INCLUDE_DIRS}
+            ${BULLET_INCLUDE_DIR}
             ${SENSORFUSION_INCLUDE_DIRS}
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_BINARY_DIR}
        )
 
 set( LIBRARIES
-#               ${VRPN_LIBRARY}
-#               ${VRPN_LIBRARIES}
+    #               ${VRPN_LIBRARY}
+    #           ${VRPN_SERVER_LIBRARY}
                ${Node_LIBRARIES}
                ${SENSORFUSION_LIBRARIES}
                ${Pangolin_LIBRARIES}
@@ -122,9 +122,9 @@ set( SHARED_SRC PlannerGui.cpp
                 )
 
 
-set( GUI_HDRS   config.h.in                
+set( GUI_HDRS   config.h.in
                 GLGuiPanel.h
-                MochaGui.h               
+                MochaGui.h
                  )
 
 set( GUI_SRC    MochaGui.cpp

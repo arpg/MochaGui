@@ -25,7 +25,7 @@ class GlOptPanel : public GLWidgetPanel {
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                     m_Ui.doLabel(m_Rect,"Norm:");
-                    m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:Norm")).str().c_str() ,0,0.1,0.8,0.8);
+                    //m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:Norm")).str().c_str() ,0,0.1,0.8,0.8); //crh
                 m_Ui.endGroup();
 
                 // Planner parameters panel
@@ -44,7 +44,7 @@ class GlOptPanel : public GLWidgetPanel {
                     m_Ui.endGroup();
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                     m_Ui.doLabel(m_Rect,"Actual Lookahead:");
-                    m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:ActualLookahead")).str().c_str() ,0,0.1,0.8,0.8);
+                    //m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:ActualLookahead")).str().c_str() ,0,0.1,0.8,0.8); //crh
                     m_Ui.endGroup();
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect, "StartCurvature T:");

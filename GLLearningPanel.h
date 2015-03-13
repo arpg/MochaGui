@@ -51,7 +51,7 @@ public:
                 m_Ui.endGroup();
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowLeftFromTop); {
-                    m_Ui.doLabel(m_Rect, (boost::format("dt:%ds") % *GetVar<double*>("learning:dt")).str().c_str() );
+                    //m_Ui.doLabel(m_Rect, (boost::format("dt:%ds") % *GetVar<double*>("learning:dt")).str().c_str() ); //crh
 
                     nv::Rect leRect(0,0,50,0) ;
                     DoNumericLineEdit(leRect,"Samples: ",GetVar<int*>("learning:TotalRegressionSamples"));
@@ -83,8 +83,8 @@ public:
                 }
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowLeftFromTop); {
-                    m_Ui.doLabel(m_Rect, (boost::format("Rates IMU:%.2f") % *GetVar<double*>("learning:ImuRate")).str().c_str() );
-                    m_Ui.doLabel(m_Rect, (boost::format(" Vicon:%.2f") % *GetVar<double*>("learning:ViconRate")).str().c_str() );
+                    //m_Ui.doLabel(m_Rect, (boost::format("Rates IMU:%.2f") % *GetVar<double*>("learning:ImuRate")).str().c_str() );//crh
+                    //m_Ui.doLabel(m_Rect, (boost::format(" Vicon:%.2f") % *GetVar<double*>("learning:ViconRate")).str().c_str() );//crh
 
                 }
                 m_Ui.endGroup();
