@@ -55,7 +55,7 @@ void LearningGui::Run()
         }
 
         {
-            boost::mutex::scoped_lock renderMutex(m_RenderkMutex);
+            std::unique_lock<std::mutex> renderMutex(m_RenderkMutex, std::try_to_lock);
             m_Gui.Render();
         }
 
@@ -90,7 +90,7 @@ void LearningGui::_UpdateTrajectories()
     //now update the GLLines to sohw the trajectory
     for(size_t ii = 0 ; ii < m_vSamples.size(); ii++ ){
         if(m_lGLLineSegments.size() <= ii){
-            boost::mutex::scoped_lock renderMutex(m_RenderkMutex);
+            std::unique_lock<std::mutex> renderMutex(m_RenderkMutex, std::try_to_lock);
             m_lGLLineSegments.push_back(GLLineStrip());
             m_lGLLineSegments.back().SetColor(GLColor(1.0f,0.0f,0.0f,1.0f));
             m_Gui.AddGLObject(&m_lGLLineSegments.back());
@@ -140,7 +140,7 @@ void LearningGui::_JoystickReadFunc()
         }
 
         {
-            boost::mutex::scoped_lock lock(m_JoystickMutex);
+            std::unique_lock<std::mutex> lock(m_JoystickMutex, std::try_to_lock);
             m_JoystickCommand = command;
         }
 
@@ -180,7 +180,7 @@ void LearningGui::_SetPoseFromFusion()
     }else{
         ControlCommand commands;
         {
-            boost::mutex::scoped_lock lock(m_JoystickMutex);
+            std::unique_lock<std::mutex> lock(m_JoystickMutex, std::try_to_lock);
             commands = m_JoystickCommand;
         }
         commands.m_dT = time - m_dLastPoseTime;
@@ -241,7 +241,7 @@ void LearningGui::_ViconReadFunc()
 
         ControlCommand command;
         {
-            boost::mutex::scoped_lock lock(m_JoystickMutex);
+            std::unique_lock<std::mutex> lock(m_JoystickMutex, std::try_to_lock);
             command = m_JoystickCommand;
         }
 
@@ -392,7 +392,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
             std::stringstream stream(sRefPlane);
             std::vector<double> vals;
             while( getline(stream, word, ',') ){
-                vals.push_back(boost::lexical_cast<double>(word));
+                vals.push_back(std::stod(word));
             }
             if(vals.size() != 16){
                 std::cout << "Attempted to read in reference plane position, but incorrect number of matrix entries provided. Must be 16 numbers" << std::endl;
@@ -418,14 +418,14 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
         m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
         m_Vicon.Start();
 
-        m_pImuThread = new boost::thread(boost::bind(&LearningGui::_ImuReadFunc,this));
-        m_pViconThread = new boost::thread(boost::bind(&LearningGui::_ViconReadFunc,this));
-        m_pLearningCaptureThread = new boost::thread(boost::bind(&LearningGui::_LearningCaptureFunc,this));
+        m_pImuThread = new std::thread(std::bind(&LearningGui::_ImuReadFunc,this));
+        m_pViconThread = new std::thread(std::bind(&LearningGui::_ViconReadFunc,this));
+        m_pLearningCaptureThread = new std::thread(std::bind(&LearningGui::_LearningCaptureFunc,this));
 
         m_Gui.SetCarVisibility(m_nDriveCarId,true);
     }
 
-    m_pPhysicsThread = new boost::thread(boost::bind(&LearningGui::_PhysicsFunc,this));
+    m_pPhysicsThread = new std::thread(std::bind(&LearningGui::_PhysicsFunc,this));
 
 
     //initialize the debug drawer
@@ -439,15 +439,15 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
     state.m_dTwv = Sophus::SE3d(mvl::Cart2T(-5,0,-0.05,0,0,0));
     m_DriveCarModel.SetState(0,state);
 
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', boost::bind(&LearningGui::_CommandHandler, this, eMochaRestart) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', boost::bind(&LearningGui::_CommandHandler, this, eMochaClear) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(&LearningGui::_CommandHandler, this, eMochaRestart) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(&LearningGui::_CommandHandler, this, eMochaClear) );
     pangolin::RegisterKeyPressCallback( '\r', [this]() {this->m_bStep = true;} );
     pangolin::RegisterKeyPressCallback( ' ', [this]() {this->m_bPaused = !this->m_bPaused;} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(LEARNING_PARAMS_FILE_NAME),m_mParameters);} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(std::string(LEARNING_PARAMS_FILE_NAME),m_mParameters);} );
 
 
-    m_pJoystickThread = new boost::thread(boost::bind(&LearningGui::_JoystickReadFunc,this));
+    m_pJoystickThread = new std::thread(std::bind(&LearningGui::_JoystickReadFunc,this));
 
     m_Regressor.Init(m_dLearnEps);
 
@@ -548,7 +548,7 @@ void LearningGui::_PhysicsFunc()
             playBackSample = 0;
             //m_Gui.SetCarVisibility(m_nPlayBackCarId,false);
             if(m_eMode == Mode_Simulation){
-                boost::this_thread::interruption_point();
+                // boost::this_thread::interruption_point(); //crh commented
                 //update the drive car position based on the car model
                 ControlCommand currentCommand;
                 while((Toc(dCurrentTime)) < m_dT) {
@@ -560,7 +560,7 @@ void LearningGui::_PhysicsFunc()
                 dCurrentTime = Tic();
 
                 {
-                    boost::mutex::scoped_lock lock(m_JoystickMutex);
+                    std::unique_lock<std::mutex> lock(m_JoystickMutex, std::try_to_lock);
                     currentCommand = m_JoystickCommand;
                 }
 
@@ -653,11 +653,11 @@ void LearningGui::_UpdateLearning(ControlCommand command, VehicleState& state)
         m_PlaybackSample = *m_pRegressionSample;
         if(m_pLearningThread == NULL){
             m_bLearningRunning = true;
-            m_pLearningThread = new boost::thread(boost::bind(&LearningGui::_LearningFunc,this,m_pRegressionSample));
+            m_pLearningThread = new std::thread(std::bind(&LearningGui::_LearningFunc,this,m_pRegressionSample));
         }else if(m_bLearningRunning == false) {
             delete m_pLearningThread;
             m_bLearningRunning = true;
-            m_pLearningThread = new boost::thread(boost::bind(&LearningGui::_LearningFunc,this,m_pRegressionSample));
+            m_pLearningThread = new std::thread(std::bind(&LearningGui::_LearningFunc,this,m_pRegressionSample));
         }
 
         //this is required to push back the button on the UI

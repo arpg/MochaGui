@@ -13,7 +13,7 @@ private:
     BulletCarModel* m_pFusionModel;
     double m_dLastCommandTime;
     bool m_bFusionCarModelInitialized;
-    boost::mutex m_DriveCarMutex;
+    std::mutex m_DriveCarMutex;
     VehicleState m_LastVehicleState;
 public:
     ProcessModelFusion(const int& nFilterSize,BulletCarModel* pFusionModel);

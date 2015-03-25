@@ -3,9 +3,11 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <thread>
+#include <functional>
+#include <vector>
 #include "Gamepad/EventDispatcher.h"
 #include "Gamepad/Gamepad.h"
-#include "boost/thread.hpp"
 
 #define JOYSTICK_AXIS_MAX 1.0
 #define JOYSTICK_AXIS_MIN -1.0
@@ -31,7 +33,7 @@ private:
 
     std::vector<double> m_vAxes;
     std::vector<int> m_vButtonStates;
-    boost::thread* m_pJoystickThread;
+    std::thread* m_pJoystickThread;
 
 };
 

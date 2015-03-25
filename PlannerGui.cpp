@@ -125,9 +125,9 @@ void PlannerGui::Init(SceneGraph::GLObject* pTerrain)
             .SetHandler(new PlannerHandler(m_SceneGraphWidgets,m_RenderState2d,pangolin::AxisNegZ,0.01f,&m_vWidgetPanels))
             .SetDrawFunction(ActivateScissorBlendedDrawFunctor(m_SceneGraphWidgets,m_RenderState2d));
 
-    pangolin::RegisterKeyPressCallback( 'v', boost::bind(&PlannerGui::_CommandHandler, this, eChangeView) );
-    pangolin::RegisterKeyPressCallback( '+', boost::bind(&PlannerGui::_CommandHandler, this, eIncreaseWpVel) );
-    pangolin::RegisterKeyPressCallback( '-', boost::bind(&PlannerGui::_CommandHandler, this, eDecreaseWpVel) );
+    pangolin::RegisterKeyPressCallback( 'v', std::bind(&PlannerGui::_CommandHandler, this, eChangeView) );
+    pangolin::RegisterKeyPressCallback( '+', std::bind(&PlannerGui::_CommandHandler, this, eIncreaseWpVel) );
+    pangolin::RegisterKeyPressCallback( '-', std::bind(&PlannerGui::_CommandHandler, this, eDecreaseWpVel) );
     pangolin::RegisterKeyPressCallback( 'S', [this] {this->m_pPanelView->Show(!this->m_pPanelView->IsShown()); } );
 
     _PopulateSceneGraph();
@@ -233,7 +233,7 @@ int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth)
 void PlannerGui::SetCarState(const int &id, const VehicleState &state, bool bAddToTrajectory /* = false */)
 {
     Car* pCar = m_vCars[id];
-    boost::mutex::scoped_lock lock(*pCar);
+    std::unique_lock<std::mutex> lock(*pCar, std::try_to_lock);
 
     Sophus::SE3d state_aug = state.m_dTwv;
     state_aug.translation() -= GetBasisVector(state_aug,2)*0.05;

@@ -1,9 +1,9 @@
+#include <thread>
+#include <functional>
 #include "CarPlanner6d.h"
 #include "threadpool.hpp"
-#include "boost/thread.hpp"
-#include "boost/thread/mutex.hpp"
 
-boost::mutex m_resultLock;
+std::mutex m_resultLock;
 std::vector<Eigen::Matrix<double,8,1> >m_vResults;
 std::vector<bool> m_vFailures;
 unsigned int nTotalNum;
@@ -49,7 +49,7 @@ void CalculateCubic(Eigen::VectorPose dStartPose,double bi, double ti, double ci
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )
 {
-    boost::threadpool::pool threadPool;
+    //boost::threadpool::pool threadPool;
     threadPool.size_controller().resize(8);
 
 
@@ -107,7 +107,7 @@ int main( int argc, char** argv )
 
                 //dGoalPose << xi,yi,ti,0,0;
                 for(double ci = ciMin ; ci <= ciMax ; ci += ciStep) {
-                    threadPool.schedule(boost::bind(CalculateCubic, dStartPose,bi,ti,ci,index));
+                    threadPool.schedule(std::bind(CalculateCubic, dStartPose,bi,ti,ci,index));
                     index++;
                 }
             }
@@ -115,7 +115,7 @@ int main( int argc, char** argv )
             //wait for  this batch to finish
             while(threadPool.pending() > 0){
                 if(Toc(lastTime) > 1.0  ){
-                    boost::mutex::scoped_lock loc(m_resultLock);
+                    std::unique_lock<std::mutex> loc(m_resultLock, std::try_to_lock);
 
                     double rate = currentItem/Toc(firstTime);
                     double timeRemaining = (double)(nTotalNum-currentItem)/rate;
@@ -222,6 +222,9 @@ int main( int argc, char** argv )
 //                                     % xMin % xMax % xStep % yMin % yMax % yStep
 //                                     % tiMin % tiMax % tiStep % ciMin % ciMax % ciStep % m_vResults.size());
 
+std::string sHeader = "Fix sHeader"; //crh
+
+/*
 std::string sHeader = boost::str(boost::format("#ifndef _CAR_PLANNER_LUT_H_\n"
                                                    "#define _CAR_PLANNER_LUT_H_\n"
                                                    "const double g_bmin=%f;\n"
@@ -236,7 +239,7 @@ std::string sHeader = boost::str(boost::format("#ifndef _CAR_PLANNER_LUT_H_\n"
                                                    "const double g_CarPlannerLut[%d][8] = {\n")
                                      % biMin % biMax % biStep
                                      % tiMin % tiMax % tiStep % ciMin % ciMax % ciStep % m_vResults.size());
-
+*/
 
     file.write(sHeader.c_str(),sHeader.length());
 

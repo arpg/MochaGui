@@ -55,7 +55,7 @@ private:
     std::ifstream m_ReadFile;
     bool m_bLoggerReady;
     msg_Log m_LastLogMessage;
-    boost::mutex m_WriteMutex;
+    std::mutex m_WriteMutex;
 };
 
 #endif // EVENTLOGGER_H

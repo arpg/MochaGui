@@ -4,8 +4,9 @@
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
 
-#include <boost/lexical_cast.hpp>
 #include <tuple>
+#include <thread>
+#include <functional>
 
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
@@ -109,14 +110,14 @@ private:
     int m_nCollectedRegressionSamples;
     int& m_nTotalRegressionSamples;
 
-    boost::thread* m_pPhysicsThread;
-    boost::thread* m_pLearningThread;
-    boost::thread* m_pLearningCaptureThread;
-    boost::thread* m_pImuThread;
-    boost::thread* m_pViconThread;
-    boost::thread* m_pJoystickThread;
-    boost::mutex m_JoystickMutex;
-    boost::mutex m_RenderkMutex;
+    std::thread* m_pPhysicsThread;
+    std::thread* m_pLearningThread;
+    std::thread* m_pLearningCaptureThread;
+    std::thread* m_pImuThread;
+    std::thread* m_pViconThread;
+    std::thread* m_pJoystickThread;
+    std::mutex m_JoystickMutex;
+    std::mutex m_RenderkMutex;
 
     ControlCommand m_JoystickCommand;
 

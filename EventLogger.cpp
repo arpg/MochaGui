@@ -1,7 +1,6 @@
-#include "EventLogger.h"
 #include <memory>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/date_time/posix_time/posix_time_io.hpp>
+#include <iomanip>
+#include "EventLogger.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////
 EventLogger::EventLogger()
@@ -81,13 +80,13 @@ std::string EventLogger::OpenNewLogFile(const std::string& sLogDir, const std::s
     std::string fileDir = sLogDir;
     // create the logging directory if needed
     if(fileDir.empty()) {
-        boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-        std::locale loc(std::wcout.getloc(),
-                        new boost::posix_time::time_facet("%Y%m%d_%H%M%S"));
-        std::stringstream wss;
-        wss.imbue(loc);
-        wss << now;
-        fileDir = "logs/" + sPrefix + wss.str() + ".dat";
+      std::time_t now = std::time(nullptr);
+      std::tm tm = *std::localtime(&now);
+      std::locale loc(std::wcout.getloc());
+      std::stringstream wss;
+      wss.imbue(loc);
+      wss << std::put_time(&tm, "%Y%m%d_%H%M%S");
+      fileDir = "logs/" + sPrefix + wss.str() + ".dat";
     }
     OpenLogFile(fileDir);
     return fileDir;
@@ -239,7 +238,7 @@ bool EventLogger::ReadMessage(msg_Log &msg)
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::WriteMessage(msg_Log &msg)
 {
-    boost::mutex::scoped_lock lock(m_WriteMutex);
+    std::unique_lock<std::mutex> lock(m_WriteMutex, std::try_to_lock);
     msg.set_timestamp(Tic());
     int byteSize = msg.ByteSize();
     m_File << byteSize ; //write the size

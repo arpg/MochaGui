@@ -251,7 +251,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     m_bPause = false;
     m_bStep = false;
 
-    printf("****************\nall keyboard is disabled until you fix boost::bind issues with pangolin! MocahGui.cpp line 251\n");
+    printf("****************\nall keyboard is disabled until you fix std::bind issues with pangolin! MocahGui.cpp line 251\n");
 
     /*
 
@@ -673,7 +673,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
             usleep(1000);
         }
         {
-            //std::unique_lock<std::mutex> lock(m_DrawMutex);
+            std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
             m_ControlLine.ClearLines();
             for (list<GLLineStrip*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
                 (*iter)->ClearLines();
@@ -691,7 +691,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
     case eMochaTogglePlans:
         {
-            //std::unique_lock<std::mutex> lock(m_DrawMutex);
+            std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
             for (list<GLLineStrip*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
                 (*iter)->SetVisible(!(*iter)->IsVisible());
             }
@@ -700,7 +700,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
     case eMochaClear:
         {
-            //std::unique_lock<std::mutex> lock(m_DrawMutex);
+            std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
             m_Gui.ClearCarTrajectory(m_nDriveCarId);
             m_ControlLine.ClearLines();
             for (GLLineStrip*& strip: m_lPlanLineSegments) {
@@ -781,7 +781,7 @@ void MochaGui::_UpdateVisuals()
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 {
-    //std::unique_lock<std::mutex> lock(m_DrawMutex);
+    std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
     //get the current plans and draw them
     Sophus::SE3d dTwv1,dTwv2;
     *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
@@ -924,7 +924,7 @@ void MochaGui::_ImuReadFunc()
     while(1){
         Imu_Accel_Gyro Msg;
         //this needs to be a blocking call .. not sure it is!!!
-        if(m_Node.receive("herbie/Imu",Msg)){
+        if(m_Node.receive("herbie/Imu",Msg)){ //crh TODO
             double dImuTime = (double)Msg.timer()/62500.0;
             double sysTime = Tic();
             m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
@@ -996,7 +996,7 @@ void MochaGui::_ControlCommandFunc()
             Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
             Req.set_phi(m_ControlCommand.m_dPhi);
             double time = Tic();
-            m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
+            m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 ); //crh TODO
             m_dControlDelay = Toc(time);
         }
 

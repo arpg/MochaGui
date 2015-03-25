@@ -1,8 +1,7 @@
 #include <fenv.h>
 #include <iostream>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/date_time/posix_time/posix_time_io.hpp>
-#include <boost/lexical_cast.hpp>
+#include <functional>
+#include <thread>
 #include <Node/Node.h>
 #include <CarPlanner/BulletCarModel.h>
 #include <CarPlanner/Vicon.h>
@@ -29,8 +28,8 @@ JoystickHandler joystick;
 
 void JoystickFunc()
 {
-    while(1){
-        boost::this_thread::interruption_point();
+    while(1){ //crh "while m_StillRun" ?
+        //boost::this_thread::interruption_point();
         joystick.UpdateJoystick();
         double joystickAccel,joystickPhi;
         joystickAccel = (((double)joystick.GetAxisValue(1)/JOYSTICK_AXIS_MAX)*-40.0);
@@ -52,7 +51,7 @@ void JoystickFunc()
 
         Req.set_accel(command.m_dForce);
         Req.set_phi(command.m_dPhi);
-        g_node.call_rpc("herbie","ProgramControlRpc",Req,Rep);
+        g_node.call_rpc("herbie","ProgramControlRpc",Req,Rep); //crh call_rpc node
 
         usleep(2000);
     }
@@ -60,8 +59,8 @@ void JoystickFunc()
 
 void ImuReadFunc()
 {
-    while(1){
-        boost::this_thread::interruption_point();
+    while(1){ //crh m_StillRun ?
+        //boost::this_thread::interruption_point();
         Imu_Accel_Gyro Msg;
         if(g_node.receive("herbie/Imu",Msg)){
             double time = (double)Msg.timer()/62500.0;
@@ -77,8 +76,8 @@ void ImuReadFunc()
 
 void ViconReadFunc()
 {
-    while(1){
-        boost::this_thread::interruption_point();
+    while(1){ //crh m_StillRun ?
+        //boost::this_thread::interruption_point();
         //this is a blocking call
         double viconTime;
         Sophus::SE3d Twb = g_vicon.GetPose("CAR",true,&viconTime);
@@ -107,7 +106,7 @@ int main( int argc, char** argv )
         std::stringstream stream(sRef);
         std::vector<double> vals;
         while( getline(stream, word, ',') ){
-            vals.push_back(boost::lexical_cast<double>(word));
+            vals.push_back(std::stod(word));
         }
         if(vals.size() != 16){
             std::cout << "Attempted to read in reference plane position, but incorrect number of matrix entries provided. Must be 16 numbers" << std::endl;
@@ -128,9 +127,9 @@ int main( int argc, char** argv )
     g_vicon.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
     g_vicon.Start();
 
-    boost::thread* pImuThread = new boost::thread(boost::bind(ImuReadFunc));
-    boost::thread* pViconThread = new boost::thread(boost::bind(ViconReadFunc));
-    boost::thread* pJoystickThread = NULL;
+    std::thread* pImuThread = new std::thread(std::bind(ImuReadFunc));
+    std::thread* pViconThread = new std::thread(std::bind(ViconReadFunc));
+    std::thread* pJoystickThread = NULL;
     if(bLogCommands){
         //initialize the joystick
         if(joystick.InitializeJoystick()) {
@@ -139,7 +138,7 @@ int main( int argc, char** argv )
             std::cout << "Failed to initialized joystick" << std::endl;
         }
 
-         pJoystickThread = new boost::thread(boost::bind(JoystickFunc));
+         pJoystickThread = new std::thread(std::bind(JoystickFunc));
     }
 
 
@@ -160,13 +159,10 @@ int main( int argc, char** argv )
     getchar();
     g_bLog = false;
 
-    pImuThread->interrupt();
     pImuThread->join();
 
-    pViconThread->interrupt();
     pViconThread->join();
 
-    pJoystickThread->interrupt();
     pJoystickThread->join();
 
     //g_vicon.Stop();

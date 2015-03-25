@@ -1,19 +1,19 @@
-#include "CarPlanner/CarPlannerCommon.h"
-#include "SensorFusionCeres.h"
-#include<fstream>
+#include <fstream>
+#include <thread>
 #include <fenv.h>
+#include <functional>
+#include <xmmintrin.h>
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
-#include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
+#include "CarPlanner/CarPlannerCommon.h"
+#include "SensorFusionCeres.h"
 #include "GetPot"
 #include "EventLogger.h"
 
 //enable floating point exceptions
-#include <xmmintrin.h>
 std::vector<SceneGraph::GLAxis*> vParamAxes;
 std::vector<SceneGraph::GLLineStrip*> vImuStrips;
-boost::mutex m_DrawMutex;
+std::mutex m_DrawMutex;
 // Scenegraph to hold GLObjects and relative transformations
 SceneGraph::GLSceneGraph glGraph;
 SceneGraph::GLAxis glpos;
@@ -285,9 +285,9 @@ int main( int argc, char** argv )
     pangolin::View& graphView = pangolin::Plotter( &m_Log)
             .SetBounds(0.0, 0.3, 0.6, 1.0);
 
-    pangolin::RegisterKeyPressCallback( '\r' , boost::bind(CommandHandler, Step ) );
-    pangolin::RegisterKeyPressCallback( ' ', boost::bind(CommandHandler, Pause ) );
-    pangolin::RegisterKeyPressCallback( 'f', boost::bind(CommandHandler, FastForward ) );
+    pangolin::RegisterKeyPressCallback( '\r' , std::bind(CommandHandler, Step ) );
+    pangolin::RegisterKeyPressCallback( ' ', std::bind(CommandHandler, Pause ) );
+    pangolin::RegisterKeyPressCallback( 'f', std::bind(CommandHandler, FastForward ) );
     pangolin::RegisterKeyPressCallback( 'v', [] { m_bViconActive = !m_bViconActive;
                                                                  std::cout << "Vicon poses " << (m_bViconActive ? "active" : "inactive") << std::endl; });
 
@@ -329,7 +329,7 @@ int main( int argc, char** argv )
     axisGroup.CompileAsGlCallList();
     glGraph.AddChild(&axisGroup);
 
-    boost::thread fusionThread(DoFusion);
+    std::thread fusionThread(DoFusion);
 
     // Default hooks for exiting (Esc) and fullscreen (tab).
     while( !pangolin::ShouldQuit() )
