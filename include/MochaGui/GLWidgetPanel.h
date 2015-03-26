@@ -3,7 +3,6 @@
 
 
 #include <CarPlanner/RigidBody.h>
-#include "SE3.h"
 
 
 /*
@@ -15,7 +14,7 @@ float& fYaw = CVarUtils::CreateCVar("car.Yaw", 0.0f, "rendering scale option");
 
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"
-#include "NvWidgets/nvwidgets/nvGlutWidgets.h"
+#include "MochaGui/NvWidgets/nvwidgets/nvGlutWidgets.h"
 
 using namespace SceneGraph;
 using namespace pangolin;

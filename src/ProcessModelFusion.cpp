@@ -1,4 +1,4 @@
-#include "ProcessModelFusion.h"
+#include "MochaGui/ProcessModelFusion.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ProcessModelFusion::ProcessModelFusion(const int &nFilterSize, BulletCarModel *pFusionModel) :
@@ -15,9 +15,9 @@ void ProcessModelFusion::RegisterInputCommands(ControlCommand command)
 {
     if(m_bFusionCarModelInitialized == true){
         if(m_dLastCommandTime == -1){
-            m_dLastCommandTime = Tic();
+            m_dLastCommandTime = CarPlanner::Tic();
         }else{
-            double currentTime = Tic();
+            double currentTime = CarPlanner::Tic();
             if((currentTime - m_dLastCommandTime) > 0.01){
                 std::unique_lock<std::mutex> lock(m_DriveCarMutex, std::try_to_lock);
                 double dt = currentTime - m_dLastCommandTime;
@@ -35,7 +35,7 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
         VehicleState currentState;
         {
             std::unique_lock<std::mutex> lock(m_DriveCarMutex, std::try_to_lock);
-            double currentTime = Tic();
+            double currentTime = CarPlanner::Tic();
             double dt = currentTime - m_dLastCommandTime;
             m_pFusionModel->UpdateState(0,command,dt);
             m_dLastCommandTime = currentTime;
@@ -70,7 +70,7 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
 
         if(m_bFusionCarModelInitialized == false){
             m_bFusionCarModelInitialized = true;
-            m_dLastCommandTime = Tic();
+            m_dLastCommandTime = CarPlanner::Tic();
         }
     }
 }

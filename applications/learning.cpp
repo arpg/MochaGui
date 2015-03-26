@@ -1,7 +1,7 @@
 #include "config.h"
 #include <fenv.h>
-#include "GetPot"
-#include "LearningGui.h"
+#include "MochaGui/GetPot"
+#include "MochaGui/learning/LearningGui.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )

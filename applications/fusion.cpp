@@ -7,8 +7,8 @@
 #include <SceneGraph/SceneGraph.h>
 #include "CarPlanner/CarPlannerCommon.h"
 #include "SensorFusionCeres.h"
-#include "GetPot"
-#include "EventLogger.h"
+#include "MochaGui/GetPot"
+#include "MochaGui/EventLogger.h"
 
 //enable floating point exceptions
 std::vector<SceneGraph::GLAxis*> vParamAxes;
@@ -76,7 +76,7 @@ void DoFusion()
     }else{
         T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523;
     }
-    g_fusion.SetCalibrationPose(Sophus::SE3d(mvl::Cart2T(T_ic)));
+    g_fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
     Sophus::SE3d dT_ic = g_fusion.GetCalibrationPose();
 
     int imuIndex = 0, globalIndex = globalStartIndex;
@@ -150,7 +150,7 @@ void DoFusion()
                     //print the calibration if needed
                     if(m_bCalibrateActive){
                         dT_ic = g_fusion.GetCalibrationPose();
-                        std::cout << "Calibration: " << mvl::T2Cart(dT_ic.matrix()).transpose().format(CleanFmt) << std::endl;
+                        std::cout << "Calibration: " << fusion::T2Cart(dT_ic.matrix()).transpose().format(CleanFmt) << std::endl;
                     }
 
                     //add an axis for this pose
@@ -187,7 +187,7 @@ void DoFusion()
                         }
 
                         Eigen::Matrix3d R = (*currentParam).m_dPose.so3().matrix();
-                        //vParamAxes[count*2]->SetPose(mvl::Cart2T((*currentParam).m_dPose));
+                        //vParamAxes[count*2]->SetPose(Cart2T((*currentParam).m_dPose));
                         Eigen::Matrix4d global_pose = ((*currentParam).m_dPose * dT_ic ).matrix();
                         //vParamAxes[count*2]->SetPose(global_pose);
                         Eigen::Vector3d x = (*currentParam).m_dV.normalized();
@@ -196,9 +196,9 @@ void DoFusion()
                         R.block<3,1>(0,0) = x;
                         R.block<3,1>(0,1) = y;
                         R.block<3,1>(0,2) = z;
-                        Eigen::Vector6d pose = mvl::T2Cart(global_pose);
-                        pose.tail(3) = mvl::R2Cart(R);
-                        vParamAxes[count*2 + 1]->SetPose(mvl::Cart2T(pose));
+                        Eigen::Vector6d pose = fusion::T2Cart(global_pose);
+                        pose.tail(3) = fusion::R2Cart(R);
+                        vParamAxes[count*2 + 1]->SetPose(Cart2T(pose));
                         vParamAxes[count*2 + 1]->SetAxisSize((*currentParam).m_dV.norm()*0.1);
                         count++;
                         m_DrawMutex.unlock();

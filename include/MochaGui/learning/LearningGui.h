@@ -12,20 +12,20 @@
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLMesh.h>
 #include <CVars/CVar.h>
-#include <CarPlanner/CarPlannerCommon.h>
-#include <CarPlanner/BulletCarModel.h>
-#include <CarPlanner/Vicon.h>
-#include <CarPlanner/CarRegressor.h>
-#include <Node/Node.h>
-#include <SensorFusion/SensorFusionCeres.h>
+#include "CarPlanner/CarPlannerCommon.h"
+#include "CarPlanner/BulletCarModel.h"
+#include "CarPlanner/Vicon.h"
+#include "CarPlanner/CarRegressor.h"
+#include "Node/Node.h"
+#include "SensorFusion/SensorFusionCeres.h"
 
-#include "JoystickHandler.h"
-#include "PlannerGui.h"
-#include "GLBulletDebugDrawer.h"
+#include "MochaGui/learning/JoystickHandler.h"
+#include "MochaGui/learning/GLLearningPanel.h"
+#include "MochaGui/PlannerGui.h"
+#include "MochaGui/GLBulletDebugDrawer.h"
 #include "Messages.pb.h"
-#include "GLLearningPanel.h"
-#include "ProcessModelFusion.h"
-#include "EventLogger.h"
+#include "MochaGui/ProcessModelFusion.h"
+#include "MochaGui/EventLogger.h"
 
 #define LEARNING_PARAMS_FILE_NAME "learning_params.csv"
 

@@ -12,9 +12,9 @@
 #include "CarPlanner/BulletCarModel.h"
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"
-#include "GLCar.h"
-#include "GLWidgetPanel.h"
-#include "UiCommon.h"
+#include "MochaGui/GLCar.h"
+#include "MochaGui/GLWidgetPanel.h"
+#include "MochaGui/UiCommon.h"
 
 
 

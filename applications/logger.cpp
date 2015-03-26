@@ -2,18 +2,19 @@
 #include <iostream>
 #include <functional>
 #include <thread>
-#include <Node/Node.h>
-#include <CarPlanner/BulletCarModel.h>
-#include <CarPlanner/Vicon.h>
+#include <atomic>
+#include "Node/Node.h"
+#include "CarPlanner/BulletCarModel.h"
+#include "CarPlanner/Vicon.h"
 
 #include "config.h"
-#include "GetPot"
+#include "MochaGui/GetPot"
 #include "Messages.pb.h"
-#include "SE3.h"
-#include "JoystickHandler.h"
-#include "EventLogger.h"
+#include "MochaGui/learning/JoystickHandler.h"
+#include "MochaGui/EventLogger.h"
 
-double g_dStartTime = Tic();
+double g_dStartTime = CarPlanner::Tic();
+std::atomic<bool> g_StillRun(true);
 Vicon g_vicon;
 node::node g_node;
 EventLogger logger;
@@ -28,8 +29,7 @@ JoystickHandler joystick;
 
 void JoystickFunc()
 {
-    while(1){ //crh "while m_StillRun" ?
-        //boost::this_thread::interruption_point();
+    while(g_StillRun){
         joystick.UpdateJoystick();
         double joystickAccel,joystickPhi;
         joystickAccel = (((double)joystick.GetAxisValue(1)/JOYSTICK_AXIS_MAX)*-40.0);
@@ -43,7 +43,7 @@ void JoystickFunc()
         command.m_dPhi = joystickPhi;
         if(g_bLog ){
             logger.LogControlCommand(command);
-            std::cout << "Joystick commands logged at:" << Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]" << std::endl;
+            std::cout << "Joystick commands logged at:" << CarPlanner::Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]" << std::endl;
         }
 
         CommandMsg Req;
@@ -59,15 +59,14 @@ void JoystickFunc()
 
 void ImuReadFunc()
 {
-    while(1){ //crh m_StillRun ?
-        //boost::this_thread::interruption_point();
+    while(g_StillRun){
         Imu_Accel_Gyro Msg;
         if(g_node.receive("herbie/Imu",Msg)){
             double time = (double)Msg.timer()/62500.0;
             if(g_bLog ){
                 std::cout << "IMU pose received at:" << time << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << "]" << std::endl;
                 fflush(stdout);
-                logger.LogImuData(Tic(),time,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
+                logger.LogImuData(CarPlanner::Tic(),time,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
             }
         }
     }
@@ -76,17 +75,16 @@ void ImuReadFunc()
 
 void ViconReadFunc()
 {
-    while(1){ //crh m_StillRun ?
-        //boost::this_thread::interruption_point();
+    while(g_StillRun){
         //this is a blocking call
         double viconTime;
         Sophus::SE3d Twb = g_vicon.GetPose("CAR",true,&viconTime);
-        Eigen::Vector6d pose = mvl::T2Cart(Twb.matrix());
+        Eigen::Vector6d pose = CarPlanner::T2Cart(Twb.matrix());
 
         if(g_bLog ){
             std::cout << "Vicon pose received at:" << viconTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
             fflush(stdout);
-            logger.LogViconData(Tic(),viconTime,Twb);
+            logger.LogViconData(CarPlanner::Tic(),viconTime,Twb);
         }
     }
 }
@@ -123,7 +121,7 @@ int main( int argc, char** argv )
 
     g_node.init("logger");
 
-    g_node.subscribe("herbie/Imu");
+    g_node.subscribe("herbie/Imu"); //crh node api change?
     g_vicon.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
     g_vicon.Start();
 
@@ -146,7 +144,7 @@ int main( int argc, char** argv )
     std::cout << "Press enter to start logging." << std::endl;
     getchar();
 
-    g_dStartTime = Tic();
+    g_dStartTime = CarPlanner::Tic();
 
     std::string logFile = logger.OpenNewLogFile("","fusion_");
     std::cout << "Opened log file " << logFile << std::endl;
@@ -158,6 +156,7 @@ int main( int argc, char** argv )
 
     getchar();
     g_bLog = false;
+    g_StillRun = false;
 
     pImuThread->join();
 

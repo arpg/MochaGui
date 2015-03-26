@@ -2,9 +2,13 @@
 #define	_GL_CAR_
 
 
-#include "SE3.h"
-#include <CarPlanner/RigidBody.h>
+#include <assimp/cimport.h>
+#include <assimp/postprocess.h>
 
+#include "CarPlanner/RigidBody.h"
+#include "pangolin/pangolin.h"
+#include "SceneGraph/SceneGraph.h"
+#include "SE3.h"
 
 /*
 float& fScale = CVarUtils::CreateCVar("car.Scale", 0.1f, "rendering scale option");
@@ -13,10 +17,6 @@ float& fPitch = CVarUtils::CreateCVar("car.Pitch", 0.0f, "rendering scale option
 float& fYaw = CVarUtils::CreateCVar("car.Yaw", 0.0f, "rendering scale option");
 */
 
-#include "pangolin/pangolin.h"
-#include "SceneGraph/SceneGraph.h"
-#include <assimp/cimport.h>
-#include <assimp/postprocess.h>
 
 using namespace SceneGraph;
 using namespace pangolin;

@@ -6,8 +6,8 @@
 #include <thread>
 #include <functional>
 #include <vector>
-#include "Gamepad/EventDispatcher.h"
-#include "Gamepad/Gamepad.h"
+#include "../Gamepad/EventDispatcher.h"
+#include "../Gamepad/Gamepad.h"
 
 #define JOYSTICK_AXIS_MAX 1.0
 #define JOYSTICK_AXIS_MIN -1.0

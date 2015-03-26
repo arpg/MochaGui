@@ -5,7 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "GLWidgetPanel.h"
+#include "MochaGui/GLWidgetPanel.h"
 #include "Eigen/Eigen"
 
 

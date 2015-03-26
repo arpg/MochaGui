@@ -1,7 +1,7 @@
 
 #include "config.h"
-#include "GetPot"
-#include "MochaGui.h"
+#include "MochaGui/GetPot"
+#include "MochaGui/gui/MochaGui.h"
 #include <fenv.h>
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,6 @@
 #include <memory>
 #include <iomanip>
-#include "EventLogger.h"
+#include "MochaGui/EventLogger.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////
 EventLogger::EventLogger()
@@ -239,7 +239,7 @@ bool EventLogger::ReadMessage(msg_Log &msg)
 void EventLogger::WriteMessage(msg_Log &msg)
 {
     std::unique_lock<std::mutex> lock(m_WriteMutex, std::try_to_lock);
-    msg.set_timestamp(Tic());
+    msg.set_timestamp(CarPlanner::Tic());
     int byteSize = msg.ByteSize();
     m_File << byteSize ; //write the size
     char* array = new char[byteSize];

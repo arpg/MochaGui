@@ -31,10 +31,6 @@ add_definitions(-DBT_NO_PROFILE)
 # Add to module path, so we can find our cmake modules
 set( CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH} )
 
-#the boost libraries that we need
-set(BOOST_LIBS regex thread date_time system timer  )
-
-
 #this dependency is required for newer versions of the boost library. unfortunately
 #boost doesn't seem to link to it..
 
@@ -44,7 +40,6 @@ find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
 find_package( CVARS REQUIRED )
-find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
 find_package( Protobuf REQUIRED )
 find_package( Bullet REQUIRED )
 find_package( SensorFusion REQUIRED )
@@ -55,7 +50,6 @@ find_package( Node REQUIRED )
 #find_package( VRPN REQUIRED )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
-link_directories( ${Boost_LIBRARY_DIRS} )
 
 set( NV_CMAKE_DIR ${CMAKE_MODULE_PATH} )
 add_subdirectory(NvWidgets)
@@ -73,7 +67,6 @@ set( _INCLUDE_DIRS
             ${Sophus_INCLUDE_DIR}
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
-            ${BOOST_INCLUDE_DIR}
             ${CarPlanner_INCLUDE_DIRS}
             ${CVARS_INCLUDE_DIR}
             ${ZeroMQ_INCLUDE_DIRS}
@@ -81,7 +74,7 @@ set( _INCLUDE_DIRS
             ${SceneGraph_INCLUDE_DIRS}
             ${BULLET_INCLUDE_DIR}
             ${SENSORFUSION_INCLUDE_DIRS}
-            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_BINARY_DIR}
        )
 
@@ -95,7 +88,6 @@ set( LIBRARIES
                ${SceneGraph_LIBRARIES}
                ${CarPlanner_LIBRARIES}
                ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
-               ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
                ${CVARS_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
                Gamepad # this is also built with the solution
@@ -103,40 +95,50 @@ set( LIBRARIES
 
 include_directories( ${_INCLUDE_DIRS} )
 
-set( SHARED_HDRS PlannerGui.h
-                 GLBulletDebugDrawer.h
-                 UiCommon.h
-                 ProcessModelFusion.h
-                GLCar.h
-                EventLogger.h
-                #Vicon.h
-                )
+set( SHARED_HDRS
+    include/MochaGui/PlannerGui.h
+    include/MochaGui/GLBulletDebugDrawer.h
+    include/MochaGui/UiCommon.h
+    include/MochaGui/ProcessModelFusion.h
+    include/MochaGui/GLCar.h
+    include/MochaGui/EventLogger.h
+    include/MochaGui/SE3.h
+    include/MochaGui/GetPot
+    include/MochaGui/GLWidgetPanel.h
+    config.h.in
+    #Vicon.h
+   )
 
-set( SHARED_SRC PlannerGui.cpp
-                GLBulletDebugDrawer.cpp
-                ProcessModelFusion.cpp
-                JoystickHandler.cpp
-                EventLogger.cpp
-                Messages.pb.cc
-                #Vicon.cpp
-                )
-
-
-set( GUI_HDRS   config.h.in
-                GLGuiPanel.h
-                MochaGui.h
-                 )
-
-set( GUI_SRC    MochaGui.cpp
-                 )
+set( SHARED_SRC
+    src/PlannerGui.cpp
+    src/GLBulletDebugDrawer.cpp
+    src/ProcessModelFusion.cpp
+    src/JoystickHandler.cpp
+    src/EventLogger.cpp
+    #src/Messages.pb.cc
+    #Vicon.cpp
+   )
 
 
-set( LEARNING_HDRS  config.h.in
-                    JoystickHandler.h
-                    GLLearningPanel.h
-                    LearningGui.h )
+set( GUI_HDRS
+    include/MochaGui/gui/GLGuiPanel.h
+    include/MochaGui/gui/MochaGui.h
+   )
+
+set( GUI_SRC
+    src/MochaGui.cpp
+   )
+
+
+set( LEARNING_HDRS
+    include/MochaGui/learning/JoystickHandler.h
+    include/MochaGui/learning/GLLearningPanel.h
+    include/MochaGui/learning/LearningGui.h
+   )
+
 set( LEARNING_SRC
-                  LearningGui.cpp )
+     src/LearningGui.cpp
+    )
 
 
 add_executable(  logger applications/logger.cpp Messages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )

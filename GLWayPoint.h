@@ -1,10 +1,7 @@
 #ifndef _GL_WAYPOINT_
 #define	_GL_WAYPOINT_
 
-#include <SimpleGui/Gui.h>
-#include <SimpleGui/GLObject.h>
-#include <SimpleGui/GLMesh.h>
-#include "SE3.h"
+#include "CarPlanner/CarPlannerCommon.h"
 #include "WayPoint.h"
 
 
@@ -40,7 +37,7 @@ public:
     void drag()
     {
         m_pWayPoint->m_bDirty = true; // flag for update
-        Eigen::Matrix4d T = mvl::Cart2T(m_pWayPoint->m_dPose);
+        Eigen::Matrix4d T = Cart2T(m_pWayPoint->m_dPose);
         char tBuff[100] = {};
         if (m_nSelectedId == m_nBaseId) {
             Eigen::Vector3d v = Window()->GetPosUnderCursor();
@@ -57,7 +54,7 @@ public:
             R.block < 3, 1 > (0, 0) = f;
             R.block < 3, 1 > (0, 1) = r;
             R.block < 3, 1 > (0, 2) = d;
-            m_pWayPoint->m_dPose.block < 3, 1 > (3, 0) = mvl::R2Cart(R);
+            m_pWayPoint->m_dPose.block < 3, 1 > (3, 0) = R2Cart(R);
             m_pWayPoint->m_dWayPoint[0] = m_pWayPoint->m_dPose[0];
             m_pWayPoint->m_dWayPoint[1] = m_pWayPoint->m_dPose[1];
         }
@@ -106,7 +103,7 @@ public:
         glColor4ub(90, 90, 255, 200);
         glPushMatrix();
         
-        Eigen::Matrix<double, 4, 4, Eigen::ColMajor> T = mvl::Cart2T(m_pWayPoint->m_dPose);
+        Eigen::Matrix<double, 4, 4, Eigen::ColMajor> T = Cart2T(m_pWayPoint->m_dPose);
         T.block < 3, 1 > (0, 3) -= 0.05 * T.block < 3, 1 > (0, 2); // move away from the surface a bit
         glMultMatrixd(T.data());
         

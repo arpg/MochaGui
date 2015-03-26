@@ -1,4 +1,4 @@
-#include "LearningGui.h"
+#include "MochaGui/learning/LearningGui.h"
 
 LearningGui *g_pLearningGuiInstance = NULL;
 
@@ -136,7 +136,7 @@ void LearningGui::_JoystickReadFunc()
 
             Req.set_accel(command.m_dForce);
             Req.set_phi(command.m_dPhi);
-            m_Node.call_rpc("herbie/ProgramControlRpc",Req,Rep);
+            m_Node.call_rpc("ninja_commander/command",Req,Rep);
         }
 
         {
@@ -174,7 +174,7 @@ void LearningGui::_SetPoseFromFusion()
     }
 
     //update learning
-    double time = Tic();
+    double time = CarPlanner::Tic();
     if(m_dLastPoseTime == -1){
         m_dLastPoseTime = time;
     }else{
@@ -204,9 +204,9 @@ void LearningGui::_ImuReadFunc()
     double lastTime = -1;
     while(1){
         Imu_Accel_Gyro Msg;
-        if(m_Node.receive("herbie/Imu",Msg)){ // TODO we do NOT need the IMU anymore -- Juan will use that on the ninja car.
+        if(m_Node.receive("nc_node/status",Msg)){ // crh node call
             //double time = (double)Msg.timer()/62500.0;
-            double sysTime = Tic();
+            double sysTime = CarPlanner::Tic();
             m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
                                      Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
 
@@ -237,7 +237,7 @@ void LearningGui::_ViconReadFunc()
         nViconSkip++;
 
         //offset the vicon measurements
-        double sysTime = Tic();
+        double sysTime = CarPlanner::Tic();
 
         ControlCommand command;
         {
@@ -410,10 +410,10 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
         m_Fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
         Eigen::Vector6d T_ic;
         T_ic << 0.02095005375,  0.07656248358, -0.02323858462,   0.0433091783,  0.02323399838,    1.574031975;
-        m_Fusion.SetCalibrationPose(Sophus::SE3d(mvl::Cart2T(T_ic)));
+        m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
         m_Fusion.SetCalibrationActive(false);
 
-        m_Node.subscribe("herbie/Imu");
+        m_Node.subscribe("ninja_commander/IMU");
         //dT_vicon_ref.block<3,3>(0,0).transposeInPlace();
         m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
         m_Vicon.Start();
@@ -436,7 +436,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
 
     //set default vehicle state
     VehicleState state;
-    state.m_dTwv = Sophus::SE3d(mvl::Cart2T(-5,0,-0.05,0,0,0));
+    state.m_dTwv = Sophus::SE3d(Cart2T(-5,0,-0.05,0,0,0));
     m_DriveCarModel.SetState(0,state);
 
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(&LearningGui::_CommandHandler, this, eMochaRestart) );
@@ -514,7 +514,7 @@ void LearningGui::_PopulateSceneGraph()
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_PhysicsFunc()
 {
-    double dCurrentTime = Tic();
+    double dCurrentTime = CarPlanner::Tic();
     double dT;
     int playBackSegment = 0, playBackSample = 0;
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
@@ -533,11 +533,11 @@ void LearningGui::_PhysicsFunc()
             //show the playback vehicle
             int dataIndex = m_vSampleIndices[playBackSegment] + playBackSample;
             //wait for the dT
-            while((Toc(dCurrentTime)) < m_PlaybackSample.m_vCommands[dataIndex].m_dT) {
+            while((CarPlanner::Toc(dCurrentTime)) < m_PlaybackSample.m_vCommands[dataIndex].m_dT) {
                 usleep(100);
             }
 
-            dCurrentTime = Tic();
+            dCurrentTime = CarPlanner::Tic();
 
             //now set the position of the two cars
             m_Gui.SetCarState(m_nDriveCarId,m_PlaybackSample.m_vStates[dataIndex]);
@@ -551,13 +551,13 @@ void LearningGui::_PhysicsFunc()
                 // boost::this_thread::interruption_point(); //crh commented
                 //update the drive car position based on the car model
                 ControlCommand currentCommand;
-                while((Toc(dCurrentTime)) < m_dT) {
+                while((CarPlanner::Toc(dCurrentTime)) < m_dT) {
                     usleep(100);
                 }
 
-                dT = Toc(dCurrentTime);
+                dT = CarPlanner::Toc(dCurrentTime);
                 //std::cout << "dt = " << dT << std::endl;
-                dCurrentTime = Tic();
+                dCurrentTime = CarPlanner::Tic();
 
                 {
                     std::unique_lock<std::mutex> lock(m_JoystickMutex, std::try_to_lock);
@@ -591,7 +591,7 @@ void LearningGui::_PhysicsFunc()
 void LearningGui::_UpdateLearning(ControlCommand command, VehicleState& state)
 {
     if(m_bMapSteering == true){
-        Eigen::Vector6d vec = mvl::T2Cart(state.m_dTwv.matrix());
+        Eigen::Vector6d vec = T2Cart(state.m_dTwv.matrix());
         if(m_vSteeringPairs.size() == 0){
             m_dLastSteeringPose = vec;
             m_dLastCurv = 0;
@@ -756,7 +756,7 @@ void LearningGui::_CommandHandler(const MochaCommands& command)
     VehicleState state;
     switch(command){
         case eMochaRestart:
-            state.m_dTwv = Sophus::SE3d(mvl::Cart2T(0,-1.5,-0.01,0,0,0));
+            state.m_dTwv = Sophus::SE3d(Cart2T(0,-1.5,-0.01,0,0,0));
             m_DriveCarModel.SetState(0,state);
             break;
 

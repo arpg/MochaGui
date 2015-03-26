@@ -12,25 +12,23 @@
 #include <dirent.h>
 #include <atomic>
 #include <thread>
+#include <assimp/DefaultLogger.hpp>
 
-#include <CarPlanner/CarController.h>
-#include <CarPlanner/LocalPlanner.h>
-#include <CarPlanner/CarRegressor.h>
-#include <CarPlanner/Vicon.h>
-#include <CarPlanner/CVarHelpers.h>
-#include <Node/Node.h>
-
-#include "GLCar.h"
-#include "PlannerGui.h"
-#include "GLBulletDebugDrawer.h"
-
+#include "SensorFusion/SensorFusionCeres.h"
+#include "CarPlanner/CarController.h"
+#include "CarPlanner/LocalPlanner.h"
+#include "CarPlanner/CarRegressor.h"
+#include "CarPlanner/Vicon.h"
+#include "CarPlanner/CVarHelpers.h"
+#include "Node/Node.h"
 
 #include "Messages.pb.h"
-#include "SensorFusion/SensorFusionCeres.h"
-#include "GLGuiPanel.h"
-#include "assimp/DefaultLogger.hpp"
-#include "EventLogger.h"
-#include "ProcessModelFusion.h"
+#include "MochaGui/GLCar.h"
+#include "MochaGui/PlannerGui.h"
+#include "MochaGui/GLBulletDebugDrawer.h"
+#include "MochaGui/gui/GLGuiPanel.h"
+#include "MochaGui/EventLogger.h"
+#include "MochaGui/ProcessModelFusion.h"
 
 using namespace CVarUtils;
 using namespace std;
