@@ -65,9 +65,9 @@ int main()
 
     joystick.InitializeJoystick();
 
-    g_CommandRpcNode.init( "ninja_commander" );
+    g_CommandRpcNode.init( "ninja_commander" ); //crh node api
 
-    g_CommandRpcNode.provide_rpc( "ProgramControlRpc", &ProgramControlRpc, NULL );
+    g_CommandRpcNode.provide_rpc( "ProgramControlRpc", &ProgramControlRpc, NULL );  //crh node api
 
     CommandMsg Req;
     CommandReply Rep;
@@ -106,14 +106,14 @@ int main()
                     m_gLastAccel = joystickAccel;
                     Req.set_accel(g_bError ? DEFAULT_ACCEL_OFFSET : joystickAccel);
                     Req.set_phi(g_bError ? DEFAULT_STEERING_OFFSET : joystickPhi);
-                    g_CommandRpcNode.call_rpc("herbie","ControlRpc",Req,Rep,100);
+                    g_CommandRpcNode.call_rpc("ninja_commander","ControlRpc",Req,Rep,100); //crh node api
                     printf("Please come fix me: Line 109 control-daemon.cpp\n");
                     g_nRpcControlCount++;
                 //}
             }else{
                 Req.set_accel(g_bError ? DEFAULT_ACCEL_OFFSET : (double)m_gLastAccel);
                 Req.set_phi(g_bError ? DEFAULT_STEERING_OFFSET : (double)m_gLastPhi);
-                g_CommandRpcNode.call_rpc("herbie","ControlRpc",Req,Rep,100);
+                g_CommandRpcNode.call_rpc("ninja_commander","ControlRpc",Req,Rep,100); //crh node api
                 printf("Please come fix me: Line 116 control-daemon.cpp\n");
                 g_nRpcControlCount++;
             }

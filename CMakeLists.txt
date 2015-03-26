@@ -31,6 +31,8 @@ add_definitions(-DBT_NO_PROFILE)
 # Add to module path, so we can find our cmake modules
 set( CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH} )
 
+message( "LUT not currently supported; source: src/lut.cpp." )
+
 #this dependency is required for newer versions of the boost library. unfortunately
 #boost doesn't seem to link to it..
 
@@ -115,7 +117,7 @@ set( SHARED_SRC
     src/ProcessModelFusion.cpp
     src/JoystickHandler.cpp
     src/EventLogger.cpp
-    #src/Messages.pb.cc
+    Messages.pb.cc
     #Vicon.cpp
    )
 

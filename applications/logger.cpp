@@ -51,7 +51,7 @@ void JoystickFunc()
 
         Req.set_accel(command.m_dForce);
         Req.set_phi(command.m_dPhi);
-        g_node.call_rpc("herbie","ProgramControlRpc",Req,Rep); //crh call_rpc node
+        g_node.call_rpc("nc_node","ProgramControlRpc",Req,Rep); //crh node api
 
         usleep(2000);
     }
@@ -61,7 +61,7 @@ void ImuReadFunc()
 {
     while(g_StillRun){
         Imu_Accel_Gyro Msg;
-        if(g_node.receive("herbie/Imu",Msg)){
+        if(g_node.receive("nc_node/state",Msg)){ //crh node api
             double time = (double)Msg.timer()/62500.0;
             if(g_bLog ){
                 std::cout << "IMU pose received at:" << time << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << "]" << std::endl;
@@ -121,8 +121,8 @@ int main( int argc, char** argv )
 
     g_node.init("logger");
 
-    g_node.subscribe("herbie/Imu"); //crh node api change?
-    g_vicon.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
+    g_node.subscribe("nc_node/state"); //crh node api
+    g_vicon.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true); //crh vicon
     g_vicon.Start();
 
     std::thread* pImuThread = new std::thread(std::bind(ImuReadFunc));

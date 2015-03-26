@@ -74,7 +74,7 @@ void DoFusion()
     if(m_bCalibrateActive){
         T_ic.setZero();
     }else{
-        T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523;
+        T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523; //crh situational
     }
     g_fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
     Sophus::SE3d dT_ic = g_fusion.GetCalibrationPose();
@@ -248,7 +248,7 @@ int main( int argc, char** argv )
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
     GetPot cl( argc, argv );
-    std::string sLog = cl.follow("20130226_142837",1,"-log");
+    std::string sLog = cl.follow("20130226_142837",1,"-log"); //crh filename
     m_nFilterSize = cl.follow(50,1,"-length");
     m_bCalibrateActive = (bool)cl.follow(0,1,"-calib");
 
@@ -263,7 +263,7 @@ int main( int argc, char** argv )
     //imuData = LoadCsv("Matlab/imu_data.csv");
     //imuData = LoadCsv("/Users/nimski/Code/Build/MochaGui/logs_imu_20121211_205530.txt");
     char imuLog[500];
-    sprintf(imuLog,"/Users/nimski/Code/Build/MochaGui/logs/%s",sLog.c_str());
+    sprintf(imuLog,"/Users/crh/MochaGui-logs/%s",sLog.c_str()); //crh filename
     m_Logger.ReadLogFile(imuLog);
 
 

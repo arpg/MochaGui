@@ -14,12 +14,12 @@
 #include <thread>
 #include <assimp/DefaultLogger.hpp>
 
-#include "SensorFusion/SensorFusionCeres.h"
 #include "CarPlanner/CarController.h"
 #include "CarPlanner/LocalPlanner.h"
 #include "CarPlanner/CarRegressor.h"
 #include "CarPlanner/Vicon.h"
 #include "CarPlanner/CVarHelpers.h"
+#include "SensorFusion/SensorFusionCeres.h"
 #include "Node/Node.h"
 
 #include "Messages.pb.h"

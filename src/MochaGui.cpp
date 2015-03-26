@@ -244,7 +244,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   m_sPlaybackLogFile = sLogFile;
 
   dout ("Initializing MochaGui");
-  m_Node.subscribe("ninja_commander/IMU"); //crh IMU or command?
+  m_Node.subscribe("nc_node/state"); //crh node api
 
   m_dStartTime = CarPlanner::Tic();
   m_bAllClean = false;
@@ -292,7 +292,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
                                                      0,-1,0,0,
                                                      0,0,-1,0,
                                                      0,0,0,1);
-  }
+  } //crh situational vicon
 
   if(sMode == "Simulation"){
     m_eControlTarget = eTargetSimulation;
@@ -393,7 +393,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   m_Gui.Init(&m_TerrainMesh);
 
   m_pGraphView = &pangolin::Plotter(&m_Log)
-      .SetBounds(0.0, 0.3, 0.6, 1.0);
+      .SetBounds(0.0, 0.3, 0.6, 1.0); //crh situational
   pangolin::DisplayBase().AddDisplay(*m_pGraphView);
 
   m_nDriveCarId = m_Gui.AddCar(m_mDefaultParameters[CarParameters::WheelBase],m_mDefaultParameters[CarParameters::Width]);
@@ -430,7 +430,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   }
 
   m_sCarObjectName = "CAR";
-  m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse());
+  m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse()); //crh situational vicon
 
   //initialize the panel
   m_GuiPanel.Init();
@@ -477,7 +477,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
 
   m_Fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
   Eigen::Vector6d T_ic;
-  T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523; //crh fudge factor?
+  T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523; //crh situational
   m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
   m_Fusion.SetCalibrationActive(false);
 }
@@ -494,12 +494,12 @@ void MochaGui::_StartThreads()
   }
   if(m_eControlTarget == eTargetSimulation){
     if(m_pImuThread != NULL){
-      // m_pImuThread->interrupt(); //don't know what eTargetSim does yet -crh
+      // m_pImuThread->interrupt(); //crh don't know what eTargetSim does yet
       m_pImuThread->join();
     }
 
     if(m_pViconThread) {
-      // m_pViconThread->interrupt(); //same as above -crh
+      // m_pViconThread->interrupt(); //crh same as above
       m_pViconThread->join();
     }
   }else{
@@ -924,7 +924,7 @@ void MochaGui::_ImuReadFunc()
   while(1){
     Imu_Accel_Gyro Msg;
     //this needs to be a blocking call .. not sure it is!!!
-    if(m_Node.receive("herbie/Imu",Msg)){ //crh TODO
+    if(m_Node.receive("nc_node/state",Msg)){ //crh node api
       double dImuTime = (double)Msg.timer()/62500.0;
       double sysTime = CarPlanner::Tic();
       m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
@@ -996,7 +996,7 @@ void MochaGui::_ControlCommandFunc()
       Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
       Req.set_phi(m_ControlCommand.m_dPhi);
       double time = CarPlanner::Tic();
-      m_Node.call_rpc( "ninja_commander/command",Req,Rep,100 ); //crh TODO
+      m_Node.call_rpc( "ninja_commander/command",Req,Rep,100 ); //crh node api
       m_dControlDelay = CarPlanner::Toc(time);
     }
 
@@ -1063,7 +1063,7 @@ void MochaGui::_ControlFunc()
       VehicleState startingState = m_vSegmentSamples[g_nStartSegmentIndex].m_vStates[0];
       startingState.m_dV = Eigen::Vector3d::Zero();
       startingState.m_dW = Eigen::Vector3d::Zero();
-      startingState.m_dTwv.translation() += GetBasisVector(startingState.m_dTwv,1)*0.25;
+      startingState.m_dTwv.translation() += GetBasisVector(startingState.m_dTwv,1)*0.25; //crh situational
       m_DriveCarModel.SetState(0,startingState);
       m_DriveCarModel.ResetCommandHistory(0);
 
@@ -1251,7 +1251,7 @@ void MochaGui::_PhysicsFunc()
       if(m_bControl3dPath) {
         if(m_bControllerRunning){
 
-          while((CarPlanner::Toc(dCurrentTic)) < 0.002) {
+          while((CarPlanner::Toc(dCurrentTic)) < 0.002) { //crh situational
             usleep(100);
           }
           currentDt = CarPlanner::Toc(dCurrentTic);
