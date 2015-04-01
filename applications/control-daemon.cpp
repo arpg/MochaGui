@@ -106,15 +106,13 @@ int main()
                     m_gLastAccel = joystickAccel;
                     Req.set_accel(g_bError ? DEFAULT_ACCEL_OFFSET : joystickAccel);
                     Req.set_phi(g_bError ? DEFAULT_STEERING_OFFSET : joystickPhi);
-                    g_CommandRpcNode.call_rpc("ninja_commander","ControlRpc",Req,Rep,100); //crh node api
-                    printf("Please come fix me: Line 109 control-daemon.cpp\n");
+                    g_CommandRpcNode.call_rpc("ninja_car","ControlRpc",Req,Rep,100); //crh node api
                     g_nRpcControlCount++;
                 //}
             }else{
                 Req.set_accel(g_bError ? DEFAULT_ACCEL_OFFSET : (double)m_gLastAccel);
                 Req.set_phi(g_bError ? DEFAULT_STEERING_OFFSET : (double)m_gLastPhi);
-                g_CommandRpcNode.call_rpc("ninja_commander","ControlRpc",Req,Rep,100); //crh node api
-                printf("Please come fix me: Line 116 control-daemon.cpp\n");
+                g_CommandRpcNode.call_rpc("ninja_car","ControlRpc",Req,Rep,100); //crh node api
                 g_nRpcControlCount++;
             }
         }catch(...){

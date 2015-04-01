@@ -49,7 +49,7 @@ public:
 
     struct Car : std::mutex
     {
-        SceneGraph::GLLineStrip m_CarLineSegments;
+        SceneGraph::GLCachedPrimitives m_CarLineSegments;
         GLCar m_GLCar;
         GLAxis m_Axis;
     };
@@ -99,7 +99,7 @@ public:
     /// Deletes all waypoints
     void ClearWaypoints();
     /// Clears the car trajectory
-    void ClearCarTrajectory(const int& id) { m_vCars[id]->m_CarLineSegments.ClearLines(); }
+    void ClearCarTrajectory(const int& id) { m_vCars[id]->m_CarLineSegments.Clear(); }
     /// Sets the dirty flag on all waypoints to true
     void SetWaypointDirtyFlag(bool bFlag);
 

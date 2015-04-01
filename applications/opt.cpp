@@ -1,5 +1,7 @@
 #include <thread>
+#include <iomanip>
 #include <fenv.h>
+#include <boost/format.hpp>
 #include "CarPlanner/LocalPlanner.h"
 #include "CarPlanner/CarController.h"
 
@@ -26,7 +28,7 @@ class GlOptPanel : public GLWidgetPanel {
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                     m_Ui.doLabel(m_Rect,"Norm:");
-                    //m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:Norm")).str().c_str() ,0,0.1,0.8,0.8); //crh
+                    m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:Norm")).str().c_str() ,0,0.1,0.8,0.8);
                 m_Ui.endGroup();
 
                 // Planner parameters panel
@@ -45,7 +47,7 @@ class GlOptPanel : public GLWidgetPanel {
                     m_Ui.endGroup();
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                     m_Ui.doLabel(m_Rect,"Actual Lookahead:");
-                    //m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:ActualLookahead")).str().c_str() ,0,0.1,0.8,0.8); //crh
+                    m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:ActualLookahead")).str().c_str() ,0,0.1,0.8,0.8);
                     m_Ui.endGroup();
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect, "StartCurvature T:");
@@ -83,7 +85,9 @@ int main( int argc, char** argv )
 
     GetPot cl( argc, argv );
 
-    std::string sMesh = cl.follow("jump.blend",1,"-mesh");
+    std::string sMesh = cl.follow("CU_luma.ply",1,"-mesh");
+
+    //std::string sMesh = cl.follow("jump.blend",1,"-mesh");
     bool bVicon = cl.search("-vicon");
 
     GLMesh terrainMesh;
@@ -93,7 +97,7 @@ int main( int argc, char** argv )
     PlannerGui gui;
     GlOptPanel panel;
     BulletCarModel carModel;
-    GLLineStrip trajectoryStrip,trajectoryBezierStrip,controlStrip,controlBezierStrip;
+    GLCachedPrimitives trajectoryStrip,trajectoryBezierStrip,controlStrip,controlBezierStrip;
     trajectoryStrip.SetColor(GLColor(0.5f,0.0f,0.0f));
     trajectoryBezierStrip.SetColor(GLColor(0.8f,0.8f,0.8f));
     controlStrip.SetColor(GLColor(0.0f,0.5f,0.0f));
@@ -210,10 +214,10 @@ int main( int argc, char** argv )
                         for(const VehicleState& state : pSample->m_vStates) {
                             vPts.push_back(state.m_dTwv.translation());
                         }
-                        trajectoryStrip.SetPointsFromTrajectory(vPts);
+                        trajectoryStrip.AddVerticesFromTrajectory(vPts);
 
                         planner.SamplePath(problem,vPts);
-                        trajectoryBezierStrip.SetPointsFromTrajectory(vPts);
+                        trajectoryBezierStrip.AddVerticesFromTrajectory(vPts);
 
                         nNumIterations++;
                         vSegmentSamples[0] = *pSample;
@@ -280,10 +284,10 @@ int main( int argc, char** argv )
                         for(const VehicleState& state : pSample->m_vStates) {
                             vPts.push_back(state.m_dTwv.translation());
                         }
-                        controlStrip.SetPointsFromTrajectory(vPts);
+                        controlStrip.AddVerticesFromTrajectory(vPts);
 
                         planner.SamplePath(problem,vPts);
-                        controlBezierStrip.SetPointsFromTrajectory(vPts);
+                        controlBezierStrip.AddVerticesFromTrajectory(vPts);
 
                         nNumIterations++;
 
@@ -304,7 +308,7 @@ int main( int argc, char** argv )
     while( !pangolin::ShouldQuit() )
     {
         {
-            //boost::mutex::scoped_lock lock(m_DrawMutex);
+            //std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh old boost code was commented
             gui.Render();
         }
     }

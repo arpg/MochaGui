@@ -129,7 +129,7 @@ private:
 
     std::vector<RegressionParameter> m_vDriveLearningParams;
     std::vector<RegressionParameter> m_vLearningParams;
-    std::list<GLLineStrip> m_lGLLineSegments;
+    std::list<GLCachedPrimitives> m_lGLLineSegments;
     std::vector<MotionSample> m_vSamples;
     std::vector<int> m_vSampleIndices;
     std::vector<RegressionParameter> m_vTweakParams;

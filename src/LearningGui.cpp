@@ -82,16 +82,16 @@ void LearningGui::Run()
 void LearningGui::_UpdateTrajectories()
 {
     //clear all line segmenst
-    for (GLLineStrip& strip: m_lGLLineSegments) {
-        strip.ClearLines();
+    for (GLCachedPrimitives& strip: m_lGLLineSegments) {
+        strip.Clear();
     }
 
-    std::list<GLLineStrip>::iterator iter = m_lGLLineSegments.begin();
+    std::list<GLCachedPrimitives>::iterator iter = m_lGLLineSegments.begin();
     //now update the GLLines to sohw the trajectory
     for(size_t ii = 0 ; ii < m_vSamples.size(); ii++ ){
         if(m_lGLLineSegments.size() <= ii){
             std::unique_lock<std::mutex> renderMutex(m_RenderkMutex, std::try_to_lock);
-            m_lGLLineSegments.push_back(GLLineStrip());
+            m_lGLLineSegments.push_back(GLCachedPrimitives());
             m_lGLLineSegments.back().SetColor(GLColor(1.0f,0.0f,0.0f,1.0f));
             m_Gui.AddGLObject(&m_lGLLineSegments.back());
             iter = m_lGLLineSegments.end();
@@ -103,7 +103,7 @@ void LearningGui::_UpdateTrajectories()
         for(const VehicleState& state : m_vSamples[ii].m_vStates){
             vPts.push_back(state.m_dTwv.translation());
         }
-        (*iter).SetPointsFromTrajectory(vPts);
+        (*iter).AddVerticesFromTrajectory(vPts);
         iter++;
     }
 }
@@ -338,7 +338,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
     //initialize the scene
     //const aiScene *pScene = aiImportFile( "jump.blend", aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
     const aiScene *pScene = aiImportFile( sMeshName.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-    if(bViconTransform){
+    if(bViconTransform){ //crh vicon
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                          0,-1,0,0,
                                                          0,0,-1,0,
@@ -409,13 +409,13 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
 
         m_Fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
         Eigen::Vector6d T_ic;
-        T_ic << 0.02095005375,  0.07656248358, -0.02323858462,   0.0433091783,  0.02323399838,    1.574031975;
+        T_ic << 0.02095005375,  0.07656248358, -0.02323858462,   0.0433091783,  0.02323399838,    1.574031975; //crh situational
         m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
         m_Fusion.SetCalibrationActive(false);
 
         m_Node.subscribe("ninja_commander/IMU");
         //dT_vicon_ref.block<3,3>(0,0).transposeInPlace();
-        m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
+        m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true); //crh vicon
         m_Vicon.Start();
 
         m_pImuThread = new std::thread(std::bind(&LearningGui::_ImuReadFunc,this));
@@ -606,7 +606,7 @@ void LearningGui::_UpdateLearning(ControlCommand command, VehicleState& state)
                 logFile.open("steeringmap.csv", std::ios::out | std::ios::in | std::ios::trunc);
                 for(size_t ii = 0 ; ii < m_vSteeringPairs.size() ; ii++){
                     std::pair<double,double> pair = m_vSteeringPairs[ii];
-                    logFile << std::setprecision(15) << pair.first << "," << pair.second << std::endl;
+                    logFile << pair.first << "," << pair.second << std::endl; //crh "<< std::setprecision(15) <<" removed after logFile
                 }
                 logFile.close();
                 m_vSteeringPairs.clear();
@@ -678,7 +678,7 @@ void LearningGui::_LearningCaptureFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_LearningFunc(MotionSample* pRegressionPlan)
 {
-    SetThreadName("Regression thread");
+    //SetThreadName("Regression thread");
     m_bLearningRunning = true;
 
     //Update from the tweaked values to the learning params
@@ -766,8 +766,8 @@ void LearningGui::_CommandHandler(const MochaCommands& command)
 
         case eMochaClear:
             m_Gui.ClearCarTrajectory(m_nDriveCarId);
-            for (GLLineStrip& lineStrip : m_lGLLineSegments) {
-                lineStrip.ClearLines();
+            for (GLCachedPrimitives& lineStrip : m_lGLLineSegments) {
+                lineStrip.Clear();
             }
             break;
 

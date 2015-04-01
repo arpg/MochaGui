@@ -9,10 +9,11 @@
 #include "SensorFusionCeres.h"
 #include "MochaGui/GetPot"
 #include "MochaGui/EventLogger.h"
+#include "MochaGui/SE3.h"
 
 //enable floating point exceptions
 std::vector<SceneGraph::GLAxis*> vParamAxes;
-std::vector<SceneGraph::GLLineStrip*> vImuStrips;
+std::vector<SceneGraph::GLCachedPrimitives*> vImuStrips;
 std::mutex m_DrawMutex;
 // Scenegraph to hold GLObjects and relative transformations
 SceneGraph::GLSceneGraph glGraph;
@@ -36,7 +37,7 @@ static int& g_nGlobalSkip = CVarUtils::CreateGetCVar("debug.GlobalSkip",0);
 #define WINDOW_HEIGHT 768
 
 
-using namespace fusion;
+//using namespace fusion;
 
 enum FusionCommands
 {
@@ -150,16 +151,16 @@ void DoFusion()
                     //print the calibration if needed
                     if(m_bCalibrateActive){
                         dT_ic = g_fusion.GetCalibrationPose();
-                        std::cout << "Calibration: " << fusion::T2Cart(dT_ic.matrix()).transpose().format(CleanFmt) << std::endl;
+                        std::cout << "Calibration: " << T2Cart(dT_ic.matrix()).transpose().format(CleanFmt) << std::endl;
                     }
 
                     //add an axis for this pose
-                    std::list<PoseParameter>::iterator currentParam;
+                    std::list<fusion::PoseParameter>::iterator currentParam;
                     int count = 0;
                     for( currentParam = g_fusion.m_lParams.begin() ; currentParam != g_fusion.m_lParams.end() ; currentParam++ )
                     {
                         m_DrawMutex.lock();
-                        std::list<PoseParameter>::iterator nextParam = currentParam;
+                        std::list<fusion::PoseParameter>::iterator nextParam = currentParam;
                         std::vector<Sophus::SE3d> posesOut;
                         nextParam++;
                         if(nextParam != g_fusion.m_lParams.end()){
@@ -167,7 +168,7 @@ void DoFusion()
 
 
                             if((int)vImuStrips.size() == count){
-                                vImuStrips.push_back(new SceneGraph::GLLineStrip());
+                                vImuStrips.push_back(new SceneGraph::GLCachedPrimitives());
                                 glGraph.AddChild(vImuStrips.back());
                             }
                             //finish this
@@ -176,7 +177,7 @@ void DoFusion()
                             for(size_t ii = 0 ; ii < posesOut.size() ;ii++){
                                 v3dPoses[ii] = (posesOut[ii] * dT_ic).translation();
                             }
-                            vImuStrips[count]->SetPointsFromTrajectory(v3dPoses);
+                            vImuStrips[count]->AddVerticesFromTrajectory(v3dPoses);
                         }
 
                         if((int)vParamAxes.size() == count*2){
@@ -196,8 +197,8 @@ void DoFusion()
                         R.block<3,1>(0,0) = x;
                         R.block<3,1>(0,1) = y;
                         R.block<3,1>(0,2) = z;
-                        Eigen::Vector6d pose = fusion::T2Cart(global_pose);
-                        pose.tail(3) = fusion::R2Cart(R);
+                        Eigen::Vector6d pose = T2Cart(global_pose);
+                        pose.tail(3) = R2Cart(R);
                         vParamAxes[count*2 + 1]->SetPose(Cart2T(pose));
                         vParamAxes[count*2 + 1]->SetAxisSize((*currentParam).m_dV.norm()*0.1);
                         count++;
@@ -306,7 +307,7 @@ int main( int argc, char** argv )
 
     glGraph.AddChild(&glpos);
 
-    SceneGraph::GLLineStrip gllinestrip;
+    SceneGraph::GLCachedPrimitives gllinestrip;
     glGraph.AddChild(&gllinestrip);
 
     glClearColor(0,0,0,0);

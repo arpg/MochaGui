@@ -251,7 +251,7 @@ void PlannerGui::SetCarState(const int &id, const VehicleState &state, bool bAdd
 
     //add this pose to the trajectory of the car if required
     if(bAddToTrajectory){
-        pCar->m_CarLineSegments.SetPoint(state.m_dTwv.translation());
+        pCar->m_CarLineSegments.AddVertex(state.m_dTwv.translation());
     }
 }
 

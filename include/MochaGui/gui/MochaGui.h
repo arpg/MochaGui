@@ -125,11 +125,11 @@ protected:
     std::vector<Eigen::MatrixXd*> m_vWayPoints;
     //vector<GLWayPoint*> m_vGLWayPoints;
     const GLWayPoint*m_pCurrentlySolving[2];
-    vector<GLLineStrip> m_vGLLineSegments;
-    vector<GLLineStrip> m_vTerrainLineSegments;
-    list<GLLineStrip*> m_lPlanLineSegments;
+    std::vector<GLCachedPrimitives> m_vGLLineSegments;
+    std::vector<GLCachedPrimitives> m_vTerrainLineSegments;
+    list<GLCachedPrimitives*> m_lPlanLineSegments;
     list<std::vector<VehicleState> *> m_lPlanStates;
-    GLLineStrip m_ControlLine;
+    GLCachedPrimitives m_ControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
 
     LocalPlanner m_Planner; // Car planner for trajectory plotting
@@ -140,7 +140,7 @@ protected:
     BulletCarModel m_ControlCarModel;
 
     //CVars
-    vector<int>& m_Path;
+    std::vector<int>& m_Path;
 #define WAYPOINT_VEL_INDEX 6
 #define WAYPOINT_AIR_INDEX 7
 
