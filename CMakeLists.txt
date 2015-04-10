@@ -93,6 +93,7 @@ set( LIBRARIES
                ${CVARS_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
                Gamepad # this is also built with the solution
+               assimp
         )
 
 include_directories( ${_INCLUDE_DIRS} )
