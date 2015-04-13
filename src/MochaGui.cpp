@@ -57,7 +57,8 @@ MochaGui::MochaGui() :
   m_Fusion(30,&m_DriveCarModel),
   m_dPlanTime(CarPlanner::Tic())//the size of the fusion sensor
 {
-  m_Node.init("MochaGui");
+  std::cout << "done!" << std::endl;
+  //m_Node.init("MochaGui");
 }
 
 ////////////////////////////////////////////////////////////////
@@ -247,7 +248,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   m_sPlaybackLogFile = sLogFile;
 
   dout ("Initializing MochaGui");
-  m_Node.subscribe("nc_node/state"); //crh node api
+//  m_Node.subscribe("nc_node/state"); //crh node api
 
   m_dStartTime = CarPlanner::Tic();
   m_bAllClean = false;

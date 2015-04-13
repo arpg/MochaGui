@@ -85,9 +85,10 @@ int main( int argc, char** argv )
 
     GetPot cl( argc, argv );
 
-    std::string sMesh = cl.follow("CU_luma.ply",1,"-mesh");
+    //std::string sMesh = cl.follow("CU_luma.ply",1,"-mesh");
 
     //std::string sMesh = cl.follow("jump.blend",1,"-mesh");
+    std::string sMesh = cl.follow("labLoop.ply",1,"-mesh");
     bool bVicon = cl.search("-vicon");
 
     GLMesh terrainMesh;
@@ -139,14 +140,13 @@ int main( int argc, char** argv )
 
     CarParameterMap params;
     //load te parameters
-    CarParameters::LoadFromFile("gui_params.csv",params);
+    CarParameters::LoadFromFile("../gui_params.csv",params);
     carModel.Init((const struct aiScene *)terrainMesh.GetScene(),params,LocalPlanner::GetNumWorldsRequired(OPT_DIM));
-
 
     gui.AddGLObject(&trajectoryStrip);
     gui.AddGLObject(&trajectoryBezierStrip);
     gui.AddGLObject(&controlStrip);
-    gui.AddGLObject(&controlBezierStrip);
+//    gui.AddGLObject(&controlBezierStrip);
     gui.AddGLObject(&endPosAxis);
 
     //holds all reference segments
@@ -161,148 +161,148 @@ int main( int argc, char** argv )
 
     //this lambda expression captures all local variables by REFERENCE, therefore
     //it cannot go out of local scope (which it won't as we are in main)
-    std::thread* pWorkThread = new std::thread([&] {
-    bool bComputeNewPath = false;
-    while(1){
-        usleep(1000);
-        if(CanContinue(bPaused,bStep) == true){
-            //first, solve the waypoints if we need to
-            if(pWaypoint0->GetDirty() || pWaypoint1->GetDirty()){
-                bComputeNewPath = true;
-                ApplyVelocitesFunctor5d functor(&carModel,Eigen::Vector3d::Zero());
+//    std::thread* pWorkThread = new std::thread([&] {
+//    bool bComputeNewPath = false;
+//    while(1){
+//        usleep(1000);
+//        if(CanContinue(bPaused,bStep) == true){
+//            //first, solve the waypoints if we need to
+//            if(pWaypoint0->GetDirty() || pWaypoint1->GetDirty()){
+//                bComputeNewPath = true;
+//                ApplyVelocitesFunctor5d functor(&carModel,Eigen::Vector3d::Zero());
 
-                //if the waypoints have been moved, raycast them to improve ground contact
-                Eigen::Vector3d dIntersect;
-                Sophus::SE3d pose(pWaypoint0->GetPose4x4_po());
-                if(carModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
-                    pose.translation() = dIntersect;
-                    pWaypoint0->SetPose(pose.matrix());
-                }
+//                //if the waypoints have been moved, raycast them to improve ground contact
+//                Eigen::Vector3d dIntersect;
+//                Sophus::SE3d pose(pWaypoint0->GetPose4x4_po());
+//                if(carModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
+//                    pose.translation() = dIntersect;
+//                    pWaypoint0->SetPose(pose.matrix());
+//                }
 
-                pose = Sophus::SE3d(pWaypoint1->GetPose4x4_po());
-                if(carModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
-                    pose.translation() = dIntersect;
-                    pWaypoint1->SetPose(pose.matrix());
-                }
+//                pose = Sophus::SE3d(pWaypoint1->GetPose4x4_po());
+//                if(carModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
+//                    pose.translation() = dIntersect;
+//                    pWaypoint1->SetPose(pose.matrix());
+//                }
 
-                VehicleState startState(Sophus::SE3d(pWaypoint0->GetPose4x4_po()),pWaypoint0->GetVelocity(),0);
-                VehicleState goalState(Sophus::SE3d(pWaypoint1->GetPose4x4_po()),pWaypoint1->GetVelocity(),0);
-                //now re-solve the path between these two
-                LocalProblem problem(&functor,startState,goalState,g_dT);
-                planner.InitializeLocalProblem(problem,0,NULL,eCostPoint);
-                problem.m_bInertialControlActive = g_bInertialControlActive;
+//                VehicleState startState(Sophus::SE3d(pWaypoint0->GetPose4x4_po()),pWaypoint0->GetVelocity(),0);
+//                VehicleState goalState(Sophus::SE3d(pWaypoint1->GetPose4x4_po()),pWaypoint1->GetVelocity(),0);
+//                //now re-solve the path between these two
+//                LocalProblem problem(&functor,startState,goalState,g_dT);
+//                planner.InitializeLocalProblem(problem,0,NULL,eCostPoint);
+//                problem.m_bInertialControlActive = g_bInertialControlActive;
 
-                //now iterate the planner
-                while(1){
-                    usleep(1000);
-                    if(CanContinue(bPaused,bStep) == true){
-                        MotionSample* pSample;
-                        bool bRes;
-                        if(bPlannerOn){
-                            bRes = planner.Iterate(problem);
-                            pSample = &problem.m_CurrentSolution.m_Sample;
-                            dNorm = problem.m_CurrentSolution.m_dNorm;
-                        }else{
-                            bRes = true;
-                            planner.SimulateTrajectory(problem.m_CurrentSolution.m_Sample,problem);
-                            pSample = &problem.m_CurrentSolution.m_Sample;
-                            dNorm = 0;
-                        }
-
-
-                        Eigen::Vector3dAlignedVec vPts;
-                        for(const VehicleState& state : pSample->m_vStates) {
-                            vPts.push_back(state.m_dTwv.translation());
-                        }
-                        trajectoryStrip.AddVerticesFromTrajectory(vPts);
-
-                        planner.SamplePath(problem,vPts);
-                        trajectoryBezierStrip.AddVerticesFromTrajectory(vPts);
-
-                        nNumIterations++;
-                        vSegmentSamples[0] = *pSample;
-
-                        if(bRes == true || nNumIterations > g_nIterationLimit){
-                            nNumIterations = 0;
-                            pWaypoint0->SetDirty(false);
-                            pWaypoint1->SetDirty(false);
-                            break;
-                        }
-                    }
-                }
-            }
-            else if(bComputeNewPath || pCarWaypoint->GetDirty() == true){
-                Eigen::Vector3d dIntersect;
-                Sophus::SE3d pose(pCarWaypoint->GetPose4x4_po());
-                if(carModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
-                    pose.translation() = dIntersect;
-                    pCarWaypoint->SetPose(pose.matrix());
-                }
-
-                controlPlan.m_StartState = VehicleState(Sophus::SE3d(pCarWaypoint->GetPose4x4_po()),pCarWaypoint->GetVelocity(),fStartCurvature);
-                //first find the closest point on the reference trajectory
-                CarController::AdjustStartingSample(vSegmentSamples,controlPlan.m_StartState,controlPlan.m_nStartSegmentIndex,controlPlan.m_nStartSampleIndex);
-
-                MotionSample trajectorySample;
-                VelocityProfile profile;
-                //prepare the trajectory ahead
-                CarController::PrepareLookaheadTrajectory(vSegmentSamples,&controlPlan,profile,trajectorySample,fLookaheadTime);
-
-                ApplyVelocitesFunctor5d functor(&carModel,Eigen::Vector3d::Zero(), NULL);
-                functor.SetNoDelay(true);
-                LocalProblem problem(&functor,controlPlan.m_StartState,controlPlan.m_GoalState,g_dT);
-                problem.m_CurrentSolution.m_dMinTrajectoryTime = fLookaheadTime;
-                problem.m_vVelProfile = profile;
-                planner.InitializeLocalProblem(problem,controlPlan.m_dStartTime,&problem.m_vVelProfile,g_bPointCost ? eCostPoint : eCostTrajectory);
-                problem.m_Trajectory = trajectorySample;
-
-                //now iterate the planner
-                while(1){
-                    usleep(1000);
-                    if(CanContinue(bPaused,bStep) == true){
-                        MotionSample* pSample;
-                        bool bRes;
-                        if(bControllerOn){
-                            bRes = planner.Iterate(problem);
-                            pSample = &problem.m_CurrentSolution.m_Sample;
-                            dNorm = problem.m_CurrentSolution.m_dNorm;
-                            dActualLookahead = problem.m_CurrentSolution.m_dMinTrajectoryTime;
-                        }else{
-                            bRes = true;
-                            planner.SimulateTrajectory(problem.m_CurrentSolution.m_Sample,problem);
-                            pSample = &problem.m_CurrentSolution.m_Sample;
-                            dNorm = 0;
-                            dActualLookahead = fLookaheadTime;
-                        }
-
-                        //set the axis position denoting the end of the sample
-                        endPosAxis.SetPose(pSample->m_vStates.back().m_dTwv.matrix());
-                        endPosAxis.SetAxisSize(pSample->m_vStates.back().m_dV.norm());
+//                //now iterate the planner
+//                while(1){
+//                    usleep(1000);
+//                    if(CanContinue(bPaused,bStep) == true){
+//                        MotionSample* pSample;
+//                        bool bRes;
+//                        if(bPlannerOn){
+//                            bRes = planner.Iterate(problem);
+//                            pSample = &problem.m_CurrentSolution.m_Sample;
+//                            dNorm = problem.m_CurrentSolution.m_dNorm;
+//                        }else{
+//                            bRes = true;
+//                            planner.SimulateTrajectory(problem.m_CurrentSolution.m_Sample,problem);
+//                            pSample = &problem.m_CurrentSolution.m_Sample;
+//                            dNorm = 0;
+//                        }
 
 
-                        Eigen::Vector3dAlignedVec vPts;
-                        for(const VehicleState& state : pSample->m_vStates) {
-                            vPts.push_back(state.m_dTwv.translation());
-                        }
-                        controlStrip.AddVerticesFromTrajectory(vPts);
+//                        Eigen::Vector3dAlignedVec vPts;
+//                        for(const VehicleState& state : pSample->m_vStates) {
+//                            vPts.push_back(state.m_dTwv.translation());
+//                        }
+//                        trajectoryStrip.AddVerticesFromTrajectory(vPts);
 
-                        planner.SamplePath(problem,vPts);
-                        controlBezierStrip.AddVerticesFromTrajectory(vPts);
+//                        planner.SamplePath(problem,vPts);
+//                        trajectoryBezierStrip.AddVerticesFromTrajectory(vPts);
 
-                        nNumIterations++;
+//                        nNumIterations++;
+//                        vSegmentSamples[0] = *pSample;
 
-                        if(bRes == true || nNumIterations > g_nIterationLimit){
-                            bComputeNewPath = false;
-                            pCarWaypoint->SetDirty(false);
-                            nNumIterations = 0;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    });
+//                        if(bRes == true || nNumIterations > g_nIterationLimit){
+//                            nNumIterations = 0;
+//                            pWaypoint0->SetDirty(false);
+//                            pWaypoint1->SetDirty(false);
+//                            break;
+//                        }
+//                    }
+//                }
+//            }
+//            else if(bComputeNewPath || pCarWaypoint->GetDirty() == true){
+//                Eigen::Vector3d dIntersect;
+//                Sophus::SE3d pose(pCarWaypoint->GetPose4x4_po());
+//                if(carModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
+//                    pose.translation() = dIntersect;
+//                    pCarWaypoint->SetPose(pose.matrix());
+//                }
+
+//                controlPlan.m_StartState = VehicleState(Sophus::SE3d(pCarWaypoint->GetPose4x4_po()),pCarWaypoint->GetVelocity(),fStartCurvature);
+//                //first find the closest point on the reference trajectory
+//                CarController::AdjustStartingSample(vSegmentSamples,controlPlan.m_StartState,controlPlan.m_nStartSegmentIndex,controlPlan.m_nStartSampleIndex);
+
+//                MotionSample trajectorySample;
+//                VelocityProfile profile;
+//                //prepare the trajectory ahead
+//                CarController::PrepareLookaheadTrajectory(vSegmentSamples,&controlPlan,profile,trajectorySample,fLookaheadTime);
+
+//                ApplyVelocitesFunctor5d functor(&carModel,Eigen::Vector3d::Zero(), NULL);
+//                functor.SetNoDelay(true);
+//                LocalProblem problem(&functor,controlPlan.m_StartState,controlPlan.m_GoalState,g_dT);
+//                problem.m_CurrentSolution.m_dMinTrajectoryTime = fLookaheadTime;
+//                problem.m_vVelProfile = profile;
+//                planner.InitializeLocalProblem(problem,controlPlan.m_dStartTime,&problem.m_vVelProfile,g_bPointCost ? eCostPoint : eCostTrajectory);
+//                problem.m_Trajectory = trajectorySample;
+
+//                //now iterate the planner
+//                while(1){
+//                    usleep(1000);
+//                    if(CanContinue(bPaused,bStep) == true){
+//                        MotionSample* pSample;
+//                        bool bRes;
+//                        if(bControllerOn){
+//                            bRes = planner.Iterate(problem);
+//                            pSample = &problem.m_CurrentSolution.m_Sample;
+//                            dNorm = problem.m_CurrentSolution.m_dNorm;
+//                            dActualLookahead = problem.m_CurrentSolution.m_dMinTrajectoryTime;
+//                        }else{
+//                            bRes = true;
+//                            planner.SimulateTrajectory(problem.m_CurrentSolution.m_Sample,problem);
+//                            pSample = &problem.m_CurrentSolution.m_Sample;
+//                            dNorm = 0;
+//                            dActualLookahead = fLookaheadTime;
+//                        }
+
+//                        //set the axis position denoting the end of the sample
+//                        endPosAxis.SetPose(pSample->m_vStates.back().m_dTwv.matrix());
+//                        endPosAxis.SetAxisSize(pSample->m_vStates.back().m_dV.norm());
+
+
+//                        Eigen::Vector3dAlignedVec vPts;
+//                        for(const VehicleState& state : pSample->m_vStates) {
+//                            vPts.push_back(state.m_dTwv.translation());
+//                        }
+//                        controlStrip.AddVerticesFromTrajectory(vPts);
+
+//                        planner.SamplePath(problem,vPts);
+//                        controlBezierStrip.AddVerticesFromTrajectory(vPts);
+
+//                        nNumIterations++;
+
+//                        if(bRes == true || nNumIterations > g_nIterationLimit){
+//                            bComputeNewPath = false;
+//                            pCarWaypoint->SetDirty(false);
+//                            nNumIterations = 0;
+//                            break;
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
+//    });
 
 
     while( !pangolin::ShouldQuit() )
@@ -313,7 +313,7 @@ int main( int argc, char** argv )
         }
     }
 
-    pWorkThread->join();
+//    pWorkThread->join();
 
     return 0;
 }

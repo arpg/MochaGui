@@ -14,7 +14,8 @@ int main( int argc, char** argv )
     std::string sMode = cl.follow( "Simulation", 1, "-mode" );
     Mode eMode = Mode_Simulation;
     if(sMode == "Experiment"){
-        eMode = Mode_Experiment;
+      std::cerr << "Setting experimental mode."  << std::endl;
+      eMode = Mode_Experiment;
     }
     LearningGui* pGui = LearningGui::GetInstance();
     pGui->Init(sRef,sMesh,vicon,eMode);

@@ -35,7 +35,7 @@ public:
         m_bPerceptable = false;
     }
 
-    void Init(GLCarDrawType eCarDrawType, std::string bodyMeshName = "./herbie/herbie.blend") {
+    void Init(GLCarDrawType eCarDrawType, std::string bodyMeshName = "./herbie/herbie.ply") {
         m_eCarDrawType = eCarDrawType;
         m_sBodyMeshName = bodyMeshName;
         m_Color = GLColor();
@@ -44,12 +44,12 @@ public:
         if (m_eCarDrawType != eTriangle) {
             //initialize the body mesh
             const struct aiScene* pBodyMesh;
-            pBodyMesh = aiImportFile("./herbie/herbie.blend", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
+            pBodyMesh = aiImportFile("./herbie/herbie.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
             m_pScene = pBodyMesh;
             LoadMeshTextures();
 
             const struct aiScene* pWheelMesh;
-            pWheelMesh = aiImportFile("./herbie/wheel.blend", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
+            pWheelMesh = aiImportFile("./herbie/wheel.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
 
 
             //load the wheels
