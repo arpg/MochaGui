@@ -6,8 +6,9 @@
 #include <assimp/postprocess.h>
 
 #include "CarPlanner/RigidBody.h"
-#include "pangolin/pangolin.h"
-#include "SceneGraph/SceneGraph.h"
+#include <pangolin/pangolin.h>
+#include <SceneGraph/SceneGraph.h>
+#include <SceneGraph/GLMesh.h>
 #include "SE3.h"
 
 /*

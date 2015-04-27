@@ -41,7 +41,7 @@ find_package(MINIGLOG REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
-find_package( CVARS REQUIRED )
+find_package( CVars REQUIRED )
 find_package( Protobuf REQUIRED )
 find_package( Bullet REQUIRED )
 find_package( SensorFusion REQUIRED )
@@ -64,13 +64,13 @@ PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 set( _INCLUDE_DIRS
     #            ${VRPN_INCLUDE_DIRS}
-	    ${MINIGLOG_INCLUDE_DIRS}
+    ${GLOG_INCLUDE_DIRS}
             ${Node_INCLUDE_DIRS}
-            ${Sophus_INCLUDE_DIR}
+            ${Sophus_INCLUDE_DIRS}
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
             ${CarPlanner_INCLUDE_DIRS}
-            ${CVARS_INCLUDE_DIR}
+            ${CVARS_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
             ${PROTOBUF_INCLUDE_DIRS}
             ${SceneGraph_INCLUDE_DIRS}
@@ -90,7 +90,7 @@ set( LIBRARIES
                ${SceneGraph_LIBRARIES}
                ${CarPlanner_LIBRARIES}
                ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
-               ${CVARS_LIBRARIES}
+               ${CVars_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
                Gamepad # this is also built with the solution
                assimp
