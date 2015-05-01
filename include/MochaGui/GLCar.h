@@ -58,7 +58,7 @@ public:
             for (size_t i = 0; i < m_vWheels.size(); i++) {
                 m_vWheels[i] = new GLMesh();
                 m_vWheels[i]->Init(pWheelMesh);
-                //m_vWheels[i]->SetScale(m_fScale*0.75);
+                //m_vWheels[i]->SetScale(m_fScale*0.75); //originally commented by nimski
             }
         }
     }

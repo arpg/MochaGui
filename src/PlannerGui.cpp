@@ -211,6 +211,7 @@ int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth)
 
     pCar->m_CarLineSegments.SetColor(GLColor(0.0f,0.0f,1.0f));
 
+    // originally commented by nimski:
     //add this to the scenegraph
     //boost::mutex::scoped_lock lock(m_DrawMutex);
 

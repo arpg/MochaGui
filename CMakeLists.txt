@@ -1,6 +1,10 @@
 project( MochaGui )
 cmake_minimum_required(VERSION 2.8)
 
+if( NOT CMAKE_BUILD_TYPE )
+    set( CMAKE_BUILD_TYPE Debug)
+endif()
+
 # Test platform type
 IF(WIN32 OR WIN64)
     MESSAGE("Windows system found..")
@@ -37,7 +41,7 @@ message( "LUT not currently supported; source: src/lut.cpp." )
 #boost doesn't seem to link to it..
 
 find_package(Pangolin REQUIRED)
-find_package(MINIGLOG REQUIRED)
+find_package( GLOG REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
