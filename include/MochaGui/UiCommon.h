@@ -6,6 +6,7 @@
 #include "GLWidgetPanel.h"
 #include "CVars/CVar.h"
 #include <CarPlanner/CVarHelpers.h>
+#define VICON_CAR_HEIGHT_OFFSET 0.02
 
 struct PlannerHandler : public SceneGraph::HandlerSceneGraph
 {
@@ -82,6 +83,26 @@ struct ActivateScissorBlendedDrawFunctor
     const pangolin::OpenGlRenderState& renderState;
 };
 
+
+enum MochaCommands{
+  eMochaPause = 1,
+  eMochaSolve = 2,
+  eMochaRestart = 3,
+  eMochaStep = 4,
+  eMochaLearn = 5,
+  eMochaToggleTrajectory = 6,
+  eMochaTogglePlans = 7,
+  eMochaLoad = 8,
+  eMochaClear = 9,
+  eMochaFixGround = 10,
+  eMochaPpmControl = 11,
+  eMochaSimulationControl = 12,
+
+  eMochaLeft = 90,
+  eMochaRight = 91,
+  eMochaUp = 92,
+  eMochaDown = 93
+};
 
 struct Waypoint
 {

@@ -17,7 +17,6 @@
 #include "CarPlanner/CarController.h"
 #include "CarPlanner/LocalPlanner.h"
 #include "CarPlanner/CarRegressor.h"
-#include "CarPlanner/Vicon.h"
 #include "CarPlanner/CVarHelpers.h"
 #include "SensorFusion/SensorFusionCeres.h"
 #include "Node/Node.h"
@@ -29,6 +28,7 @@
 #include "MochaGui/gui/GLGuiPanel.h"
 #include "MochaGui/EventLogger.h"
 #include "MochaGui/ProcessModelFusion.h"
+#include "MochaGui/Vicon.h"
 
 using namespace CVarUtils;
 using namespace std;

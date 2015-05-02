@@ -1,7 +1,7 @@
 #include <fenv.h>
 #include <iostream>
 #include "Node/Node.h"
-#include "CarPlanner/Vicon.h"
+#include "MochaGui/Vicon.h"
 #include "MochaGui/SE3.h"
 
 #include "config.h"

@@ -5,10 +5,10 @@
 #include <atomic>
 #include "Node/Node.h"
 #include "CarPlanner/BulletCarModel.h"
-#include "CarPlanner/Vicon.h"
 
 #include "config.h"
 #include "MochaGui/GetPot"
+#include "MochaGui/Vicon.h"
 #include "Messages.pb.h"
 #include "MochaGui/learning/JoystickHandler.h"
 #include "MochaGui/EventLogger.h"
