@@ -102,7 +102,7 @@ void MochaGui::Run() {
   {
 
     {
-      std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock);
+      std::lock_guard<std::mutex> lock(m_DrawMutex);
       m_Gui.Render();
     }
 
@@ -677,7 +677,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
       usleep(1000);
     }
   {
-    std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
+    std::lock_guard<std::mutex> lock(m_DrawMutex); //crh uncommented
     m_ControlLine.Clear();
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->Clear();
@@ -695,7 +695,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
   case eMochaTogglePlans:
   {
-    std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
+    std::lock_guard<std::mutex> lock(m_DrawMutex); //crh uncommented
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->SetVisible(!(*iter)->IsVisible());
     }
@@ -704,7 +704,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
   case eMochaClear:
   {
-    std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
+    std::lock_guard<std::mutex> lock(m_DrawMutex); //crh uncommented
     m_Gui.ClearCarTrajectory(m_nDriveCarId);
     m_ControlLine.Clear();
     for (GLCachedPrimitives*& strip: m_lPlanLineSegments) {
@@ -785,7 +785,7 @@ void MochaGui::_UpdateVisuals()
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 {
-  std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock); //crh uncommented
+  std::lock_guard<std::mutex> lock(m_DrawMutex); //crh uncommented
   //get the current plans and draw them
   Sophus::SE3d dTwv1,dTwv2;
   *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
@@ -897,7 +897,7 @@ void MochaGui::_ViconReadFunc()
       if(g_bProcessModelActive){
         ControlCommand command;
         {
-          std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+          std::lock_guard<std::mutex> lock(m_ControlMutex);
           command = m_ControlCommand;
         }
         m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
@@ -966,7 +966,7 @@ void MochaGui::_ControlCommandFunc()
       //get commands from the controller, apply to the car and update the position
       //of the car in the controller
       {
-        std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+        std::lock_guard<std::mutex> lock(m_ControlMutex);
         double dCurrentTime = CarPlanner::Tic();
         m_Controller.GetCurrentCommands(dCurrentTime,
                                         m_ControlCommand,
@@ -1101,7 +1101,7 @@ void MochaGui::_ControlFunc()
           _UpdateVehicleStateFromFusion(currentState);
           //set the command history and current pose on the controller
           {
-            std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+            std::lock_guard<std::mutex> lock(m_ControlMutex);
             m_Controller.SetCurrentPose(currentState,&m_DriveCarModel.GetCommandHistoryRef(0));
           }
         }else{
@@ -1281,7 +1281,7 @@ void MochaGui::_PhysicsFunc()
 
           //get the current commands
           {
-            std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+            std::lock_guard<std::mutex> lock(m_ControlMutex);
 
             if(m_bPause == false && g_bInfiniteTime == false){
               m_dPlanTime = CarPlanner::Tic();
@@ -1402,7 +1402,7 @@ void MochaGui::_PlannerFunc() {
 
         {
           //lock the drawing look as we will be modifying things here
-          std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock);
+          std::lock_guard<std::mutex> lock(m_DrawMutex);
           if(a->GetDirty()) {
             Sophus::SE3d pose(a->GetPose4x4_po());
             if(m_DriveCarModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
@@ -1480,7 +1480,7 @@ void MochaGui::_PlannerFunc() {
             numInterations++;
 
             //lock the mutex as this next bit will modify object
-            std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock );
+            std::lock_guard<std::mutex> lock(m_DrawMutex );
 
             if (m_bCompute3dPath == true ) {
               success =  res;

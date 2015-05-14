@@ -238,7 +238,7 @@ bool EventLogger::ReadMessage(msg_Log &msg)
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::WriteMessage(msg_Log &msg)
 {
-    std::unique_lock<std::mutex> lock(m_WriteMutex, std::try_to_lock);
+    std::lock_guard<std::mutex> lock(m_WriteMutex);
     msg.set_timestamp(CarPlanner::Tic());
     int byteSize = msg.ByteSize();
     m_File << byteSize ; //write the size

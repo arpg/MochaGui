@@ -234,7 +234,7 @@ int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth)
 void PlannerGui::SetCarState(const int &id, const VehicleState &state, bool bAddToTrajectory /* = false */)
 {
     Car* pCar = m_vCars[id];
-    std::unique_lock<std::mutex> lock(*pCar, std::try_to_lock);
+    std::lock_guard<std::mutex> lock(*pCar);
 
     Sophus::SE3d state_aug = state.m_dTwv;
     state_aug.translation() -= GetBasisVector(state_aug,2)*0.05;
