@@ -57,8 +57,7 @@ MochaGui::MochaGui() :
   m_Fusion(30,&m_DriveCarModel),
   m_dPlanTime(CarPlanner::Tic())//the size of the fusion sensor
 {
-  std::cout << "done!" << std::endl;
-  //m_Node.init("MochaGui");
+  m_Node.init("MochaGui");
 }
 
 ////////////////////////////////////////////////////////////////
@@ -74,9 +73,7 @@ MochaGui::~MochaGui()
 MochaGui *MochaGui::GetInstance()
 {
   if(g_pMochaGuiInstance == NULL) {
-    std::cout << "Starting new MochaGui since none is found." << std::endl; //debug
     g_pMochaGuiInstance = new MochaGui();
-    std::cout << "New MochaGui has no problem with u." << std::endl; //debug
   }
 
   return g_pMochaGuiInstance;
@@ -255,7 +252,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   m_bPause = false;
   m_bStep = false;
 
-  printf("****************\nall keyboard is disabled until you fix std::bind issues with pangolin! MocahGui.cpp line 254\n");
+  printf("****************\nall keyboard is disabled until you fix std::bind issues with pangolin! MochaGui.cpp line 254\n");
 
   /*
 
@@ -484,6 +481,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523; //crh situational
   m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
   m_Fusion.SetCalibrationActive(false);
+  m_pControlLine.reset(new GLCachedPrimitives);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -678,7 +676,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
     }
   {
     std::unique_lock<std::mutex> lock(m_DrawMutex); //crh uncommented
-    m_ControlLine.Clear();
+    m_pControlLine->Clear();
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->Clear();
     }
@@ -706,7 +704,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
   {
     std::unique_lock<std::mutex> lock(m_DrawMutex); //crh uncommented
     m_Gui.ClearCarTrajectory(m_nDriveCarId);
-    m_ControlLine.Clear();
+    m_pControlLine->Clear();
     for (GLCachedPrimitives*& strip: m_lPlanLineSegments) {
       strip->Clear();
     }
@@ -812,10 +810,10 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 
 
     //create a line that points to the intended destination
-    m_ControlLine.Clear();
-    m_ControlLine.AddVertex(pPlan->m_StartState.m_dTwv.translation());
-    m_ControlLine.AddVertex(pPlan->m_GoalState.m_dTwv.translation());
-    m_ControlLine.SetColor(GLColor(1.0f,1.0f,1.0f));
+    m_pControlLine->Clear();
+    m_pControlLine->AddVertex(pPlan->m_StartState.m_dTwv.translation());
+    m_pControlLine->AddVertex(pPlan->m_GoalState.m_dTwv.translation());
+    m_pControlLine->SetColor(GLColor(1.0f,1.0f,1.0f));
 
     m_DestAxis.SetPose(pPlan->m_GoalState.m_dTwv.matrix());
     m_DestAxis.SetAxisSize(pPlan->m_GoalState.m_dV.norm());
@@ -1027,7 +1025,7 @@ void MochaGui::_ControlFunc()
 
     while(m_StillControl) {
 
-      m_ControlLine.Clear();
+      m_pControlLine->Clear();
       for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
         pStrip->Clear();
       }
@@ -1553,7 +1551,7 @@ void MochaGui::_PopulateSceneGraph() {
 
 
   m_Gui.AddGLObject(&m_DestAxis);
-  m_Gui.AddGLObject(&m_ControlLine);
+  m_Gui.AddGLObject(m_pControlLine.get());
   m_Gui.AddPanel(&m_GuiPanel);
 }
 
