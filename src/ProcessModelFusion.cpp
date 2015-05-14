@@ -19,7 +19,7 @@ void ProcessModelFusion::RegisterInputCommands(ControlCommand command)
         }else{
             double currentTime = CarPlanner::Tic();
             if((currentTime - m_dLastCommandTime) > 0.01){
-                std::lock_guard<std::mutex> lock(m_DriveCarMutex);
+                std::unique_lock<std::mutex> lock(m_DriveCarMutex);
                 double dt = currentTime - m_dLastCommandTime;
                 m_dLastCommandTime = currentTime;
                 m_pFusionModel->UpdateState(0, command,dt);
@@ -34,7 +34,7 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
     if(m_bFusionCarModelInitialized == true){
         VehicleState currentState;
         {
-            std::lock_guard<std::mutex> lock(m_DriveCarMutex);
+            std::unique_lock<std::mutex> lock(m_DriveCarMutex);
             double currentTime = CarPlanner::Tic();
             double dt = currentTime - m_dLastCommandTime;
             m_pFusionModel->UpdateState(0,command,dt);
@@ -59,7 +59,7 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
 
     if(IsActive()){
 
-            std::lock_guard<std::mutex> lock(m_DriveCarMutex);
+            std::unique_lock<std::mutex> lock(m_DriveCarMutex);
             fusion::PoseParameter currentPose = GetCurrentPose();
             m_LastVehicleState.m_dTwv = currentPose.m_dPose;
             m_LastVehicleState.m_dV = currentPose.m_dV;
@@ -78,7 +78,7 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
 /////////////////////////////////////////////////////////////////////////////////////////
 void ProcessModelFusion::GetVehicleState(VehicleState &state)
 {
-    std::lock_guard<std::mutex> lock(m_DriveCarMutex);
+    std::unique_lock<std::mutex> lock(m_DriveCarMutex);
     m_pFusionModel->GetVehicleState(0,state);
 }
 

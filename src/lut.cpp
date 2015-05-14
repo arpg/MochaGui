@@ -14,7 +14,7 @@ unsigned int currentItem = 0;
 
 void SetResult(int index, Eigen::Matrix<double,8,1> val)
 {
-  std::lock_guard<std::mutex> loc(m_resultLock);
+  std::unique_lock<std::mutex> loc(m_resultLock);
   m_vResults[index] = val;
 }
 
@@ -117,7 +117,7 @@ int main( int argc, char** argv )
     //wait for  this batch to finish
     while(threadPool.pending() > 0){
       if(CarPlanner::Toc(lastTime) > 1.0  ){
-        std::lock_guard<std::mutex> loc(m_resultLock);
+        std::unique_lock<std::mutex> loc(m_resultLock);
 
         double rate = currentItem/CarPlanner::Toc(firstTime);
         double timeRemaining = (double)(nTotalNum-currentItem)/rate;

@@ -55,7 +55,7 @@ void LearningGui::Run()
     }
 
     {
-      std::lock_guard<std::mutex> renderMutex(m_RenderkMutex);
+      std::unique_lock<std::mutex> renderMutex(m_RenderkMutex);
       m_Gui.Render();
     }
 
@@ -90,7 +90,7 @@ void LearningGui::_UpdateTrajectories()
   //now update the GLLines to sohw the trajectory
   for(size_t ii = 0 ; ii < m_vSamples.size(); ii++ ){
     if(m_lGLLineSegments.size() <= ii){
-      std::lock_guard<std::mutex> renderMutex(m_RenderkMutex);
+      std::unique_lock<std::mutex> renderMutex(m_RenderkMutex);
       m_lGLLineSegments.push_back(GLCachedPrimitives());
       m_lGLLineSegments.back().SetColor(GLColor(1.0f,0.0f,0.0f,1.0f));
       m_Gui.AddGLObject(&m_lGLLineSegments.back());
@@ -142,7 +142,7 @@ void LearningGui::_JoystickReadFunc()
     }
 
     {
-      std::lock_guard<std::mutex> lock(m_JoystickMutex);
+      std::unique_lock<std::mutex> lock(m_JoystickMutex);
       m_JoystickCommand = command;
     }
 
@@ -182,7 +182,7 @@ void LearningGui::_SetPoseFromFusion()
   }else{
     ControlCommand commands;
     {
-      std::lock_guard<std::mutex> lock(m_JoystickMutex);
+      std::unique_lock<std::mutex> lock(m_JoystickMutex);
       commands = m_JoystickCommand;
     }
     commands.m_dT = time - m_dLastPoseTime;
@@ -243,7 +243,7 @@ void LearningGui::_ViconReadFunc()
 
     ControlCommand command;
     {
-      std::lock_guard<std::mutex> lock(m_JoystickMutex);
+      std::unique_lock<std::mutex> lock(m_JoystickMutex);
       command = m_JoystickCommand;
     }
 
@@ -566,7 +566,7 @@ void LearningGui::_PhysicsFunc()
         dCurrentTime = CarPlanner::Tic();
 
         {
-          std::lock_guard<std::mutex> lock(m_JoystickMutex);
+          std::unique_lock<std::mutex> lock(m_JoystickMutex);
           currentCommand = m_JoystickCommand;
         }
 

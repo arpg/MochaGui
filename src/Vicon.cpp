@@ -113,7 +113,7 @@ Sophus::SE3d Vicon::GetPose( const std::string& sObjectName, bool blocking/* = f
     }
 
     TrackerObject& obj = m_mObjects[sObjectName];
-    std::lock_guard<std::mutex> lock(obj.m_Mutex);
+    std::unique_lock<std::mutex> lock(obj.m_Mutex);
 
     //if blocking wait until we have a signal that the pose for this object has been updated
     if(blocking && obj.m_bPoseUpdated == false){
@@ -192,7 +192,7 @@ void VRPN_CALLBACK Vicon::_MoCapHandler( void* uData, const vrpn_TRACKERCB tData
     TrackerObject* pObj = (TrackerObject*)uData;
     //lock the sensor poses as we update them
     {
-        std::lock_guard<std::mutex> lock(pObj->m_Mutex);
+        std::unique_lock<std::mutex> lock(pObj->m_Mutex);
 
         Eigen::Matrix4d T;
         if(pObj->m_bRobotFrame){
