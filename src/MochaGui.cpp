@@ -81,7 +81,6 @@ MochaGui *MochaGui::GetInstance()
 
 ////////////////////////////////////////////////////////////////
 void MochaGui::Run() {
-  std::cout << "Running." << std::endl; //debug
   //create the list of cvars not tsave
   std::vector<std::string> filter = { "not", "debug.MinLookaheadTime", "debug.MaxPlanTimeMultiplier", "debug.FreezeControl", "debug.PointCost",
                                       "debug.Show2DResult","debug.Optimize2DOnly","debug.ForceZeroStartingCurvature","debug.UseCentralDifferences",
@@ -304,23 +303,32 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
   btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
   btTriangleMesh *pTriangleMesh = new btTriangleMesh();
+
+  /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
   BulletCarModel::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+
+  /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
   btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
 
+  /// Also initialize a GLObject for the terrain mesh.
   m_TerrainMesh.Init(pScene);
   //m_MeshHeightMap.Init("ramp.blend");
   //m_GLHeightMap.Init(&m_ActiveHeightMap);
 
-
   //initialize the car parameters
   CarParameters::LoadFromFile(PARAMS_FILE_NAME,m_mDefaultParameters);
 
+  /// Generate as many new cars as we need in order to use MPC.
   m_LearningCarModel.Init(pCollisionShape,dMin,dMax, m_mDefaultParameters, REGRESSOR_NUM_WORLDS );
   m_PlanCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,LocalPlanner::GetNumWorldsRequired(OPT_DIM) );
   m_ControlCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters, LocalPlanner::GetNumWorldsRequired(OPT_DIM)  );
   //parameters[CarParameters::SteeringCoef] = -700.0;
+
+  /// As well as the car that we're actually driving.
   m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1 );
 
+  /// Set the two control commands we have to be the offsets calculated
+  /// for the car; this should make it set to drive straight and not move.
   m_ControlCommand.m_dForce = m_mDefaultParameters[CarParameters::AccelOffset];
   m_ControlCommand.m_dPhi = m_mDefaultParameters[CarParameters::SteeringOffset];
 
@@ -328,7 +336,8 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
 
   //    }
 
-
+  /// Set all of the ControlParams in MochaGui to be RegressionParameters that
+  /// we grab from the ControlCarModel's CarParameters.
   m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::DynamicFrictionCoef,&m_ControlCarModel));
   m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::ControlDelay,&m_ControlCarModel));
   m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::SteeringCoef,&m_ControlCarModel));
@@ -347,12 +356,14 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::MagicFormula_C,&m_ControlCarModel));
   m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::MagicFormula_E,&m_ControlCarModel));
 
+  /// Attach CVars to each one of those parameters so we can manipulate them.
   for(RegressionParameter& param : m_vControlParams){
     std::string name("controller.Params.");
     name += param.m_sName;
     AttachCVar(name,&param,"");
   }
 
+  /// Copy the MochaGui's ControlParams into the PlanCar.
   m_vPlannerParams = m_vControlParams;
 
   for(RegressionParameter& param : m_vPlannerParams){
@@ -362,6 +373,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     AttachCVar(name,&param,"");
   }
 
+  /// Do the same for the DriveCar.
   m_vDriveParams = m_vControlParams;
 
   for(RegressionParameter& param : m_vDriveParams){
@@ -371,9 +383,10 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     AttachCVar(name,&param,"");
   }
 
-  //initialize the debug drawer
+  //initialize the debug drawer on the DriveCar.
   m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
+  /// Establish number of waypoints and where they are; set them to CVars.
   int numWaypoints = 12;
   for(int ii = 0; ii < numWaypoints ; ii++){
     char buf[100];
@@ -382,33 +395,38 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     (*m_vWayPoints.back()) << ii*0.5,0,0,0,0,0, 1,0;
     m_Path.push_back(ii);
   }
-  //close the loop
+
+  /// Make the 1st entry also the last, so the path is a loop.
   m_Path.push_back(0);
 
+  /// Print StateStatus, LearningStatus etc. to specificy positions
+  /// in the GUI.
   m_nStateStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
   m_nLearningStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
   m_nControlStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
   m_nGravityStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
 
+  /// How opaque is the TerrainMesh (in GL).
   m_TerrainMesh.SetAlpha(1.0);
   m_Gui.Init(&m_TerrainMesh);
 
-  m_pGraphView = &pangolin::Plotter(&m_Log)
-      .SetBounds(0.0, 0.3, 0.6, 1.0); //crh situational
+  m_pGraphView = &pangolin::Plotter(&m_Log).SetBounds(0.0, 0.3, 0.6, 1.0); //crh situational
   pangolin::DisplayBase().AddDisplay(*m_pGraphView);
 
+  /// AddCar requires knowledge of the WheelBase and the Width.
   m_nDriveCarId = m_Gui.AddCar(m_mDefaultParameters[CarParameters::WheelBase],m_mDefaultParameters[CarParameters::Width]);
   m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
   //populate all the objects
   _PopulateSceneGraph();
 
+  /// Populate an empty set of States for each of the PlanStates (also empty).
   m_lPlanStates.resize(25);
   for (std::vector<VehicleState>*& vStates: m_lPlanStates) {
     vStates = new std::vector<VehicleState>();
   }
 
-
+  /// Vicon refplane assuming we don't have one already.
   Eigen::Matrix4d dT_vicon_ref = Eigen::Matrix4d::Identity();
   if(sRefPlane.empty() == false){
     std::string word;
@@ -430,8 +448,9 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     }
   }
 
-  m_sCarObjectName = "CAR";
-  m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse()); //crh situational vicon
+  /// Start tracking where the vicon believes the car to be.
+  m_sCarObjectName = "ninjacar"; // crh: vrpn ninjacar name
+  m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse()); //crh situational vicon: server address
 
   //initialize the panel
   m_GuiPanel.Init();
