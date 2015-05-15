@@ -515,11 +515,13 @@ void MochaGui::_StartThreads()
   }
   if(m_eControlTarget == eTargetSimulation){
     if(m_pImuThread != NULL){
+      m_bStillImu = false;
       // m_pImuThread->interrupt(); //crh don't know what eTargetSim does yet
       m_pImuThread->join();
     }
 
     if(m_pViconThread) {
+      m_bStillVicon = false;
       // m_pViconThread->interrupt(); //crh same as above
       m_pViconThread->join();
     }
@@ -555,30 +557,34 @@ void MochaGui::_KillThreads()
 {
   _KillController();
 
-  m_StillRun = false;
-
   if(m_pPhysicsThread) {
-    m_pPhysicsThread->join();
+      //m_pPhysicsThread->interrupt();
+      m_pPhysicsThread->join();
   }
 
   if(m_pPlannerThread) {
-    m_pPlannerThread->join();
+      //m_pPlannerThread->interrupt();
+      m_pPlannerThread->join();
   }
 
   if(m_pLearningThread){
-    m_pLearningThread->join();
+      //m_pLearningThread->interrupt();
+      m_pLearningThread->join();
   }
 
   if(m_pImuThread) {
-    m_pImuThread->join();
+      //m_pImuThread->interrupt();
+      m_pImuThread->join();
   }
 
   if(m_pViconThread) {
-    m_pViconThread->join();
+      //m_pViconThread->interrupt();
+      m_pViconThread->join();
   }
 
   if(m_pCommandThread) {
-    m_pCommandThread->join();
+      //m_pCommandThread->interrupt();
+      m_pCommandThread->join();
   }
 
   delete m_pControlThread;
@@ -1105,9 +1111,10 @@ void MochaGui::_ControlFunc()
         while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false
                && m_StillControl )){
           usleep(1000);
+          //boost::this_thread::interruption_point();
         }
 
-
+        //boost::this_thread::interruption_point();
 
         if(m_bSimulate3dPath ){
           m_DriveCarModel.GetVehicleState(0,currentState);
@@ -1215,17 +1222,20 @@ void MochaGui::_PhysicsFunc()
   double dCurrentTic = -1;
   double dPlanTimer = 0;
 
-  while(m_StillRun){
+  while(1){
+    //boost::this_thread::interruption_point();
 
-    while(m_bSimulate3dPath == false && m_StillRun){
+    while(m_bSimulate3dPath == false &&){
       dCurrentTic = CarPlanner::Tic();
+      //boost::this_thread::interruption_point();
       usleep(10000);
     }
 
     //this is so pausing doesn't shoot the car in the air
     double pauseStartTime = CarPlanner::Tic();
-    while(m_bPause == true && m_bSimulate3dPath == true && m_StillRun) {
+    while(m_bPause == true && m_bSimulate3dPath == true) {
       usleep(1000);
+      //boost::this_thread::interruption_point();
 
       //This section will play back control paths, if the user has elected to do so
       if(g_bPlaybackControlPaths){
@@ -1475,16 +1485,18 @@ void MochaGui::_PlannerFunc() {
         //problem.m_lPreviousCommands = previousCommands;
 
         bool success = false;
-        while(success == false && m_StillRun){
+        while(success == false){
           //if we are paused, then wait
-          while(m_bPause == true && m_StillRun) {
+          while(m_bPause == true) {
             usleep(1000);
+            //boost::this_thread::interruption_point;
             if(m_bStep == true){
               m_bStep = false;
               break;
             }
           }
 
+          //boost::this_thread::interruption_point;
           Eigen::Vector3dAlignedVec vActualTrajectory, vControlTrajectory;
           bool res;
           if(numInterations > g_nIterationLimit){

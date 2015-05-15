@@ -146,8 +146,10 @@ protected:
 
 
     //flags
-    std::atomic<bool> m_StillRun;
-    std::atomic<bool> m_StillControl;
+    std::atomic<bool> m_bStillRun;
+    std::atomic<bool> m_bStillImu;
+    std::atomic<bool> m_bStillControl;
+    std::atomic<bool> m_bStillVicon;
     bool& m_bPlannerOn;
     bool& m_bShowProjectedPath;
     bool& m_bCompute3dPath;
