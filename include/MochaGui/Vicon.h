@@ -47,8 +47,8 @@ class Vicon
 
     private:
         static void _ThreadFunction(Vicon *pVT);
-        static void VRPN_CALLBACK _MoCapHandler(void* uData, const vrpn_TRACKERCB tData );
-        static void VRPN_CALLBACK _MoCapVelHandler( void* uData, const vrpn_TRACKERVELCB tData );
+        //static void VRPN_CALLBACK _MoCapHandler(void* uData, const vrpn_TRACKERCB tData );
+        //static void VRPN_CALLBACK _MoCapVelHandler( void* uData, const vrpn_TRACKERVELCB tData );
 
     private:
 

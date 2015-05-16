@@ -516,13 +516,13 @@ void MochaGui::_StartThreads()
   if(m_eControlTarget == eTargetSimulation){
     if(m_pImuThread != NULL){
       m_bStillImu = false;
-      // m_pImuThread->interrupt(); //crh don't know what eTargetSim does yet
+      // m_pImuThread->interrupt();
       m_pImuThread->join();
     }
 
     if(m_pViconThread) {
       m_bStillVicon = false;
-      // m_pViconThread->interrupt(); //crh same as above
+      // m_pViconThread->interrupt();
       m_pViconThread->join();
     }
   }else{
@@ -542,10 +542,9 @@ void MochaGui::_StartThreads()
 
 void MochaGui::_KillController()
 {
-  m_StillControl = false;
-
   //reset the threads
   if(m_pControlThread) {
+    //m_pControlThread->interrupt();
     m_pControlThread->join();
   }
   m_bControl3dPath = false;
@@ -1048,7 +1047,7 @@ void MochaGui::_ControlFunc()
   {
     m_bControllerRunning = false;
 
-    while(m_StillControl) {
+    while(1) {
 
       m_pControlLine->Clear();
       for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
@@ -1106,9 +1105,10 @@ void MochaGui::_ControlFunc()
       //m_ControlCommand = ControlCommand();
       m_bControllerRunning = true;
       VehicleState currentState;
-      while(m_StillControl)
+      while(1)
       {
-        while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false
+        while((m_eControlTarget != eTargetExperiment &&
+               m_bSimulate3dPath == false
                && m_StillControl )){
           usleep(1000);
           //boost::this_thread::interruption_point();
