@@ -22,6 +22,8 @@
 #include <vector>
 #include <condition_variable>
 #include "CarPlanner/CarPlannerCommon.h"
+#include <HAL/Messages/Pose.h>
+#include <Node/Node.h>
 
 
 //struct MochaEntity

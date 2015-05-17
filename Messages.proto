@@ -69,7 +69,7 @@ message msg_ImuLog{
     required msg_Matrix gyro = 4;
 }
 
-message msg_ViconLog{
+message msg_LocalizerLog{
     required double systemTime = 1;
     required double deviceTime = 2;
     required msg_Matrix pose_7d = 3;
@@ -82,5 +82,5 @@ message msg_Log {
     optional msg_ControlPlan controlPlan = 4;
     optional msg_Segments segments = 5;
     optional msg_ImuLog imu = 6;
-    optional msg_ViconLog vicon = 7;
+    optional msg_LocalizerLog localizer = 7;
 }

@@ -156,7 +156,7 @@ void EventLogger::LogImuData(const double dSysTime, const double dDeviceTime, co
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::LogViconData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d &dTwb)
+void EventLogger::LogLocalizerData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d &dTwb)
 {
     msg_Log logMsg;
     msg_ViconLog& viconMsg = *logMsg.mutable_vicon();

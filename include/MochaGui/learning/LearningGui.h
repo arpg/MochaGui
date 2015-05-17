@@ -43,7 +43,7 @@ class LearningGui
 public:
     LearningGui();
     /// Initializes the GUI
-    void Init(std::string sRefPlane, std::string sMeshName, bool bViconTransform, Mode eMode);
+    void Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode);
 
     /// Runs the GUI
     void Run();
@@ -74,15 +74,15 @@ private:
 
     void _JoystickReadFunc();
     void _ImuReadFunc();
-    void _ViconReadFunc();
+    void _LocalizerReadFunc();
 
     void _CommandHandler(const MochaCommands& command);
 
     /// vicon reader
-    Vicon m_Vicon;
+    Localizer m_Localizer;
     /// node for capturing IMU data from the car
     node::node m_Node;
-    /// name of the car used for vicon tracking
+    /// name of the car used for localizer tracking (used previously in vrpn)
     std::string m_sCarObjectName;
 
     //view related variables
@@ -100,7 +100,7 @@ private:
 
     double& m_dT;
     double m_dImuRate;
-    double m_dViconRate;
+    double m_dLocalizerRate;
 
     bool& m_bLearn;
     bool m_bLearningRunning;
@@ -115,7 +115,7 @@ private:
     std::thread* m_pLearningThread;
     std::thread* m_pLearningCaptureThread;
     std::thread* m_pImuThread;
-    std::thread* m_pViconThread;
+    std::thread* m_pLocalizerThread;
     std::thread* m_pJoystickThread;
     std::mutex m_JoystickMutex;
     std::mutex m_RenderkMutex;

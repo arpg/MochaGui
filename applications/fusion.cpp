@@ -24,7 +24,7 @@ Eigen::IOFormat CleanFmt(10, 0, ", ", "\n" , "[" , "]");
 bool m_bPaused = true;
 bool m_bStep = false;
 bool m_bFF;
-bool m_bViconActive = true;
+bool m_bLocalizerActive = true;
 int m_nFilterSize = 50;
 int m_bCalibrateActive = false;
 pangolin::DataLog m_Log;
@@ -124,13 +124,13 @@ void DoFusion()
                     imuIndex = 0;
                 }
             }
-        }else if(msg.has_vicon()){
-            const msg_ViconLog& viconMsg = msg.vicon();
-            if(time >= viconMsg.systemtime()){
+        }else if(msg.has_localizer()){
+            const msg_LocalizerLog& localizerMsg = msg.localizer();
+            if(time >= localizerMsg.systemtime()){
                 bReadNextMessage = true;
                 //push the imu data in
                 globalIndex++;
-                if(m_bViconActive && globalIndex >= g_nGlobalSkip){
+                if(m_bLocalizerActive && globalIndex >= g_nGlobalSkip){
                     globalIndex = 0;
                     m_bFF = false;
 
@@ -145,8 +145,8 @@ void DoFusion()
 
                     //std::cout << "Global pose found at time " << t << ": " << globalData[globalIndex].tail(6).transpose().format(CleanFmt) << std::endl;
                     Eigen::MatrixXd pose7d;
-                    m_Logger.ReadMatrix(pose7d,viconMsg.pose_7d());
-                    g_fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),viconMsg.devicetime(),viconMsg.systemtime());
+                    m_Logger.ReadMatrix(pose7d,localizerMsg.pose_7d());
+                    g_fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),localizerMsg.devicetime(),localizerMsg.systemtime());
 
                     //print the calibration if needed
                     if(m_bCalibrateActive){
@@ -222,7 +222,7 @@ void DoFusion()
             //skip commands for now
             bReadNextMessage = true;
         }else{
-            dout("Message does not have vicon, imu or control command. Aborting.");
+            dout("Message does not have localizer, imu or control command. Aborting.");
         }
 
         if(bReadNextMessage){
@@ -289,8 +289,8 @@ int main( int argc, char** argv )
     pangolin::RegisterKeyPressCallback( '\r' , std::bind(CommandHandler, Step ) );
     pangolin::RegisterKeyPressCallback( ' ', std::bind(CommandHandler, Pause ) );
     pangolin::RegisterKeyPressCallback( 'f', std::bind(CommandHandler, FastForward ) );
-    pangolin::RegisterKeyPressCallback( 'v', [] { m_bViconActive = !m_bViconActive;
-                                                                 std::cout << "Vicon poses " << (m_bViconActive ? "active" : "inactive") << std::endl; });
+    pangolin::RegisterKeyPressCallback( 'v', [] { m_bLocalizerActive = !m_bLocalizerActive;
+                                                                 std::cout << "Localizer poses " << (m_bLocalizerActive ? "active" : "inactive") << std::endl; });
 
 
     pangolin::DisplayBase().AddDisplay(view3d);
@@ -316,9 +316,9 @@ int main( int argc, char** argv )
     //add all the global poses
     msg_Log logMsg;
     while(m_Logger.ReadMessage(logMsg)){
-        if(logMsg.has_vicon()){
+        if(logMsg.has_localizer()){
             Eigen::MatrixXd poseVec;
-            m_Logger.ReadMatrix(poseVec,logMsg.vicon().pose_7d());
+            m_Logger.ReadMatrix(poseVec,logMsg.localizer().pose_7d());
             SceneGraph::GLAxis* axis = new SceneGraph::GLAxis(0.02);
             axis->SetPose(m_Logger.ReadPoseVector(poseVec).matrix());
             axisGroup.AddChild(axis);

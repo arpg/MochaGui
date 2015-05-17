@@ -239,7 +239,7 @@ void MochaGui::_UpdateWaypointFiles()
 }
 
 ////////////////////////////////////////////////////////////////
-void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::string sMode, std::string sLogFile)
+void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, std::string sMode, std::string sLogFile)
 {
   m_sPlaybackLogFile = sLogFile;
 
@@ -287,7 +287,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
   const aiScene *pScene = aiImportFile( sMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
   std::cout << aiGetErrorString() << std::endl;
 
-  if(bVicon){
+  if(bLocalizer){
     pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                      0,-1,0,0,
                                                      0,0,-1,0,
@@ -889,7 +889,7 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_ViconReadFunc()
+void MochaGui::_LocalizerReadFunc()
 {
   double lastTime = CarPlanner::Tic();
   int numPoses = 0;
@@ -898,14 +898,14 @@ void MochaGui::_ViconReadFunc()
 
   while(1){
     //this is a blocking call
-    double viconTime;
-    const Sophus::SE3d Twb = m_Vicon.GetPose(m_sCarObjectName,true,&viconTime);
+    double localizerTime;
+    const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
 
     double sysTime = CarPlanner::Tic();
 
     double dt = CarPlanner::Tic()-lastTime;
     if(dt > 0.5){
-      m_dViconFreq = numPoses/dt;
+      m_dLocalizerFreq = numPoses/dt;
       lastTime = CarPlanner::Tic();
       numPoses = 0;
     }
@@ -932,7 +932,7 @@ void MochaGui::_ViconReadFunc()
 
 
       if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-        m_FusionLogger.LogViconData(CarPlanner::Tic(),viconTime,Twb);
+        m_FusionLogger.LogLocalizerData(CarPlanner::Tic(),localizerTime,Twb);
       }
 
     }
