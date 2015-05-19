@@ -159,10 +159,10 @@ void EventLogger::LogImuData(const double dSysTime, const double dDeviceTime, co
 void EventLogger::LogLocalizerData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d &dTwb)
 {
     msg_Log logMsg;
-    msg_ViconLog& viconMsg = *logMsg.mutable_vicon();
-    viconMsg.set_devicetime(dDeviceTime);
-    viconMsg.set_systemtime(dSysTime);
-    WriteMatrix(_GetPoseVector(dTwb),*viconMsg.mutable_pose_7d());
+    msg_LocalizerLog& localizerMsg = *logMsg.mutable_localizer();
+    localizerMsg.set_devicetime(dDeviceTime);
+    localizerMsg.set_systemtime(dSysTime);
+    WriteMatrix(_GetPoseVector(dTwb),*localizerMsg.mutable_pose_7d());
 
     WriteMessage(logMsg);
 }

@@ -333,7 +333,7 @@ bool LearningGui::_LoadData(std::vector<std::string> *vArgs)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bViconTransform, Mode eMode)
+void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode)
 {
   m_eMode = eMode;
 
@@ -344,7 +344,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
   if (pScene == nullptr) {
     std::cerr << "Failed to import file: " << aiGetErrorString() << std::endl;
   }
-  if(bViconTransform){ //crh vicon
+  if(bLocalizerTransform){ //crh vicon
     pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                      0,-1,0,0,
                                                      0,0,-1,0,
