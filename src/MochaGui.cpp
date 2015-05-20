@@ -521,7 +521,7 @@ void MochaGui::_StartThreads()
     }
 
     if(m_pLocalizerThread) {
-      m_bStillLocalizer = false;
+      m_bStillLocalize = false;
       // m_pLocalizerThread->interrupt();
       m_pLocalizerThread->join();
     }

@@ -7,7 +7,6 @@
 #include "CarPlanner/MochaException.h"
 #include "CarPlanner/RpgUtils.h"
 
-
 //////////////////////////////////////////////////////////////////
 Eigen::Vector3d Quat2Euler( double *Q )
 {
@@ -51,10 +50,10 @@ void Localizer::TrackObject(
   std::string sUri = sNodeName + "/" + sObjectName;
 
   TrackerObject* pObj = &m_mObjects[ sObjectName ];
+  pObj->m_NodeReceiverName = "ninja_tracker";
 
-  //pObj->m_pTracker = new node::node( sUri.c_str(), m_pLocalizerConnection  );
   pObj->m_pNode.reset(new node::node( false ));
-  pObj->m_pNode->init("ninja_commander");
+  pObj->m_pNode->init(pObj->m_NodeReceiverName);
   pObj->m_pNode->subscribe(sUri);
 
   std::cout << "Node is running at: Localizer.cpp l. 64 \n"
@@ -155,12 +154,13 @@ eLocType Localizer::WhereAmI( Eigen::Matrix<double, 6, 1 > P )
 }
 
 //////////////////////////////////////////////////////////////////
-void Localizer::_ThreadFunction(Localizer *pV)
+void Localizer::_ThreadFunction(Localizer *pL)
 {
   while (1) {
     std::map< std::string, TrackerObject >::iterator it;
-    for( it = pV->m_mObjects.begin(); it != pV->m_mObjects.end(); it++ ) {
-      it->second.m_pNode->receive();
+    for( it = pL->m_mObjects.begin(); it != pL->m_mObjects.end(); it++ ) {
+      //it->second.m_pNode->receive(); //crh replaced vrpn_Tracker_Remote.mainloop()
+      std::cout << "Blocking call needed? Localizer.cpp l. 163." << std::endl;
       //boost::this_thread::interruption_point(); //crh needs atomic?
 
     }

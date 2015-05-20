@@ -255,14 +255,14 @@ void LearningGui::_LocalizerReadFunc()
 
     if(lastTime == -1){
       lastTime = sysTime;
-      nNumVicon = 0;
+      nNumLocalizer = 0;
     }else if( (sysTime - lastTime) > 1 ){
-      m_dViconRate = nNumVicon / (sysTime - lastTime);
-      //dout("Vicon rate is " << m_dViconRate << " based on " << nNumVicon);
-      nNumVicon = 0;
+      m_dLocalizerRate = nNumLocalizer / (sysTime - lastTime);
+      //dout("Localizer rate is " << m_dLocalizerRate << " based on " << nNumLocalizer);
+      nNumLocalizer = 0;
       lastTime = sysTime;
     }
-    nNumVicon++;
+    nNumLocalizer++;
   }
 }
 
@@ -280,7 +280,7 @@ bool LearningGui::_SaveData(std::vector<std::string> *vArgs)
   m_Logger.SetIsReady(true);
 
   for(size_t ii = 0 ; ii < m_pRegressionSample->m_vStates.size() && ii < m_pRegressionSample->m_vCommands.size() ; ii++){
-    m_Logger.LogPoseUpdate(m_pRegressionSample->m_vStates[ii],EventLogger::eVicon);
+    m_Logger.LogPoseUpdate(m_pRegressionSample->m_vStates[ii],EventLogger::eLocalizer);
     m_Logger.LogControlCommand(m_pRegressionSample->m_vCommands[ii]);
   }
   m_Logger.CloseLogFile();
@@ -427,7 +427,8 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
 
     /// Assume there can be multiple objects, and there's a node that is
     /// publishing information on each object (but only one node that tracks
-    /// them all). That node is called "object_tracker", and the
+    /// them all). That node is called "object_tracker", and the object being
+    /// tracked is provided in a separate argument to construct the full URI.
     m_Localizer.TrackObject("object_tracker", "ninja_car", Sophus::SE3d(dT_localizer_ref).inverse(),true); //crh localizer
     m_Localizer.Start();
 
@@ -509,7 +510,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
       .SetVar("learning:LearningParams",&m_vLearningParams)
       .SetVar("learning:DriveParams",&m_vDriveLearningParams)
       .SetVar("learning:ImuRate",&m_dImuRate)
-      .SetVar("learning:ViconRate",&m_dViconRate)
+      .SetVar("learning:LocalizerRate",&m_dLocalizerRate)
       .SetVar("learning:ProcessModelEnabled",&m_bProcessModelEnabled)
       .SetVar("learning:Refresh",&m_bRefresh)
       .SetVar("learning:Regress",&m_bRegress);

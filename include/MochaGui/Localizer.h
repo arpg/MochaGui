@@ -46,6 +46,7 @@ class Localizer
             Localizer*                          m_pLocalizerObject;
             std::mutex                          m_Mutex;
             std::condition_variable             m_PoseUpdated;
+            std::string													m_NodeReceiverName;
 
             //metrics
             double                                  m_dLastTime;
@@ -65,7 +66,7 @@ class Localizer
                 m_pLocalizerObject = obj.m_pLocalizerObject;
 
             }
-        };
+        }; //end struct TrackerObject
 
         std::map< std::string,  TrackerObject >     m_mObjects;
 
