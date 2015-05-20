@@ -1,24 +1,24 @@
 #include <fenv.h>
 #include <iostream>
-#include "Node/Node.h"
-#include "MochaGui/Vicon.h"
+#include <Node/Node.h>
+#include "MochaGui/Localizer.h"
 #include "MochaGui/SE3.h"
 
 #include "config.h"
 #include "MochaGui/GetPot"
 #include "Messages.pb.h"
 
-Vicon g_vicon;
+Localizer g_localizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )
 {
     GetPot cl( argc, argv );
 
-    g_vicon.TrackObject("Ref_Plane", "192.168.10.1",false); //crh vicon
-    g_vicon.Start();
+    g_localizer.TrackObject("Ref_Plane", "192.168.10.1",false); //crh node call
+    g_localizer.Start();
     //wait for the pose
-    Eigen::Vector6d pose = T2Cart(g_vicon.GetPose("Ref_Plane",true).matrix());
+    Eigen::Vector6d pose = T2Cart(g_localizer.GetPose("Ref_Plane",true).matrix());
     //now show the pose
     std::stringstream ss;
     Eigen::IOFormat CleanFmt(10, 0, ",", ",", "", "");

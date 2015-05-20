@@ -1,23 +1,7 @@
-/*
- * File:   Vicon.h
- * Author: jmf
- *
- * Created on February 16, 2012, 5:07 PM
- * Moved by crh from CarPlanner to MochaGui.
- */
-
-#ifndef VICON_H
-#define VICON_H
-
+#pragma once
 
 #include <Eigen/Eigen>
 #include <eigen3/Eigen/src/Core/products/GeneralBlockPanelKernel.h>
-
-//This is required to compile with Wall
-#pragma GCC diagnostic push
-    # pragma GCC diagnostic ignored "-Wunused-variable"
-    #include <vrpn_Tracker.h>
-#pragma GCC diagnostic pop
 
 #include <vector>
 #include <condition_variable>
@@ -33,13 +17,13 @@
 //    Eigen::Vector6d m_DPose;
 //};
 
-class Vicon
+class Localizer
 {
     public:
-        Vicon();
-        virtual ~Vicon();
-        void TrackObject(const std::string& sObjectName, const std::string& sHost , bool bRobotFrame = true);
-        void TrackObject(const std::string& sObjectName, const std::string& sHost , Sophus::SE3d dToffset, bool bRobotFrame = true);
+        Localizer();
+        virtual ~Localizer();
+        void TrackObject(const std::string& sNodeName , const std::string& sObjectName, bool bRobotFrame = true);
+        void TrackObject(const std::string& sNodeName, const std::string& sObjectName , Sophus::SE3d dToffset, bool bRobotFrame = true);
         void Start();
         void Stop();
         Sophus::SE3d GetPose(const std::string& sObjectName , bool blocking = false, double *time = NULL, double *rate = NULL);
@@ -48,9 +32,7 @@ class Vicon
         eLocType WhereAmI( Eigen::Vector6d P );
 
     private:
-        static void _ThreadFunction(Vicon *pVT);
-        //static void VRPN_CALLBACK _MoCapHandler(void* uData, const vrpn_TRACKERCB tData );
-        //static void VRPN_CALLBACK _MoCapVelHandler( void* uData, const vrpn_TRACKERVELCB tData );
+        static void _ThreadFunction(Localizer *pVT);
 
     private:
 
@@ -58,11 +40,12 @@ class Vicon
         {
             Sophus::SE3d                        m_dSensorPose;
             Sophus::SE3d                        m_dToffset;
-            double                                 m_dTime;
-            vrpn_Tracker_Remote*                   m_pTracker;
-            Vicon*                                 m_pViconObject;
-            std::mutex                                                      m_Mutex;
-            std::condition_variable                             m_PoseUpdated;
+            double                              m_dTime;
+            //vrpn_Tracker_Remote*              m_pTracker; //crh convert to node call?
+            std::shared_ptr<node::node>  				m_pNode;
+            Localizer*                          m_pLocalizerObject;
+            std::mutex                          m_Mutex;
+            std::condition_variable             m_PoseUpdated;
 
             //metrics
             double                                  m_dLastTime;
@@ -74,13 +57,12 @@ class Vicon
             {
             }
 
-            TrackerObject(const Vicon::TrackerObject& obj): m_Mutex(),
+            TrackerObject(const Localizer::TrackerObject& obj): m_Mutex(),
                 m_PoseUpdated()
             {
                 m_dSensorPose = obj.m_dSensorPose;
                 m_dTime = obj.m_dTime;
-                m_pTracker = obj.m_pTracker;
-                m_pViconObject = obj.m_pViconObject;
+                m_pLocalizerObject = obj.m_pLocalizerObject;
 
             }
         };
@@ -89,8 +71,4 @@ class Vicon
 
         bool                                        m_bIsStarted;
         std::thread*                                m_pThread;
-        vrpn_Connection*                            m_pViconConnection;
 };
-
-#endif  /* VICON_H */
-

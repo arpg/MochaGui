@@ -28,7 +28,7 @@
 #include "MochaGui/gui/GLGuiPanel.h"
 #include "MochaGui/EventLogger.h"
 #include "MochaGui/ProcessModelFusion.h"
-#include "MochaGui/Vicon.h"
+#include "MochaGui/Localizer.h"
 
 using namespace CVarUtils;
 using namespace std;

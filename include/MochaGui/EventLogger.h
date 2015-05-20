@@ -13,7 +13,7 @@ public:
     enum PoseUpdateSource
     {
         eIMU = 0,
-        eVicon = 1,
+        eLocalizer = 1,
         eSimulation = 2
     };
 

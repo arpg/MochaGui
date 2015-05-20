@@ -23,7 +23,7 @@
 #include "MochaGui/learning/GLLearningPanel.h"
 #include "MochaGui/PlannerGui.h"
 #include "MochaGui/GLBulletDebugDrawer.h"
-#include "MochaGui/Vicon.h"
+#include "MochaGui/Localizer.h"
 #include "Messages.pb.h"
 #include "MochaGui/ProcessModelFusion.h"
 #include "MochaGui/EventLogger.h"
@@ -78,7 +78,7 @@ private:
 
     void _CommandHandler(const MochaCommands& command);
 
-    /// vicon reader
+    /// localization reader
     Localizer m_Localizer;
     /// node for capturing IMU data from the car
     node::node m_Node;

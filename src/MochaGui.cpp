@@ -46,7 +46,7 @@ MochaGui::MochaGui() :
   m_pControlThread(0),
   m_pCommandThread(0),
   m_pImuThread(0),
-  m_pViconThread(0),
+  m_pLocalizerThread(0),
   m_bLoggerEnabled(CreateUnsavedCVar("logger.Enabled", false, "")),
   m_sLogFileName(CreateUnsavedCVar("logger.FileName", std::string(), "")),
   m_bFusionLoggerEnabled(CreateUnsavedCVar("logger.FusionEnabled", false, "")),
@@ -84,7 +84,7 @@ void MochaGui::Run() {
   //create the list of cvars not tsave
   std::vector<std::string> filter = { "not", "debug.MinLookaheadTime", "debug.MaxPlanTimeMultiplier", "debug.FreezeControl", "debug.PointCost",
                                       "debug.Show2DResult","debug.Optimize2DOnly","debug.ForceZeroStartingCurvature","debug.UseCentralDifferences",
-                                      "debug.UseGoalPoseStepping","debug.DisableDamping","debug.MonotonicCost","debug.ViconDownsampler",
+                                      "debug.UseGoalPoseStepping","debug.DisableDamping","debug.MonotonicCost","debug.LocalizerDownsampler",
                                       "debug.ImuIntegrationOnly","debug.ShowJacobianPaths","debug.SkidCompensationActive","debug.PlaybackControlPaths",
                                       "debug.MaxLookaheadTime","debug.InertialControl","debug.StartSegmentIndex","planner.PointCostWeights",
                                       "planner.TrajCostWeights", "planner.Epsilon"};
@@ -292,7 +292,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
                                                      0,-1,0,0,
                                                      0,0,-1,0,
                                                      0,0,0,1);
-  } //crh situational vicon
+  } //crh situational localizer
 
   if(sMode == "Simulation"){
     m_eControlTarget = eTargetSimulation;
@@ -426,8 +426,8 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
     vStates = new std::vector<VehicleState>();
   }
 
-  /// Vicon refplane assuming we don't have one already.
-  Eigen::Matrix4d dT_vicon_ref = Eigen::Matrix4d::Identity();
+  /// Localizer refplane assuming we don't have one already.
+  Eigen::Matrix4d dT_localizer_ref = Eigen::Matrix4d::Identity();
   if(sRefPlane.empty() == false){
     std::string word;
     std::stringstream stream(sRefPlane);
@@ -441,16 +441,16 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
 
       for(int ii = 0 ; ii < 4 ; ii++){
         for(int jj = 0 ; jj < 4 ; jj++){
-          dT_vicon_ref(ii,jj) = vals[ii*4 + jj];
+          dT_localizer_ref(ii,jj) = vals[ii*4 + jj];
         }
       }
       std::cout << "Ref plane matrix successfully read" << std::endl;
     }
   }
 
-  /// Start tracking where the vicon believes the car to be.
-  m_sCarObjectName = "ninjacar"; // crh: vrpn ninjacar name
-  m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse()); //crh situational vicon: server address
+  /// Start tracking where the localizer believes the car to be.
+  m_sCarObjectName = "ninjacar"; // crh convert to node uri
+  m_Localizer.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_localizer_ref).inverse()); //crh convert to node call
 
   //initialize the panel
   m_GuiPanel.Init();
@@ -458,7 +458,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   //fusion parameters
   m_GuiPanel.SetVar("fusion:FilterSize",m_Fusion.GetFilterSizePtr())
       .SetVar("fusion:RMSE",m_Fusion.GetRMSEPtr())
-      .SetVar("fusion:ViconFreq",&m_dViconFreq)
+      .SetVar("fusion:LocalizerFreq",&m_dLocalizerFreq)
       .SetVar("fusion:ImuFreq",&m_dImuFreq)
       .SetVar("fusion:Vel",&m_dVel)
       .SetVar("fusion:Pos",&m_dPos);
@@ -520,20 +520,20 @@ void MochaGui::_StartThreads()
       m_pImuThread->join();
     }
 
-    if(m_pViconThread) {
-      m_bStillVicon = false;
-      // m_pViconThread->interrupt();
-      m_pViconThread->join();
+    if(m_pLocalizerThread) {
+      m_bStillLocalizer = false;
+      // m_pLocalizerThread->interrupt();
+      m_pLocalizerThread->join();
     }
   }else{
-    m_Vicon.Start();
+    m_Localizer.Start();
 
     if(m_pImuThread == NULL){
       m_pImuThread = new std::thread(std::bind(&MochaGui::_ImuReadFunc,this));
     }
 
-    if(m_pViconThread == NULL){
-      m_pViconThread = new std::thread(std::bind(&MochaGui::_ViconReadFunc,this));
+    if(m_pLocalizerThread == NULL){
+      m_pLocalizerThread = new std::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
     }
   }
 
@@ -576,9 +576,9 @@ void MochaGui::_KillThreads()
       m_pImuThread->join();
   }
 
-  if(m_pViconThread) {
-      //m_pViconThread->interrupt();
-      m_pViconThread->join();
+  if(m_pLocalizerThread) {
+      //m_pLocalizerThread->interrupt();
+      m_pLocalizerThread->join();
   }
 
   if(m_pCommandThread) {
@@ -590,16 +590,16 @@ void MochaGui::_KillThreads()
   delete m_pPhysicsThread;
   delete m_pPlannerThread;
   delete m_pImuThread;
-  delete m_pViconThread;
+  delete m_pLocalizerThread;
   delete m_pCommandThread;
 
   m_pControlThread = 0;
   m_pPhysicsThread = 0;
   m_pPlannerThread = 0 ;
   m_pImuThread = 0;
-  m_pViconThread = 0;
+  m_pLocalizerThread = 0;
 
-  m_Vicon.Stop();
+  m_Localizer.Stop();
 }
 
 
@@ -881,7 +881,7 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
   }
 
   if(m_bLoggerEnabled && m_Logger.IsReady()){
-    m_Logger.LogPoseUpdate(currentState,EventLogger::eVicon);
+    m_Logger.LogPoseUpdate(currentState,EventLogger::eLocalizer);
   }
 
   //dout("Theta: " << currentState.GetTheta());
@@ -894,7 +894,7 @@ void MochaGui::_LocalizerReadFunc()
   double lastTime = CarPlanner::Tic();
   int numPoses = 0;
   int counter = 1;
-  //double viconTime = 0;
+  //double localizerTime = 0;
 
   while(1){
     //this is a blocking call

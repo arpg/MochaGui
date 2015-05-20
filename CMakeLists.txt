@@ -112,7 +112,7 @@ set( SHARED_HDRS
     include/MochaGui/SE3.h
     include/MochaGui/GetPot
     include/MochaGui/GLWidgetPanel.h
-    include/MochaGui/Vicon.h
+    include/MochaGui/Localizer.h
     config.h.in
    )
 
@@ -122,7 +122,7 @@ set( SHARED_SRC
     src/ProcessModelFusion.cpp
     src/JoystickHandler.cpp
     src/EventLogger.cpp
-    src/Vicon.cpp
+    src/Localizer.cpp
     Messages.pb.cc
    )
 

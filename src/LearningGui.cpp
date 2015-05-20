@@ -2,13 +2,13 @@
 
 LearningGui *g_pLearningGuiInstance = NULL;
 
-//static int& g_nViconDownsampler = CVarUtils::CreateGetCVar("debug.ViconDownsampler",0);
+//static int& g_nLocalizerDownsampler = CVarUtils::CreateGetCVar("debug.ViconDownsampler",0);
 /////////////////////////////////////////////////////////////////////////////////////////
 LearningGui::LearningGui() :
   m_sCarObjectName("CAR"),
   m_dT(CreateCVar("learning.TimeInteval", 0.005, "")),
   m_dImuRate(0),
-  m_dViconRate(0),
+  m_dLocalizerRate(0),
   m_bLearn(CreateCVar("learning.Active", false, "")),
   m_bLearningRunning(false),
   m_pRegressionSample(NULL),
@@ -159,7 +159,7 @@ void LearningGui::_JoystickReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_SetPoseFromFusion()
 {
-  //update state from vicon
+  //update state from localizer
   VehicleState state;
   if(m_bProcessModelEnabled == false){
     fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
@@ -170,7 +170,7 @@ void LearningGui::_SetPoseFromFusion()
   }else{
     m_Fusion.GetVehicleState(state);
   }
-  //fix the vicon offset
+  //fix the localizer offset
   if(m_bPlayback == false){
     m_Gui.SetCarState(m_nDriveCarId,state,m_bLearn);
   }
@@ -227,18 +227,18 @@ void LearningGui::_ImuReadFunc()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void LearningGui::_ViconReadFunc()
+void LearningGui::_LocalizerReadFunc()
 {
-  int nNumVicon = 0;
+  int nNumLocalizer = 0;
   double lastTime = -1;
-  int nViconSkip = 0;
+  int nLocalizerSkip = 0;
   while(1){
     //this is a blocking call
-    double viconTime;
-    Sophus::SE3d pose = m_Vicon.GetPose(m_sCarObjectName,true,&viconTime);
-    nViconSkip++;
+    double localizerTime;
+    Sophus::SE3d pose = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
+    nLocalizerSkip++;
 
-    //offset the vicon measurements
+    //offset the localizer measurements
     double sysTime = CarPlanner::Tic();
 
     ControlCommand command;
@@ -344,7 +344,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
   if (pScene == nullptr) {
     std::cerr << "Failed to import file: " << aiGetErrorString() << std::endl;
   }
-  if(bLocalizerTransform){ //crh vicon
+  if(bLocalizerTransform){ //crh localizer
     pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                      0,-1,0,0,
                                                      0,0,-1,0,
@@ -392,7 +392,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
 
   //initialize the fusion
   if(m_eMode == Mode_Experiment){
-    Eigen::Matrix4d dT_vicon_ref = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4d dT_localizer_ref = Eigen::Matrix4d::Identity();
     if(sRefPlane.empty() == false){
       std::string word;
       std::stringstream stream(sRefPlane);
@@ -406,7 +406,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
 
         for(int ii = 0 ; ii < 4 ; ii++){
           for(int jj = 0 ; jj < 4 ; jj++){
-            dT_vicon_ref(ii,jj) = vals[ii*4 + jj];
+            dT_localizer_ref(ii,jj) = vals[ii*4 + jj];
           }
         }
         std::cout << "Ref plane matrix successfully read" << std::endl;
@@ -419,13 +419,20 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
     m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
     m_Fusion.SetCalibrationActive(false);
 
-    m_Node.subscribe("ninja_commander/IMU");
-    //dT_vicon_ref.block<3,3>(0,0).transposeInPlace();
-    m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true); //crh vicon
-    m_Vicon.Start();
+    /// Take care of all Node calls with Localizer object rather than direct
+    /// Node calls here.
+
+    //m_Node.subscribe("ninja_commander/IMU");
+    //dT_localizer_ref.block<3,3>(0,0).transposeInPlace();
+
+    /// Assume there can be multiple objects, and there's a node that is
+    /// publishing information on each object (but only one node that tracks
+    /// them all). That node is called "object_tracker", and the
+    m_Localizer.TrackObject("object_tracker", "ninja_car", Sophus::SE3d(dT_localizer_ref).inverse(),true); //crh localizer
+    m_Localizer.Start();
 
     m_pImuThread = new std::thread(std::bind(&LearningGui::_ImuReadFunc,this));
-    m_pViconThread = new std::thread(std::bind(&LearningGui::_ViconReadFunc,this));
+    m_pLocalizerThread = new std::thread(std::bind(&LearningGui::_LocalizerReadFunc,this));
     m_pLearningCaptureThread = new std::thread(std::bind(&LearningGui::_LearningCaptureFunc,this));
 
     m_Gui.SetCarVisibility(m_nDriveCarId,true);

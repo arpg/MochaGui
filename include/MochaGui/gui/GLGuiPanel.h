@@ -60,7 +60,7 @@ public:
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect,"Freq: IMU:");
                         //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ImuFreq")).str().c_str() ,0,0.1,0.8,0.8); //crh
-                        m_Ui.doLabel(m_Rect,"Vicon:");
+                        m_Ui.doLabel(m_Rect,"Localizer:");
                         //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ViconFreq")).str().c_str() ,0,0.1,0.8,0.8 ); //crh
                     m_Ui.endGroup();
 

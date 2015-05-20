@@ -130,8 +130,8 @@ void EventLogger::LogControlPlan(const ControlPlan& plan)
     planMsg.set_starttime(plan.m_dStartTime);
     planMsg.set_endtime(plan.m_dEndTime);
     WriteMotionSample(plan.m_Sample,*planMsg.mutable_sample());
-    WriteVehicleState(plan.m_StartState,eVicon,*planMsg.mutable_startstate());
-    WriteVehicleState(plan.m_GoalState,eVicon,*planMsg.mutable_endstate());
+    WriteVehicleState(plan.m_StartState,eLocalizer,*planMsg.mutable_startstate());
+    WriteVehicleState(plan.m_GoalState,eLocalizer,*planMsg.mutable_endstate());
     planMsg.set_startsampleindex(plan.m_nStartSampleIndex);
     planMsg.set_startsegmentindex(plan.m_nStartSegmentIndex);
     planMsg.set_endsampleindex(plan.m_nEndSampleIndex);
@@ -269,7 +269,7 @@ void EventLogger::WriteMotionSample(const MotionSample &sample, msg_MotionSample
 {
     for(const VehicleState& state: sample.m_vStates){
         msg_VehicleState& msgState = *msgSample.add_states();
-        WriteVehicleState(state,eVicon,msgState);
+        WriteVehicleState(state,eLocalizer,msgState);
     }
 
     for(const ControlCommand& command: sample.m_vCommands){
