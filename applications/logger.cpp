@@ -3,7 +3,7 @@
 #include <functional>
 #include <thread>
 #include <atomic>
-#include "Node/Node.h"
+#include <Node/Node.h>
 #include "CarPlanner/BulletCarModel.h"
 
 #include "config.h"

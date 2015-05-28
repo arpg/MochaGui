@@ -6,7 +6,7 @@
 #include <vector>
 #include <condition_variable>
 #include "CarPlanner/CarPlannerCommon.h"
-#include <HAL/Messages/Pose.h>
+#include "Messages.pb.h" // NOT HAL/Messages.pb.h.
 #include <Node/Node.h>
 
 

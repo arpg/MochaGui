@@ -53,7 +53,6 @@ find_package( LibAO REQUIRED )
 find_package( IOKit REQUIRED )
 find_package( Sophus REQUIRED )
 find_package( Node REQUIRED )
-find_package( VRPN REQUIRED )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 
@@ -62,12 +61,11 @@ add_subdirectory(NvWidgets)
 add_subdirectory(Gamepad)
 
 
-include_directories( ${CMAKE_BINARY_DIR} )
+include_directories( ${CMAKE_CURRENT_BINARY_DIR} )
 PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 
 set( _INCLUDE_DIRS
-    ${VRPN_INCLUDE_DIRS}
     ${GLOG_INCLUDE_DIRS}
             ${Node_INCLUDE_DIRS}
             ${Sophus_INCLUDE_DIRS}
@@ -85,8 +83,6 @@ set( _INCLUDE_DIRS
        )
 
 set( LIBRARIES
-    ${VRPN_LIBRARY}
-    ${VRPN_SERVER_LIBRARY}
                ${Node_LIBRARIES}
                ${SENSORFUSION_LIBRARIES}
                ${Pangolin_LIBRARIES}
@@ -116,6 +112,8 @@ set( SHARED_HDRS
     config.h.in
    )
 
+list(APPEND SHARED_HDRS ${PROTO_HDRS})
+
 set( SHARED_SRC
     src/PlannerGui.cpp
     src/GLBulletDebugDrawer.cpp
@@ -123,8 +121,9 @@ set( SHARED_SRC
     src/JoystickHandler.cpp
     src/EventLogger.cpp
     src/Localizer.cpp
-    Messages.pb.cc
    )
+
+list(APPEND SHARED_SRC ${PROTO_SRCS})
 
 
 set( GUI_HDRS

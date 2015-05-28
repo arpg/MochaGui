@@ -1225,7 +1225,7 @@ void MochaGui::_PhysicsFunc()
   while(1){
     //boost::this_thread::interruption_point();
 
-    while(m_bSimulate3dPath == false &&){
+    while(m_bSimulate3dPath == false){
       dCurrentTic = CarPlanner::Tic();
       //boost::this_thread::interruption_point();
       usleep(10000);
