@@ -27,6 +27,10 @@ Eigen::Vector3d Quat2Euler( double *Q )
 Localizer::Localizer()
 {
   m_bIsStarted = false;
+  m_abStopLocalizer = false;
+  m_pNode.reset(new node::node( false ));
+  m_NodeReceiverName = "ninja_tracker";
+  m_pNode->init(m_NodeReceiverName);
 }
 
 //////////////////////////////////////////////////////////////////
@@ -47,17 +51,13 @@ void Localizer::TrackObject(
     )
 {
 
-  std::string sUri = sNodeName + "/" + sObjectName;
 
   TrackerObject* pObj = &m_mObjects[ sObjectName ];
-  pObj->m_NodeReceiverName = "ninja_tracker";
+  pObj->m_sUri = sNodeName + "/" + sObjectName;
 
-  pObj->m_pNode.reset(new node::node( false ));
-  pObj->m_pNode->init(pObj->m_NodeReceiverName);
-  pObj->m_pNode->subscribe(sUri);
-
+  this->m_pNode->subscribe(pObj->m_sUri);
   std::cout << "Node is running at: Localizer.cpp l. 64 \n"
-               "Also fix ~Localizer." << std::endl;
+               "~Localizer working?" << std::endl;
   pObj->m_dToffset = dToffset;
   pObj->m_bRobotFrame = bRobotFrame;
   pObj->m_pLocalizerObject = this;
@@ -159,9 +159,14 @@ void Localizer::_ThreadFunction(Localizer *pL)
   while (1) {
     std::map< std::string, TrackerObject >::iterator it;
     for( it = pL->m_mObjects.begin(); it != pL->m_mObjects.end(); it++ ) {
-      //it->second.m_pNode->receive(); //crh replaced vrpn_Tracker_Remote.mainloop()
+      msg_Matrix msg;
+      pL->m_pNode->receive(it->second.m_sUri,msg); //crh replaced vrpn_Tracker_Remote.mainloop()
+      /// TODO: convert this to a SE3d and overwrite m_dSensorPose using
+      /// it->second->m_dSensorPose; may need to invoke something like Matrix.h
+      /// in HAL.
       std::cout << "Blocking call needed? Localizer.cpp l. 163." << std::endl;
-      //boost::this_thread::interruption_point(); //crh needs atomic?
+      //boost::this_thread::interruption_point(); //crh replaced with next line
+      if(pL->m_abStopLocalizer) { return; }
 
     }
 

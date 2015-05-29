@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <condition_variable>
+#include <atomic>
 #include "CarPlanner/CarPlannerCommon.h"
 #include "Messages.pb.h" // NOT HAL/Messages.pb.h.
 #include <Node/Node.h>
@@ -42,11 +43,10 @@ class Localizer
             Sophus::SE3d                        m_dToffset;
             double                              m_dTime;
             //vrpn_Tracker_Remote*              m_pTracker; //crh convert to node call?
-            std::shared_ptr<node::node>  				m_pNode;
             Localizer*                          m_pLocalizerObject;
             std::mutex                          m_Mutex;
             std::condition_variable             m_PoseUpdated;
-            std::string													m_NodeReceiverName;
+            std::string													m_sUri;
 
             //metrics
             double                                  m_dLastTime;
@@ -69,7 +69,10 @@ class Localizer
         }; //end struct TrackerObject
 
         std::map< std::string,  TrackerObject >     m_mObjects;
+        std::shared_ptr<node::node>  				m_pNode;
+        std::string													m_NodeReceiverName;
 
+        std::atomic<bool>														m_abStopLocalizer;
         bool                                        m_bIsStarted;
         std::thread*                                m_pThread;
 };
