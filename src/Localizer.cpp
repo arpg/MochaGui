@@ -161,10 +161,7 @@ void Localizer::_ThreadFunction(Localizer *pL)
     for( it = pL->m_mObjects.begin(); it != pL->m_mObjects.end(); it++ ) {
       ninjacar::PoseMsg msg;
       pL->m_pNode->receive(it->second.m_sUri,msg); //crh replaced vrpn_Tracker_Remote.mainloop()
-
-      /// TODO: convert this to a SE3d and overwrite m_dSensorPose using
-      /// it->second->m_dSensorPose; may need to invoke something like Matrix.h
-      /// in HAL.
+      ninjacar::ReadPoseSE3(msg,&it->second.m_dSensorPose);
       std::cout << "Blocking call needed? Localizer.cpp l. 163." << std::endl;
       //boost::this_thread::interruption_point(); //crh replaced with next line
       if(pL->m_abStopLocalizer) { return; }
