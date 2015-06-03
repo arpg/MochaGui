@@ -13,15 +13,16 @@
 #include <atomic>
 #include <thread>
 #include <assimp/DefaultLogger.hpp>
+#include <node/Node.h>
 
 #include "CarPlanner/CarController.h"
 #include "CarPlanner/LocalPlanner.h"
 #include "CarPlanner/CarRegressor.h"
 #include "CarPlanner/CVarHelpers.h"
 #include "SensorFusion/SensorFusionCeres.h"
-#include "Node/Node.h"
 
 #include "Messages.pb.h"
+#include "Imu.pb.h"
 #include "MochaGui/GLCar.h"
 #include "MochaGui/PlannerGui.h"
 #include "MochaGui/GLBulletDebugDrawer.h"

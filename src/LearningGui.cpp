@@ -133,8 +133,8 @@ void LearningGui::_JoystickReadFunc()
     //if we are in experiment mode, send these to the ppm
     if(m_eMode  == Mode_Experiment){
       //send the messages to the control-daemon
-      CommandMsg Req;
-      CommandReply Rep;
+      ninjacar::CommandMsg Req;
+      ninjacar::CommandReply Rep;
 
       Req.set_accel(command.m_dForce);
       Req.set_phi(command.m_dPhi);
@@ -205,12 +205,15 @@ void LearningGui::_ImuReadFunc()
   int nNumImu = 0;
   double lastTime = -1;
   while(1){
-    Imu_Accel_Gyro Msg;
+    ninjacar::ImuMsg Msg;
     if(m_Node.receive("nc_node/status",Msg)){ // crh node call
       //double time = (double)Msg.timer()/62500.0;
       double sysTime = CarPlanner::Tic();
-      m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
-                               Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
+      Eigen::VectorXd Accel,Gyro;
+      ninjacar::ReadVector(Msg.accel(),&Accel);
+      ninjacar::ReadVector(Msg.gyro(),&Gyro);
+      m_Fusion.RegisterImuPose(Accel(0)*G_ACCEL,Accel(1)*G_ACCEL,Accel(2)*G_ACCEL,
+                               Gyro(0),Gyro(1),Gyro(2),sysTime,sysTime);
 
       if(lastTime == -1){
         lastTime = sysTime;
@@ -303,7 +306,7 @@ bool LearningGui::_LoadData(std::vector<std::string> *vArgs)
 
   int counter = 0;
   m_Logger.ReadLogFile(vArgs->at(0));
-  msg_Log msg;
+  ninjacar::LogMsg msg;
   while(m_Logger.ReadMessage(msg))
   {
     if(msg.has_vehiclestate() == false || msg.has_controlcommand() == false){

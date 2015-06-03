@@ -30,24 +30,24 @@ void EventLogger::OpenLogFile(const std::string& fileName)
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::LogPoseUpdate(const VehicleState& state,const PoseUpdateSource& eSource)
 {
-    msg_Log logMsg;
-    msg_VehicleState& msgState = *logMsg.mutable_vehiclestate();
+    ninjacar::LogMsg MsgLog;
+    ninjacar::VehicleStateMsg& msgState = *MsgLog.mutable_vehiclestate();
     WriteVehicleState(state,eSource,msgState);
 
-    WriteMessage(logMsg);
+    WriteMessage(MsgLog);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::LogControlCommand(const ControlCommand& command)
 {
-    msg_Log logMsg;
-    msg_ControlCommand& msg = *logMsg.mutable_controlcommand();
+    ninjacar::LogMsg MsgLog;
+    ninjacar::ControlCommandMsg& msg = *MsgLog.mutable_controlcommand();
     WriteControlCommand(command,msg);
-    WriteMessage(logMsg);
+    WriteMessage(MsgLog);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::ReadCommand(ControlCommand& command, const msg_ControlCommand& msgCommand)
+void EventLogger::ReadCommand(ControlCommand& command, const ninjacar::ControlCommandMsg& msgCommand)
 {
     command.m_dT = msgCommand.dt();
     command.m_dForce = msgCommand.force();
@@ -56,21 +56,21 @@ void EventLogger::ReadCommand(ControlCommand& command, const msg_ControlCommand&
     command.m_dCurvature = msgCommand.curvature();
 
     Eigen::MatrixXd tempVec;
-    ReadMatrix(tempVec,msgCommand.torque_3d());
+    ninjacar::ReadMatrix(msgCommand.torque_3d(),&tempVec);
     tempVec = command.m_dTorque;
 }
 
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::WriteControlCommand(const ControlCommand& command, msg_ControlCommand& commandMsg)
+void EventLogger::WriteControlCommand(const ControlCommand& command, ninjacar::ControlCommandMsg& msgControlCommand)
 {
-    commandMsg.set_dt(command.m_dT);
-    commandMsg.set_force(command.m_dForce);
-    commandMsg.set_phi(command.m_dPhi);
-    commandMsg.set_time(command.m_dTime);
-    commandMsg.set_curvature(command.m_dCurvature);
-    WriteMatrix(command.m_dTorque,*commandMsg.mutable_torque_3d());
+    msgControlCommand.set_dt(command.m_dT);
+    msgControlCommand.set_force(command.m_dForce);
+    msgControlCommand.set_phi(command.m_dPhi);
+    msgControlCommand.set_time(command.m_dTime);
+    msgControlCommand.set_curvature(command.m_dCurvature);
+    ninjacar::WriteMatrix(command.m_dTorque,msgControlCommand.mutable_torque_3d());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -101,7 +101,7 @@ void EventLogger::CloseLogFile()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::ReadControlPlan(ControlPlan &plan, const msg_ControlPlan &msgPlan)
+void EventLogger::ReadControlPlan(ControlPlan &plan, const ninjacar::ControlPlanMsg &msgPlan)
 {
     plan.m_dStartTime = msgPlan.starttime();
     plan.m_dEndTime = msgPlan.endtime();
@@ -125,8 +125,8 @@ void EventLogger::ReadControlPlan(ControlPlan &plan, const msg_ControlPlan &msgP
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::LogControlPlan(const ControlPlan& plan)
 {
-    msg_Log logMsg;
-    msg_ControlPlan& planMsg = *logMsg.mutable_controlplan();
+    ninjacar::LogMsg MsgLog;
+    ninjacar::ControlPlanMsg& planMsg = *MsgLog.mutable_controlplan();
     planMsg.set_starttime(plan.m_dStartTime);
     planMsg.set_endtime(plan.m_dEndTime);
     WriteMotionSample(plan.m_Sample,*planMsg.mutable_sample());
@@ -139,50 +139,50 @@ void EventLogger::LogControlPlan(const ControlPlan& plan)
     //WriteMatrix(_GetPoseVector(plan.m_dStartPose),*planMsg.mutable_startpose_7d());
     //WriteMatrix(_GetPoseVector(plan.m_dEndPose),*planMsg.mutable_endpose_7d());
 
-    WriteMessage(logMsg);
+    WriteMessage(MsgLog);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::LogImuData(const double dSysTime, const double dDeviceTime, const Eigen::Vector3d &dAccel, const Eigen::Vector3d &dGyro)
 {
-    msg_Log logMsg;
-    msg_ImuLog& imuMsg = *logMsg.mutable_imu();
-    imuMsg.set_devicetime(dDeviceTime);
-    imuMsg.set_systemtime(dSysTime);
-    WriteMatrix(dAccel,*imuMsg.mutable_accel());
-    WriteMatrix(dGyro,*imuMsg.mutable_gyro());
+    ninjacar::LogMsg MsgLog;
+    ninjacar::ImuMsg& imuMsg = *MsgLog.mutable_imu();
+    imuMsg.set_device_time(dDeviceTime);
+    imuMsg.set_system_time(dSysTime);
+    ninjacar::WriteVector(dAccel,imuMsg.mutable_accel());
+    ninjacar::WriteVector(dGyro,imuMsg.mutable_gyro());
 
-    WriteMessage(logMsg);
+    WriteMessage(MsgLog);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::LogLocalizerData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d &dTwb)
 {
-    msg_Log logMsg;
-    msg_LocalizerLog& localizerMsg = *logMsg.mutable_localizer();
-    localizerMsg.set_devicetime(dDeviceTime);
-    localizerMsg.set_systemtime(dSysTime);
-    WriteMatrix(_GetPoseVector(dTwb),*localizerMsg.mutable_pose_7d());
-
-    WriteMessage(logMsg);
+    ninjacar::LogMsg MsgLog;
+    ninjacar::PoseMsg& localizerMsg = *MsgLog.mutable_localizer();
+    localizerMsg.set_device_time(dDeviceTime);
+    localizerMsg.set_system_time(dSysTime);
+    localizerMsg.set_type(ninjacar::PoseMsg_Type_SE3);
+    ninjacar::WriteVector(_GetPoseVector(dTwb),localizerMsg.mutable_pose());
+    WriteMessage(MsgLog);
 }
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void EventLogger::WriteSegmentSamples(const std::vector<MotionSample> vSegmentSamples)
 {
-    msg_Log logMsg;
-    msg_Segments& segMsg = *logMsg.mutable_segments();
+    ninjacar::LogMsg MsgLog;
+    ninjacar::SegmentsMsg& segMsg = *MsgLog.mutable_segments();
     for(const MotionSample& sample: vSegmentSamples){
         WriteMotionSample(sample,*segMsg.add_segments());
     }
 
-    WriteMessage(logMsg);
+    WriteMessage(MsgLog);
 }
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::ReadVehicleState(VehicleState &state, EventLogger::PoseUpdateSource &eSource, const msg_VehicleState &msgState)
+void EventLogger::ReadVehicleState(VehicleState &state, EventLogger::PoseUpdateSource &eSource, const ninjacar::VehicleStateMsg &msgState)
 {
     state.m_dCurvature = msgState.curvature();
     state.m_dSteering = msgState.steering();
@@ -190,31 +190,31 @@ void EventLogger::ReadVehicleState(VehicleState &state, EventLogger::PoseUpdateS
     eSource = (PoseUpdateSource)msgState.source();
 
     Eigen::MatrixXd vec;
-    ReadMatrix(vec,msgState.pose_7d());
+    ninjacar::ReadMatrix(msgState.pose_7d(),&vec);
     state.m_dTwv = ReadPoseVector(vec);
-    ReadMatrix(vec,msgState.vel_3d());
+    ninjacar::ReadMatrix(msgState.vel_3d(),&vec);
     state.m_dV = vec;
-    ReadMatrix(vec,msgState.w_3d());
+    ninjacar::ReadMatrix(msgState.w_3d(),&vec);
     state.m_dW = vec;
 }
 
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::WriteVehicleState(const VehicleState& state,const PoseUpdateSource& eSource,msg_VehicleState &msgState)
+void EventLogger::WriteVehicleState(const VehicleState& state,const PoseUpdateSource& eSource,ninjacar::VehicleStateMsg &msgState)
 {
     msgState.set_curvature(state.m_dCurvature);
     msgState.set_steering(state.m_dSteering);
     msgState.set_time(state.m_dTime);
     msgState.set_source((int)eSource);
 
-    WriteMatrix(_GetPoseVector(state.m_dTwv),*msgState.mutable_pose_7d());
-    WriteMatrix(state.m_dV,*msgState.mutable_vel_3d());
-    WriteMatrix(state.m_dW,*msgState.mutable_w_3d());
+    ninjacar::WriteMatrix(_GetPoseVector(state.m_dTwv),msgState.mutable_pose_7d());
+    ninjacar::WriteMatrix(state.m_dV,msgState.mutable_vel_3d());
+    ninjacar::WriteMatrix(state.m_dW,msgState.mutable_w_3d());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-bool EventLogger::ReadMessage(msg_Log &msg)
+bool EventLogger::ReadMessage(ninjacar::LogMsg &msg)
 {
     m_LastLogMessage.Clear();
     int byteSize;
@@ -236,7 +236,7 @@ bool EventLogger::ReadMessage(msg_Log &msg)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::WriteMessage(msg_Log &msg)
+void EventLogger::WriteMessage(ninjacar::LogMsg &msg)
 {
     std::unique_lock<std::mutex> lock(m_WriteMutex);
     msg.set_timestamp(CarPlanner::Tic());
@@ -249,7 +249,7 @@ void EventLogger::WriteMessage(msg_Log &msg)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::ReadMotionSample(MotionSample &sample, const msg_MotionSample &msgSample)
+void EventLogger::ReadMotionSample(MotionSample &sample, const ninjacar::MotionSampleMsg &msgSample)
 {
     sample.m_vStates.resize(msgSample.states_size());
     sample.m_vCommands.resize(msgSample.command_size());
@@ -265,38 +265,18 @@ void EventLogger::ReadMotionSample(MotionSample &sample, const msg_MotionSample 
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::WriteMotionSample(const MotionSample &sample, msg_MotionSample &msgSample)
+void EventLogger::WriteMotionSample(const MotionSample &sample, ninjacar::MotionSampleMsg &msgSample)
 {
     for(const VehicleState& state: sample.m_vStates){
-        msg_VehicleState& msgState = *msgSample.add_states();
+        ninjacar::VehicleStateMsg& msgState = *msgSample.add_states();
         WriteVehicleState(state,eLocalizer,msgState);
     }
 
     for(const ControlCommand& command: sample.m_vCommands){
-        msg_ControlCommand& msgCommand = *msgSample.add_command();
+        ninjacar::ControlCommandMsg& msgCommand = *msgSample.add_command();
         WriteControlCommand(command,msgCommand);
     }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::WriteMatrix(const Eigen::MatrixXd &mat, msg_Matrix &msg)
-{
-    msg.set_cols(mat.cols());
-    msg.set_rows(mat.rows());
-    for(int ii = 0 ; ii < mat.cols()*mat.rows() ; ii++){
-        msg.add_data(mat(ii));
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::ReadMatrix(Eigen::MatrixXd &mat, const msg_Matrix &msg)
-{
-    mat.resize(msg.rows(),msg.cols());
-    for(int ii = 0 ; ii < msg.data_size() ; ii++){
-        mat(ii) = msg.data(ii);
-    }
-}
-
 
 /////////////////////////////////////////////////////////////////////////////////////////
 Eigen::Vector7d EventLogger::_GetPoseVector(const Sophus::SE3d &pose)

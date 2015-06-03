@@ -28,7 +28,7 @@ std::atomic<double> m_gLastAccel;
 std::atomic<double> m_gLastPhi;
 std::atomic<int> m_nProgramCount;
 
-void ProgramControlRpc( CommandMsg& Req, CommandReply& Rep, void* userData )
+void ProgramControlRpc( ninjacar::CommandMsg& Req, ninjacar::CommandReply& Rep, void* userData )
 {    
     if(g_eMaster == eProgramControl){
         try{
@@ -69,8 +69,8 @@ int main()
 
     g_CommandRpcNode.provide_rpc( "ProgramControlRpc", &ProgramControlRpc, NULL );  //crh node api
 
-    CommandMsg Req;
-    CommandReply Rep;
+    ninjacar::CommandMsg Req;
+    ninjacar::CommandReply Rep;
 
     while(1)
     {

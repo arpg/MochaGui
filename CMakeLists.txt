@@ -5,27 +5,6 @@ if( NOT CMAKE_BUILD_TYPE )
     set( CMAKE_BUILD_TYPE Debug)
 endif()
 
-# Test platform type
-IF(WIN32 OR WIN64)
-    MESSAGE("Windows system found..")
-  SET(_WIN_ 1)
-ENDIF()
-
-IF(UNIX)
-  MESSAGE("Unix system found..")
-  SET(_UNIX_ 1)
-ENDIF()
-
-IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    MESSAGE("OS X system found..")
-   SET(_OSX_ 1)
-ENDIF()
-
-IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    MESSAGE("Linux system found..")
-   SET(_LINUX_ 1)
-ENDIF()
-
 # TODO fix all these warnings instead of suppressing them!!
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
@@ -35,12 +14,14 @@ add_definitions(-DBT_NO_PROFILE)
 # Add to module path, so we can find our cmake modules
 set( CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH} )
 
+include( SetPlatformVars )
+
 message( "LUT not currently supported; source: src/lut.cpp." )
 
 #this dependency is required for newer versions of the boost library. unfortunately
 #boost doesn't seem to link to it..
 
-find_package(Pangolin REQUIRED)
+find_package( Pangolin REQUIRED)
 find_package( GLOG REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
@@ -53,6 +34,7 @@ find_package( LibAO REQUIRED )
 find_package( IOKit REQUIRED )
 find_package( Sophus REQUIRED )
 find_package( Node REQUIRED )
+find_package( HAL REQUIRED)
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 
@@ -62,39 +44,52 @@ add_subdirectory(Gamepad)
 
 
 include_directories( ${CMAKE_CURRENT_BINARY_DIR} )
-PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
+set( PROTO_DIR src/Messages )
+set( _PROTO_SRCS
+    # unique messages for MochaGui
+    ${PROTO_DIR}/Messages.proto
+    ${PROTO_DIR}/State.proto
+    # messages from HAL
+    ${PROTO_DIR}/Matrix.proto
+    ${PROTO_DIR}/Pose.proto
+    ${PROTO_DIR}/Imu.proto
+    )
+
+PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS ${_PROTO_SRCS} )
 
 set( _INCLUDE_DIRS
     ${GLOG_INCLUDE_DIRS}
-            ${Node_INCLUDE_DIRS}
-            ${Sophus_INCLUDE_DIRS}
-            ${LIBAO_INCLUDE_DIR}
-            ${Pangolin_INCLUDE_DIRS}
-            ${CarPlanner_INCLUDE_DIRS}
-            ${CVARS_INCLUDE_DIRS}
-            ${ZeroMQ_INCLUDE_DIRS}
-            ${PROTOBUF_INCLUDE_DIRS}
-            ${SceneGraph_INCLUDE_DIRS}
-            ${BULLET_INCLUDE_DIR}
-            ${SENSORFUSION_INCLUDE_DIRS}
-            ${CMAKE_CURRENT_SOURCE_DIR}/include
-            ${CMAKE_BINARY_DIR}
-       )
+    ${Node_INCLUDE_DIRS}
+    ${HAL_INCLUDE_DIRS}
+    ${Sophus_INCLUDE_DIRS}
+    ${LIBAO_INCLUDE_DIR}
+    ${Pangolin_INCLUDE_DIRS}
+    ${CarPlanner_INCLUDE_DIRS}
+    ${CVars_INCLUDE_DIRS}
+    ${ZeroMQ_INCLUDE_DIRS}
+    ${PROTOBUF_INCLUDE_DIRS}
+    ${SceneGraph_INCLUDE_DIRS}
+    ${BULLET_INCLUDE_DIR}
+    ${SENSORFUSION_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}
+    )
 
 set( LIBRARIES
-               ${Node_LIBRARIES}
-               ${SENSORFUSION_LIBRARIES}
-               ${Pangolin_LIBRARIES}
-               ${LIBAO_LIBRARY}
-               ${SceneGraph_LIBRARIES}
-               ${CarPlanner_LIBRARIES}
-               ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
-               ${CVars_LIBRARIES}
-               nvwidgets #this is built with MochaGui. No finding is required
-               Gamepad # this is also built with the solution
-               assimp
-        )
+     ${Node_LIBRARIES}
+     ${HAL_LIBRARIES}
+     ${SENSORFUSION_LIBRARIES}
+     ${Pangolin_LIBRARIES}
+     ${LIBAO_LIBRARY}
+     ${SceneGraph_LIBRARIES}
+     ${CarPlanner_LIBRARIES}
+     ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
+     ${CVars_LIBRARIES}
+     nvwidgets #this is built with MochaGui. No finding is required
+     Gamepad # this is also built with the solution
+     assimp
+     )
 
 include_directories( ${_INCLUDE_DIRS} )
 
@@ -109,6 +104,7 @@ set( SHARED_HDRS
     include/MochaGui/GetPot
     include/MochaGui/GLWidgetPanel.h
     include/MochaGui/Localizer.h
+    include/MochaGui/Matrix.h
     config.h.in
    )
 

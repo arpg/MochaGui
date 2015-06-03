@@ -159,8 +159,9 @@ void Localizer::_ThreadFunction(Localizer *pL)
   while (1) {
     std::map< std::string, TrackerObject >::iterator it;
     for( it = pL->m_mObjects.begin(); it != pL->m_mObjects.end(); it++ ) {
-      msg_Matrix msg;
+      ninjacar::PoseMsg msg;
       pL->m_pNode->receive(it->second.m_sUri,msg); //crh replaced vrpn_Tracker_Remote.mainloop()
+
       /// TODO: convert this to a SE3d and overwrite m_dSensorPose using
       /// it->second->m_dSensorPose; may need to invoke something like Matrix.h
       /// in HAL.

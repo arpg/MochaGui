@@ -46,8 +46,8 @@ void JoystickFunc()
             std::cout << "Joystick commands logged at:" << CarPlanner::Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]" << std::endl;
         }
 
-        CommandMsg Req;
-        CommandReply Rep;
+        ninjacar::CommandMsg Req;
+        ninjacar::CommandReply Rep;
 
         Req.set_accel(command.m_dForce);
         Req.set_phi(command.m_dPhi);
@@ -60,13 +60,17 @@ void JoystickFunc()
 void ImuReadFunc()
 {
     while(g_StillRun){
-        Imu_Accel_Gyro Msg;
+        ninjacar::ImuMsg Msg;
         if(g_node.receive("nc_node/state",Msg)){ //crh node api
-            double time = (double)Msg.timer()/62500.0;
+            //double time = (double)Msg.timer()/62500.0; //crh old (int32)Msg.timer in Imu_Accel_Gyro
+            double time = Msg.device_time();
             if(g_bLog ){
-                std::cout << "IMU pose received at:" << time << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << "]" << std::endl;
+                Eigen::VectorXd Accel,Gyro;
+                ninjacar::ReadVector(Msg.accel(),&Accel);
+                ninjacar::ReadVector(Msg.gyro(),&Gyro);
+                std::cout << "IMU pose received at:" << time << "seconds [" << Accel(1) << " " <<  -Accel(0) << " " << Accel(2) << "]" << std::endl;
                 fflush(stdout);
-                logger.LogImuData(CarPlanner::Tic(),time,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
+                logger.LogImuData(CarPlanner::Tic(),time,Eigen::Vector3d(Accel(0),Accel(1),Accel(2)),Eigen::Vector3d(Gyro(0),Gyro(1),Gyro(2)));
             }
         }
     }

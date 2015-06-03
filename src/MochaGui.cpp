@@ -158,7 +158,7 @@ void MochaGui::_PlaybackLog(double dt)
 
     //now open a log file
     m_Logger.ReadLogFile(m_sPlaybackLogFile);
-    msg_Log msg;
+    ninjacar::LogMsg msg;
     m_Logger.ReadMessage(msg);
     if(msg.has_segments() == false){
       dout("Expected segments to be at the beggining of the log file, but the log packet did not have segments. Aborting playback.");
@@ -182,7 +182,7 @@ void MochaGui::_PlaybackLog(double dt)
     //set the initial playback timer
     m_dPlaybackTimer = msg.timestamp();
   }else{
-    msg_Log msg;
+    ninjacar::LogMsg msg;
     m_dPlaybackTimer += dt;
     msg = m_Logger.GetLastMessage();
     //once we are done with this message, read a new one
@@ -948,16 +948,20 @@ void MochaGui::_ImuReadFunc()
   int numPoses = 0;
 
   while(1){
-    Imu_Accel_Gyro Msg;
+    ninjacar::ImuMsg Msg;
     //this needs to be a blocking call .. not sure it is!!!
     if(m_Node.receive("nc_node/state",Msg)){ //crh node api
-      double dImuTime = (double)Msg.timer()/62500.0;
+      //double dImuTime = (double)Msg.timer()/62500.0; //crh old (int32)timer
+      double dImuTime = Msg.device_time();
       double sysTime = CarPlanner::Tic();
-      m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
-                               Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
+      Eigen::VectorXd Accel,Gyro;
+      ninjacar::ReadVector(Msg.accel(),&Accel);
+      ninjacar::ReadVector(Msg.gyro(),&Gyro);
+      m_Fusion.RegisterImuPose(Accel(0)*G_ACCEL,Accel(1)*G_ACCEL,Accel(2)*G_ACCEL,
+                               Gyro(0),Gyro(1),Gyro(2),sysTime,sysTime);
 
       if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-        m_FusionLogger.LogImuData(sysTime,dImuTime,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
+        m_FusionLogger.LogImuData(sysTime,dImuTime,Eigen::Vector3d(Accel(0),Accel(1),Accel(2)),Eigen::Vector3d(Gyro(0),Gyro(1),Gyro(2)));
       }
       //std::cout << "IMU pose received at:" << sysTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
       //            if(m_bLoggerEnabled && m_Logger.IsReady()){
@@ -1016,8 +1020,8 @@ void MochaGui::_ControlCommandFunc()
 
       //send the commands to the car via node
       m_nNumPoseUpdates++;
-      CommandMsg Req;
-      CommandReply Rep;
+      ninjacar::CommandMsg Req;
+      ninjacar::CommandReply Rep;
 
       Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
       Req.set_phi(m_ControlCommand.m_dPhi);

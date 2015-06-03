@@ -1,10 +1,11 @@
 #ifndef EVENTLOGGER_H
 #define EVENTLOGGER_H
 
+#include "Messages.pb.h"
+#include "MochaGui/Matrix.h"
 #include "CarPlanner/CarPlannerCommon.h"
 #include "CarPlanner/BulletCarModel.h"
 #include "CarPlanner/CarController.h"
-#include "Messages.pb.h"
 
 
 class EventLogger
@@ -21,19 +22,17 @@ public:
     void ReadLogFile(const std::string& fileName);
     void OpenLogFile(const std::string& fileName);
 
-    bool ReadMessage(msg_Log& msg);
-    void ReadMatrix(Eigen::MatrixXd &mat, const msg_Matrix &msg);
-    void ReadVehicleState(VehicleState &state, PoseUpdateSource &eSource, const msg_VehicleState &msgState);
-    void ReadMotionSample(MotionSample& sample, const msg_MotionSample& msgSample);
-    void ReadCommand(ControlCommand& command, const msg_ControlCommand& msgCommand);
-    void ReadControlPlan(ControlPlan& plan, const msg_ControlPlan& msgPlan);
+    bool ReadMessage(ninjacar::LogMsg& msg);
+    void ReadVehicleState(VehicleState &state, PoseUpdateSource &eSource, const ninjacar::VehicleStateMsg &msgState);
+    void ReadMotionSample(MotionSample& sample, const ninjacar::MotionSampleMsg& msgSample);
+    void ReadCommand(ControlCommand& command, const ninjacar::ControlCommandMsg& msgCommand);
+    void ReadControlPlan(ControlPlan& plan, const ninjacar::ControlPlanMsg& msgPlan);
 
-    void WriteVehicleState(const VehicleState &state, const PoseUpdateSource &eSource, msg_VehicleState &msgState);
-    void WriteMessage(msg_Log& msg);
-    void WriteMotionSample(const MotionSample& sample, msg_MotionSample& msgSample);
-    void WriteControlCommand(const ControlCommand &command, msg_ControlCommand &commandMsg);
+    void WriteVehicleState(const VehicleState &state, const PoseUpdateSource &eSource, ninjacar::VehicleStateMsg &msgState);
+    void WriteMessage(ninjacar::LogMsg& msg);
+    void WriteMotionSample(const MotionSample& sample, ninjacar::MotionSampleMsg& msgSample);
+    void WriteControlCommand(const ControlCommand &command, ninjacar::ControlCommandMsg &msgControlCommand);
     void WriteSegmentSamples(const std::vector<MotionSample> vSegmentSamples);
-    void WriteMatrix(const Eigen::MatrixXd& mat,msg_Matrix& msg);
 
     void LogPoseUpdate(const VehicleState &state, const PoseUpdateSource &eSource);
     void LogControlCommand(const ControlCommand &command);
@@ -47,14 +46,14 @@ public:
     bool IsReady(){ return m_bLoggerReady; }
     void SetIsReady(const bool bIsReady){ m_bLoggerReady = bIsReady;}
 
-    msg_Log& GetLastMessage(){return m_LastLogMessage;}
+    ninjacar::LogMsg& GetLastMessage(){return m_LastLogMessage;}
     Sophus::SE3d ReadPoseVector(const Eigen::MatrixXd &vec);
 private:
     Eigen::Vector7d _GetPoseVector(const Sophus::SE3d& pose);
     std::ofstream m_File;
     std::ifstream m_ReadFile;
     bool m_bLoggerReady;
-    msg_Log m_LastLogMessage;
+    ninjacar::LogMsg m_LastLogMessage;
     std::mutex m_WriteMutex;
 };
 

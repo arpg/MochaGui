@@ -5,6 +5,7 @@
 #include <xmmintrin.h>
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
+#include "Imu.pb.h" // added to give ImuMsgs (not ImuMsgs)
 #include "CarPlanner/CarPlannerCommon.h"
 #include "SensorFusionCeres.h"
 #include "MochaGui/GetPot"
@@ -81,7 +82,7 @@ void DoFusion()
     Sophus::SE3d dT_ic = g_fusion.GetCalibrationPose();
 
     int imuIndex = 0, globalIndex = globalStartIndex;
-    msg_Log msg;
+    ninjacar::LogMsg msg;
 
     double time = -1;
     //g_fusion.m_bTimeCalibrated = true;
@@ -108,16 +109,16 @@ void DoFusion()
         bool bReadNextMessage = false;
 
         if(msg.has_imu()){
-            const msg_ImuLog& imuMsg = msg.imu();
-            if(time >= imuMsg.systemtime()){
+            const ninjacar::ImuMsg& imuMsg = msg.imu();
+            if(time >= imuMsg.system_time()){
                 bReadNextMessage = true;
                 imuIndex++;
                 //push the imu data in
                 if(imuIndex > m_nImuSkip){
-                    Eigen::MatrixXd accel,gyro;
-                    m_Logger.ReadMatrix(accel,imuMsg.accel());
-                    m_Logger.ReadMatrix(gyro,imuMsg.gyro());
-                    g_fusion.RegisterImuPose(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL,gyro(0),gyro(1),gyro(2),imuMsg.devicetime(),imuMsg.systemtime());
+                    Eigen::VectorXd accel,gyro;
+                    ninjacar::ReadVector(imuMsg.accel(),&accel);
+                    ninjacar::ReadVector(imuMsg.gyro(),&gyro);
+                    g_fusion.RegisterImuPose(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL,gyro(0),gyro(1),gyro(2),imuMsg.device_time(),imuMsg.system_time());
                     m_Log.Log(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL);
                     //PoseParameter param = g_fusion.GetCurrentPose();
                     //std::cout << "Imu data at time " << imuMsg.systemtime() << " is [" << accel.transpose() << "] [" << gyro.transpose() << "] vel " << param.m_dV.norm() << std::endl;
@@ -125,8 +126,8 @@ void DoFusion()
                 }
             }
         }else if(msg.has_localizer()){
-            const msg_LocalizerLog& localizerMsg = msg.localizer();
-            if(time >= localizerMsg.systemtime()){
+            const ninjacar::PoseMsg& localizerMsg = msg.localizer();
+            if(time >= localizerMsg.system_time()){
                 bReadNextMessage = true;
                 //push the imu data in
                 globalIndex++;
@@ -144,9 +145,9 @@ void DoFusion()
 
 
                     //std::cout << "Global pose found at time " << t << ": " << globalData[globalIndex].tail(6).transpose().format(CleanFmt) << std::endl;
-                    Eigen::MatrixXd pose7d;
-                    m_Logger.ReadMatrix(pose7d,localizerMsg.pose_7d());
-                    g_fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),localizerMsg.devicetime(),localizerMsg.systemtime());
+                    Eigen::VectorXd pose7d;
+                    ninjacar::ReadVector(localizerMsg.pose(),&pose7d);
+                    g_fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),localizerMsg.device_time(),localizerMsg.system_time());
 
                     //print the calibration if needed
                     if(m_bCalibrateActive){
@@ -314,11 +315,11 @@ int main( int argc, char** argv )
 
 
     //add all the global poses
-    msg_Log logMsg;
-    while(m_Logger.ReadMessage(logMsg)){
-        if(logMsg.has_localizer()){
-            Eigen::MatrixXd poseVec;
-            m_Logger.ReadMatrix(poseVec,logMsg.localizer().pose_7d());
+    ninjacar::LogMsg MsgLog;
+    while(m_Logger.ReadMessage(MsgLog)){
+        if(MsgLog.has_localizer()){
+            Eigen::VectorXd poseVec;
+            ninjacar::ReadVector(MsgLog.localizer().pose(),&poseVec);
             SceneGraph::GLAxis* axis = new SceneGraph::GLAxis(0.02);
             axis->SetPose(m_Logger.ReadPoseVector(poseVec).matrix());
             axisGroup.AddChild(axis);
