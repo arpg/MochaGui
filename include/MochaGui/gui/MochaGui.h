@@ -22,7 +22,6 @@
 #include "SensorFusion/SensorFusionCeres.h"
 
 #include "Messages.pb.h"
-#include "Imu.pb.h"
 #include "MochaGui/GLCar.h"
 #include "MochaGui/PlannerGui.h"
 #include "MochaGui/GLBulletDebugDrawer.h"

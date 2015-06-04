@@ -34,7 +34,6 @@ find_package( LibAO REQUIRED )
 find_package( IOKit REQUIRED )
 find_package( Sophus REQUIRED )
 find_package( Node REQUIRED )
-find_package( HAL REQUIRED)
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 
@@ -51,7 +50,7 @@ set( _PROTO_SRCS
     ${PROTO_DIR}/Messages.proto
     ${PROTO_DIR}/State.proto
     # messages from HAL
-    ${PROTO_DIR}/Matrix.proto
+    ${PROTO_DIR}/Matrix.proto #from Matrix.proto
     ${PROTO_DIR}/Pose.proto
     ${PROTO_DIR}/Imu.proto
     )
@@ -61,7 +60,6 @@ PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS ${_PROTO_SRCS} )
 set( _INCLUDE_DIRS
     ${GLOG_INCLUDE_DIRS}
     ${Node_INCLUDE_DIRS}
-    ${HAL_INCLUDE_DIRS}
     ${Sophus_INCLUDE_DIRS}
     ${LIBAO_INCLUDE_DIR}
     ${Pangolin_INCLUDE_DIRS}
@@ -78,7 +76,6 @@ set( _INCLUDE_DIRS
 
 set( LIBRARIES
      ${Node_LIBRARIES}
-     ${HAL_LIBRARIES}
      ${SENSORFUSION_LIBRARIES}
      ${Pangolin_LIBRARIES}
      ${LIBAO_LIBRARY}
@@ -143,7 +140,7 @@ set( LEARNING_SRC
     )
 
 
-add_executable(  logger applications/logger.cpp Messages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
+add_executable(  logger applications/logger.cpp ${SHARED_HDRS} ${SHARED_SRC} )
 target_link_libraries( logger ${LIBRARIES} )
 
 add_executable(  refplane applications/refplane.cpp ${SHARED_HDRS} ${SHARED_SRC} )
@@ -164,7 +161,11 @@ target_link_libraries( control-daemon ${LIBRARIES} )
 add_executable( fusion applications/fusion.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
 target_link_libraries( fusion ${LIBRARIES} )
 
-
+# move resource files from source to build dir
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/herbie ${CMAKE_CURRENT_BINARY_DIR} )
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/jump.ply ${CMAKE_CURRENT_BINARY_DIR} )
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/learning_params.csv ${CMAKE_CURRENT_BINARY_DIR} )
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/gui_params.csv ${CMAKE_CURRENT_BINARY_DIR} )
 
 # Generate config file for use in headers
 CONFIGURE_FILE(

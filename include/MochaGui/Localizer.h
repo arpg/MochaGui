@@ -6,7 +6,6 @@
 #include <vector>
 #include <condition_variable>
 #include <atomic>
-#include "Messages.pb.h" // NOT HAL/Messages.pb.h.
 #include "MochaGui/Matrix.h"
 #include "CarPlanner/CarPlannerCommon.h"
 #include <Node/Node.h>

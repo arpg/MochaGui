@@ -5,7 +5,6 @@
 #include <xmmintrin.h>
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
-#include "Imu.pb.h" // added to give ImuMsgs (not ImuMsgs)
 #include "CarPlanner/CarPlannerCommon.h"
 #include "SensorFusionCeres.h"
 #include "MochaGui/GetPot"
