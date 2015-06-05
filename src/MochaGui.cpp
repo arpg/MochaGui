@@ -450,7 +450,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
 
   /// Start tracking where the localizer believes the car to be.
   m_sCarObjectName = "ninja_car"; // crh convert to node uri
-  m_Localizer.TrackObject(m_sCarObjectName, "ninja_tracker",Sophus::SE3d(dT_localizer_ref).inverse()); //crh convert to node call
+  m_Localizer.TrackObject("object_tracker", m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse()); //crh convert to node call
 
   //initialize the panel
   m_GuiPanel.Init();
