@@ -125,8 +125,8 @@ int main( int argc, char** argv )
 
     g_node.init("logger");
 
-    g_node.subscribe("nc_node/state"); //crh node api
-    g_localizer.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_localizer_ref).inverse(),true); //crh straight-up node call?
+    g_node.subscribe("ninja_car/IMU"); //crh node api
+    g_localizer.TrackObject("ninja_tracker", "ninja_car",Sophus::SE3d(dT_localizer_ref).inverse(),true); //crh straight-up node call?
     g_localizer.Start();
 
     std::thread* pImuThread = new std::thread(std::bind(ImuReadFunc));

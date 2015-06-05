@@ -162,10 +162,10 @@ add_executable( fusion applications/fusion.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
 target_link_libraries( fusion ${LIBRARIES} )
 
 # move resource files from source to build dir
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/herbie ${CMAKE_CURRENT_BINARY_DIR} )
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/jump.ply ${CMAKE_CURRENT_BINARY_DIR} )
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/learning_params.csv ${CMAKE_CURRENT_BINARY_DIR} )
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/gui_params.csv ${CMAKE_CURRENT_BINARY_DIR} )
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/herbie DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/jump.ply DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/learning_params.csv DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/gui_params.csv DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
 
 # Generate config file for use in headers
 CONFIGURE_FILE(
