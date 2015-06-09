@@ -57,7 +57,7 @@ MochaGui::MochaGui() :
   m_Fusion(30,&m_DriveCarModel),
   m_dPlanTime(CarPlanner::Tic())//the size of the fusion sensor
 {
-  m_Node.init("MochaGui");
+  m_Node.init("bushido");
 }
 
 ////////////////////////////////////////////////////////////////
@@ -244,7 +244,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   m_sPlaybackLogFile = sLogFile;
 
   dout ("Initializing MochaGui");
-//  m_Node.subscribe("nc_node/state"); //crh node api
+  m_Node.subscribe("ninja_car/state"); //crh node api
 
   m_dStartTime = CarPlanner::Tic();
   m_bAllClean = false;
@@ -282,17 +282,22 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   //m_KHeightMap.LoadMap(DEFAULT_MAP_NAME,DEFAULT_MAP_IMAGE_NAME);
   //m_KHeightMap.SaveMap("room2.heightmap");
 
-  //initialize the car model
+  //initialize the car model -- first import the environment model.
 
   const aiScene *pScene = aiImportFile( sMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
   std::cout << aiGetErrorString() << std::endl;
 
   if(bLocalizer){
     pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
-                                                     0,-1,0,0,
-                                                     0,0,-1,0,
+                                                     0,1,0,0,
+                                                     0,0,1,0,
                                                      0,0,0,1);
-  } //crh situational localizer
+  } else {
+  pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                   0,1,0,0,
+                                                   0,0,-1,0,
+                                                   0,0,0,1);
+  }
 
   if(sMode == "Simulation"){
     m_eControlTarget = eTargetSimulation;
@@ -500,7 +505,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523; //crh situational
   m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
   m_Fusion.SetCalibrationActive(false);
-  m_pControlLine.reset(new GLCachedPrimitives);
+  m_pControlLine = new GLCachedPrimitives();
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1189,7 +1194,8 @@ void MochaGui::_ControlFunc()
         m_Gui.GetWaypoint(ii)->m_Waypoint.SetLocked(false);
       }
 
-      usleep(10000);
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      //usleep(10000);
     }
   }catch(...){
     dout("Control thread exception caught...");
@@ -1232,13 +1238,15 @@ void MochaGui::_PhysicsFunc()
     while(m_bSimulate3dPath == false){
       dCurrentTic = CarPlanner::Tic();
       //boost::this_thread::interruption_point();
-      usleep(10000);
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      //usleep(10000);
     }
 
     //this is so pausing doesn't shoot the car in the air
     double pauseStartTime = CarPlanner::Tic();
     while(m_bPause == true && m_bSimulate3dPath == true) {
-      usleep(1000);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      //usleep(1000);
       //boost::this_thread::interruption_point();
 
       //This section will play back control paths, if the user has elected to do so
@@ -1247,7 +1255,8 @@ void MochaGui::_PhysicsFunc()
         for(std::vector<VehicleState>*& pStates: m_lPlanStates){
           for(const VehicleState& state: *pStates){
             while(m_bPause){
-              usleep(10000);
+              std::this_thread::sleep_for(std::chrono::milliseconds(10));
+              //usleep(10000);
               if(m_bStep){
                 m_bStep = false;
                 break;
@@ -1255,7 +1264,8 @@ void MochaGui::_PhysicsFunc()
             }
             m_Gui.SetCarState(m_nDriveCarId,state);
             //m_DriveCarModel.SetState(0,state);
-            usleep(1E6*0.01);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            //usleep(1E6*0.01);
           }
         }
         m_bPause = true;
@@ -1287,7 +1297,8 @@ void MochaGui::_PhysicsFunc()
         if(m_bControllerRunning){
 
           while((CarPlanner::Toc(dCurrentTic)) < 0.002) { //crh situational
-            usleep(100);
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            //usleep(100);
           }
           currentDt = CarPlanner::Toc(dCurrentTic);
           dCurrentTic = CarPlanner::Tic();
@@ -1356,7 +1367,8 @@ void MochaGui::_PhysicsFunc()
         //wait until we have reached the correct dT to
         //apply the next set of commands
         while((CarPlanner::Toc(dCurrentTic)) < m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dT) {
-          usleep(100);
+          std::this_thread::sleep_for(std::chrono::microseconds(100));
+          //usleep(100);
         }
         dCurrentTic = CarPlanner::Tic();
 
@@ -1381,7 +1393,8 @@ void MochaGui::_PhysicsFunc()
       nCurrentSegment = 0;
       nCurrentSample = 0;
       dCurrentTic = -1;
-      usleep(1000);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      //usleep(1000);
     }
   }
 }
@@ -1423,7 +1436,8 @@ void MochaGui::_PlannerFunc() {
         if(m_bControllerRunning){
           m_bControl3dPath = false;
           while(m_bControllerRunning == true) {
-            usleep(1000);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            //usleep(1000);
           }
         }
 
@@ -1492,7 +1506,8 @@ void MochaGui::_PlannerFunc() {
         while(success == false){
           //if we are paused, then wait
           while(m_bPause == true) {
-            usleep(1000);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            //usleep(1000);
             //boost::this_thread::interruption_point;
             if(m_bStep == true){
               m_bStep = false;
@@ -1555,7 +1570,8 @@ void MochaGui::_PlannerFunc() {
     vDirtyIds.clear();
 
     if(m_bPlanning == false) {
-      usleep(10000);
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      //usleep(10000);
     }
   }
 }
@@ -1586,7 +1602,7 @@ void MochaGui::_PopulateSceneGraph() {
 
 
   m_Gui.AddGLObject(&m_DestAxis);
-  m_Gui.AddGLObject(m_pControlLine.get());
+  //m_Gui.AddGLObject(m_pControlLine);
   m_Gui.AddPanel(&m_GuiPanel);
 }
 

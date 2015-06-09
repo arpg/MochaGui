@@ -129,7 +129,7 @@ protected:
     std::vector<GLCachedPrimitives> m_vTerrainLineSegments;
     list<GLCachedPrimitives*> m_lPlanLineSegments;
     list<std::vector<VehicleState> *> m_lPlanStates;
-    std::shared_ptr<GLCachedPrimitives> m_pControlLine;
+    GLCachedPrimitives* m_pControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
 
     LocalPlanner m_Planner; // Car planner for trajectory plotting

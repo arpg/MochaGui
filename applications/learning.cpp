@@ -8,7 +8,7 @@ int main( int argc, char** argv )
 {
     GetPot cl( argc, argv );
 
-    std::string sMesh = cl.follow("jump.ply",1,"-mesh");
+    std::string sMesh = cl.follow("lab.ply",1,"-mesh");
     bool localizer = cl.search("-localizer");
     std::string sRef = cl.follow( "", 1, "-ref" );
     std::string sMode = cl.follow( "Simulation", 1, "-mode" );

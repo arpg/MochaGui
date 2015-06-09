@@ -45,9 +45,6 @@ void PlannerGui::Render()
         m_RenderState.Follow(OpenGlMatrix(m_pFollowCar->m_GLCar.GetPose4x4_po()));
     }
 
-    //TODO: remove this and debug the GL problem that's occuring
-    glGetError();
-
     // Swap frames and Process Events
     pangolin::FinishGlutFrame();
 

@@ -29,7 +29,7 @@ Localizer::Localizer()
   m_bIsStarted = false;
   m_abStopLocalizer = false;
   m_pNode.reset(new node::node( false ));
-  m_NodeReceiverName = "ninja_tracker";
+  m_NodeReceiverName = "bushido";
   m_pNode->init(m_NodeReceiverName);
 }
 
@@ -169,7 +169,7 @@ void Localizer::_ThreadFunction(Localizer *pL)
     }
 
     //small sleep to not eat up all the cpu
-    usleep(1000);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
 
