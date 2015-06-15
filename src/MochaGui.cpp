@@ -397,7 +397,14 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
     char buf[100];
     snprintf( buf, 100, "waypnt.%d", ii );
     m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-    (*m_vWayPoints.back()) << ii*0.5,0,0,0,0,0, 1,0;
+    /// Linear waypoints.
+//    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
+
+    /// Waypoints in a circle.
+    (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints),
+        cos(ii*2*M_PI/numWaypoints),
+        0, 0, 0, -ii*2*M_PI/numWaypoints, 1,0;
+    /// Load this segment ID into a vector that enumerates the path elements.
     m_Path.push_back(ii);
   }
 
@@ -1582,6 +1589,8 @@ void MochaGui::_PopulateSceneGraph() {
 
   m_vGLLineSegments.resize(m_Path.size() - 1);
   for (size_t ii = 0; ii < m_vGLLineSegments.size(); ii++) {
+    m_vGLLineSegments[ii].SetColor(GLColor(0.0f,0.0f,0.0f));
+    m_vGLLineSegments[ii].SetIgnoreDepth(true);
     m_Gui.AddGLObject(&m_vGLLineSegments[ii],true);
   }
 

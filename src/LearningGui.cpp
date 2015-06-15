@@ -352,6 +352,11 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
                                                      0,-1,0,0,
                                                      0,0,-1,0,
                                                      0,0,0,1);
+  } else {
+    pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                     0,1,0,0,
+                                                     0,0,-1,0,
+                                                     0,0,0,1);
   }
   m_TerrainMesh.Init(pScene);
 

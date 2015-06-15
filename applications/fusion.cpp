@@ -264,7 +264,7 @@ int main( int argc, char** argv )
     //imuData = LoadCsv("Matlab/imu_data.csv");
     //imuData = LoadCsv("/Users/nimski/Code/Build/MochaGui/logs_imu_20121211_205530.txt");
     char imuLog[500];
-    sprintf(imuLog,"/Users/crh/MochaGui-logs/%s",sLog.c_str()); //crh filename
+    sprintf(imuLog,"/Users/crh/Projects/MochaGui-build/logs/%s",sLog.c_str()); //crh filename
     m_Logger.ReadLogFile(imuLog);
 
 

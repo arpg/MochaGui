@@ -38,7 +38,8 @@ PlannerGui::~PlannerGui()
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::Render()
 {
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
+    // this lock wasn't used by nimski previously.
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_pView->ActivateScissorAndClear();
 
     if(m_pFollowCar != NULL){
@@ -77,7 +78,12 @@ void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh, con
 
     if(bLocalizerCoords){
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
-                                                         0,-1,0,0,
+                                                         0,1,0,0,
+                                                         0,0,1,0,
+                                                         0,0,0,1);
+    } else {
+      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                         0,1,0,0,
                                                          0,0,-1,0,
                                                          0,0,0,1);
     }
@@ -210,7 +216,7 @@ int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth)
 
     // originally commented by nimski:
     //add this to the scenegraph
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
 
     m_SceneGraph.AddChild(&pCar->m_GLCar);
     m_pLight->AddShadowCasterAndReceiver(&pCar->m_GLCar);

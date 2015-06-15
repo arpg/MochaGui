@@ -56,8 +56,6 @@ void Localizer::TrackObject(
   pObj->m_sUri = sNodeName + "/" + sObjectName;
 
   this->m_pNode->subscribe(pObj->m_sUri);
-  std::cout << "Node is running at: Localizer.cpp l. 64 \n"
-               "~Localizer working?" << std::endl;
   pObj->m_dToffset = dToffset;
   pObj->m_bRobotFrame = bRobotFrame;
   pObj->m_pLocalizerObject = this;
@@ -67,10 +65,10 @@ void Localizer::TrackObject(
 //////////////////////////////////////////////////////////////////
 Localizer::~Localizer()
 {
-//  std::map< std::string, TrackerObject >::iterator it;
-//  for( it = m_mObjects.begin(); it != m_mObjects.end(); it++ ){
-//    delete( it->second.m_pNode );
-//  }
+  std::map< std::string, TrackerObject >::iterator it;
+  for( it = m_mObjects.begin(); it != m_mObjects.end(); it++ ){
+    delete( it->second.m_pLocalizerObject );
+  }
 // std::shared_ptr deletes itself.
 }
 

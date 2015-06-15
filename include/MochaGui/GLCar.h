@@ -39,15 +39,28 @@ public:
     void Init(GLCarDrawType eCarDrawType, std::string bodyMeshName = "./herbie/herbie.ply") {
         m_eCarDrawType = eCarDrawType;
         m_sBodyMeshName = bodyMeshName;
-        m_Color = GLColor();
+        // Set the color of the car, if we are without textures.
+        m_Color = GLColor(1.0f,1.0f,1.0f);
 
         //only if the body isn't a triangle, load the meshes
         if (m_eCarDrawType != eTriangle) {
             //initialize the body mesh
             const struct aiScene* pBodyMesh;
-            pBodyMesh = aiImportFile("./herbie/herbie.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
-            m_pScene = pBodyMesh;
-            LoadMeshTextures();
+            //SetObjectName("mesh");
+            pBodyMesh = aiImportFile("./herbie/herbie.ply", aiProcess_Triangulate
+                                     | aiProcess_GenSmoothNormals
+                                     | aiProcess_JoinIdenticalVertices
+                                     | aiProcess_OptimizeMeshes
+                                     | aiProcess_FindInvalidData
+                                     | aiProcess_FixInfacingNormals);
+
+            if( pBodyMesh == NULL ){
+              throw GLMeshException("Unable to load mesh.");
+            }else{
+              m_pScene = pBodyMesh;
+            }
+
+            GLMesh::Init(m_pScene);
 
             const struct aiScene* pWheelMesh;
             pWheelMesh = aiImportFile("./herbie/wheel.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
@@ -72,8 +85,10 @@ public:
 //            glVertex3d(-m_fScale, m_fScale / 2, 0);
             glEnd();
         } else {
-            //glScaled(m_dScale(0),m_dScale(1),m_dScale(2));
-            GLMesh::DrawCanonicalObject();
+          //glScaled(m_dScale(0),m_dScale(1),m_dScale(2));
+          // Set the color now if there are no textures.
+          glColor4f(m_Color.r, m_Color.g, m_Color.b, m_Color.a);
+          GLMesh::DrawCanonicalObject();
         }
 
         glColor4f(1.0,1.0,1.0,1.0);

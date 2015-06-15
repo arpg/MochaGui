@@ -16,10 +16,7 @@ set( CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_
 
 include( SetPlatformVars )
 
-message( "LUT not currently supported; source: src/lut.cpp." )
-
-#this dependency is required for newer versions of the boost library. unfortunately
-#boost doesn't seem to link to it..
+#this dependency is required for newer versions of the boost library.
 
 find_package( Pangolin REQUIRED)
 find_package( GLOG REQUIRED)
@@ -83,9 +80,9 @@ set( LIBRARIES
      ${CarPlanner_LIBRARIES}
      ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
      ${CVars_LIBRARIES}
+     ${ASSIMP_LIBRARIES}
      nvwidgets #this is built with MochaGui. No finding is required
      Gamepad # this is also built with the solution
-     assimp
      )
 
 include_directories( ${_INCLUDE_DIRS} )
