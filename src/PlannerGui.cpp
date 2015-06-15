@@ -38,15 +38,13 @@ PlannerGui::~PlannerGui()
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::Render()
 {
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
+    // this lock wasn't used by nimski previously.
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_pView->ActivateScissorAndClear();
 
     if(m_pFollowCar != NULL){
         m_RenderState.Follow(OpenGlMatrix(m_pFollowCar->m_GLCar.GetPose4x4_po()));
     }
-
-    //TODO: remove this and debug the GL problem that's occuring
-    glGetError();
 
     // Swap frames and Process Events
     pangolin::FinishGlutFrame();
@@ -73,14 +71,19 @@ void PlannerGui::Render()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh, const bool bViconCoords /* = false */)
+void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh, const bool bLocalizerCoords /* = false */)
 {
     const aiScene *pScene = aiImportFile( sTerrainMeshFileName.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
     std::cout << aiGetErrorString() << std::endl;
 
-    if(bViconCoords){
+    if(bLocalizerCoords){
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
-                                                         0,-1,0,0,
+                                                         0,1,0,0,
+                                                         0,0,1,0,
+                                                         0,0,0,1);
+    } else {
+      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                         0,1,0,0,
                                                          0,0,-1,0,
                                                          0,0,0,1);
     }
@@ -213,7 +216,7 @@ int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth)
 
     // originally commented by nimski:
     //add this to the scenegraph
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
 
     m_SceneGraph.AddChild(&pCar->m_GLCar);
     m_pLight->AddShadowCasterAndReceiver(&pCar->m_GLCar);

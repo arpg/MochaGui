@@ -24,7 +24,7 @@ Eigen::IOFormat CleanFmt(10, 0, ", ", "\n" , "[" , "]");
 bool m_bPaused = true;
 bool m_bStep = false;
 bool m_bFF;
-bool m_bViconActive = true;
+bool m_bLocalizerActive = true;
 int m_nFilterSize = 50;
 int m_bCalibrateActive = false;
 pangolin::DataLog m_Log;
@@ -81,7 +81,7 @@ void DoFusion()
     Sophus::SE3d dT_ic = g_fusion.GetCalibrationPose();
 
     int imuIndex = 0, globalIndex = globalStartIndex;
-    msg_Log msg;
+    ninjacar::LogMsg msg;
 
     double time = -1;
     //g_fusion.m_bTimeCalibrated = true;
@@ -108,29 +108,29 @@ void DoFusion()
         bool bReadNextMessage = false;
 
         if(msg.has_imu()){
-            const msg_ImuLog& imuMsg = msg.imu();
-            if(time >= imuMsg.systemtime()){
+            const ninjacar::ImuMsg& imuMsg = msg.imu();
+            if(time >= imuMsg.system_time()){
                 bReadNextMessage = true;
                 imuIndex++;
                 //push the imu data in
                 if(imuIndex > m_nImuSkip){
-                    Eigen::MatrixXd accel,gyro;
-                    m_Logger.ReadMatrix(accel,imuMsg.accel());
-                    m_Logger.ReadMatrix(gyro,imuMsg.gyro());
-                    g_fusion.RegisterImuPose(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL,gyro(0),gyro(1),gyro(2),imuMsg.devicetime(),imuMsg.systemtime());
+                    Eigen::VectorXd accel,gyro;
+                    ninjacar::ReadVector(imuMsg.accel(),&accel);
+                    ninjacar::ReadVector(imuMsg.gyro(),&gyro);
+                    g_fusion.RegisterImuPose(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL,gyro(0),gyro(1),gyro(2),imuMsg.device_time(),imuMsg.system_time());
                     m_Log.Log(accel(0)*G_ACCEL,accel(1)*G_ACCEL,accel(2)*G_ACCEL);
                     //PoseParameter param = g_fusion.GetCurrentPose();
                     //std::cout << "Imu data at time " << imuMsg.systemtime() << " is [" << accel.transpose() << "] [" << gyro.transpose() << "] vel " << param.m_dV.norm() << std::endl;
                     imuIndex = 0;
                 }
             }
-        }else if(msg.has_vicon()){
-            const msg_ViconLog& viconMsg = msg.vicon();
-            if(time >= viconMsg.systemtime()){
+        }else if(msg.has_localizer()){
+            const ninjacar::PoseMsg& localizerMsg = msg.localizer();
+            if(time >= localizerMsg.system_time()){
                 bReadNextMessage = true;
                 //push the imu data in
                 globalIndex++;
-                if(m_bViconActive && globalIndex >= g_nGlobalSkip){
+                if(m_bLocalizerActive && globalIndex >= g_nGlobalSkip){
                     globalIndex = 0;
                     m_bFF = false;
 
@@ -144,9 +144,9 @@ void DoFusion()
 
 
                     //std::cout << "Global pose found at time " << t << ": " << globalData[globalIndex].tail(6).transpose().format(CleanFmt) << std::endl;
-                    Eigen::MatrixXd pose7d;
-                    m_Logger.ReadMatrix(pose7d,viconMsg.pose_7d());
-                    g_fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),viconMsg.devicetime(),viconMsg.systemtime());
+                    Eigen::VectorXd pose7d;
+                    ninjacar::ReadVector(localizerMsg.pose(),&pose7d);
+                    g_fusion.RegisterGlobalPose(m_Logger.ReadPoseVector(pose7d),localizerMsg.device_time(),localizerMsg.system_time());
 
                     //print the calibration if needed
                     if(m_bCalibrateActive){
@@ -222,7 +222,7 @@ void DoFusion()
             //skip commands for now
             bReadNextMessage = true;
         }else{
-            dout("Message does not have vicon, imu or control command. Aborting.");
+            dout("Message does not have localizer, imu or control command. Aborting.");
         }
 
         if(bReadNextMessage){
@@ -264,7 +264,7 @@ int main( int argc, char** argv )
     //imuData = LoadCsv("Matlab/imu_data.csv");
     //imuData = LoadCsv("/Users/nimski/Code/Build/MochaGui/logs_imu_20121211_205530.txt");
     char imuLog[500];
-    sprintf(imuLog,"/Users/crh/MochaGui-logs/%s",sLog.c_str()); //crh filename
+    sprintf(imuLog,"/Users/crh/Projects/MochaGui-build/logs/%s",sLog.c_str()); //crh filename
     m_Logger.ReadLogFile(imuLog);
 
 
@@ -289,8 +289,8 @@ int main( int argc, char** argv )
     pangolin::RegisterKeyPressCallback( '\r' , std::bind(CommandHandler, Step ) );
     pangolin::RegisterKeyPressCallback( ' ', std::bind(CommandHandler, Pause ) );
     pangolin::RegisterKeyPressCallback( 'f', std::bind(CommandHandler, FastForward ) );
-    pangolin::RegisterKeyPressCallback( 'v', [] { m_bViconActive = !m_bViconActive;
-                                                                 std::cout << "Vicon poses " << (m_bViconActive ? "active" : "inactive") << std::endl; });
+    pangolin::RegisterKeyPressCallback( 'v', [] { m_bLocalizerActive = !m_bLocalizerActive;
+                                                                 std::cout << "Localizer poses " << (m_bLocalizerActive ? "active" : "inactive") << std::endl; });
 
 
     pangolin::DisplayBase().AddDisplay(view3d);
@@ -314,11 +314,11 @@ int main( int argc, char** argv )
 
 
     //add all the global poses
-    msg_Log logMsg;
-    while(m_Logger.ReadMessage(logMsg)){
-        if(logMsg.has_vicon()){
-            Eigen::MatrixXd poseVec;
-            m_Logger.ReadMatrix(poseVec,logMsg.vicon().pose_7d());
+    ninjacar::LogMsg MsgLog;
+    while(m_Logger.ReadMessage(MsgLog)){
+        if(MsgLog.has_localizer()){
+            Eigen::VectorXd poseVec;
+            ninjacar::ReadVector(MsgLog.localizer().pose(),&poseVec);
             SceneGraph::GLAxis* axis = new SceneGraph::GLAxis(0.02);
             axis->SetPose(m_Logger.ReadPoseVector(poseVec).matrix());
             axisGroup.AddChild(axis);

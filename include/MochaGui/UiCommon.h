@@ -1,7 +1,6 @@
-#ifndef UICOMMON_H
-#define UICOMMON_H
+#pragma once
 
-#include "pangolin/pangolin.h"
+#include <pangolin/pangolin.h>
 #include "SceneGraph/SceneGraph.h"
 #include "GLWidgetPanel.h"
 #include "CVars/CVar.h"
@@ -133,5 +132,3 @@ struct Waypoint
 //    Stream.getline(str,255);
 //    waypoint.m_eType = (WaypointType)std::strtol(str,NULL,10);
 //}
-
-#endif // UICOMMON_H

@@ -1,7 +1,6 @@
 #include <thread>
 #include <iomanip>
 #include <fenv.h>
-#include <boost/format.hpp>
 #include "CarPlanner/LocalPlanner.h"
 #include "CarPlanner/CarController.h"
 
@@ -28,7 +27,11 @@ class GlOptPanel : public GLWidgetPanel {
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                     m_Ui.doLabel(m_Rect,"Norm:");
-                    m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:Norm")).str().c_str() ,0,0.1,0.8,0.8);
+                    std::stringstream oss;
+                    oss << std::fixed << std::setprecision(2) << *GetVar<double*>("planner:Norm");
+                    m_Ui.doLabel(m_Rect, oss.str().c_str() ,0,0.1,0.8,0.8);
+                    // clear the string stream
+                    oss.str("");
                 m_Ui.endGroup();
 
                 // Planner parameters panel
@@ -47,7 +50,9 @@ class GlOptPanel : public GLWidgetPanel {
                     m_Ui.endGroup();
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                     m_Ui.doLabel(m_Rect,"Actual Lookahead:");
-                    m_Ui.doLabel(m_Rect, (boost::format("%.4f") % *GetVar<double*>("planner:ActualLookahead")).str().c_str() ,0,0.1,0.8,0.8);
+                    oss << *GetVar<double*>("planner:ActualLookahead");
+                    m_Ui.doLabel(m_Rect, oss.str().c_str() ,0,0.1,0.8,0.8);
+                    oss.str("");
                     m_Ui.endGroup();
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect, "StartCurvature T:");
@@ -88,8 +93,8 @@ int main( int argc, char** argv )
     //std::string sMesh = cl.follow("CU_luma.ply",1,"-mesh");
 
     //std::string sMesh = cl.follow("jump.blend",1,"-mesh");
-    std::string sMesh = cl.follow("labLoop.ply",1,"-mesh");
-    bool bVicon = cl.search("-vicon");
+    std::string sMesh = cl.follow("lab.ply",1,"-mesh");
+    bool bLocalizer = cl.search("-localizer");
 
     GLMesh terrainMesh;
     GLAxis endPosAxis;
@@ -103,7 +108,8 @@ int main( int argc, char** argv )
     trajectoryBezierStrip.SetColor(GLColor(0.8f,0.8f,0.8f));
     controlStrip.SetColor(GLColor(0.0f,0.5f,0.0f));
     controlBezierStrip.SetColor(GLColor(0.8f,0.8f,0.8f));
-    gui.Init(sMesh,&terrainMesh,bVicon);
+    gui.Init(sMesh,&terrainMesh,bLocalizer);
+
     gui.AddPanel(&panel);
 
     panel.SetVar("planner:PlannerOn",&bPlannerOn);

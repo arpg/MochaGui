@@ -1,0 +1,44 @@
+package ninjacar;
+
+import "Matrix.proto";
+
+message VehicleStateMsg {
+   required MatrixMsg pose_7d = 1;
+   required MatrixMsg vel_3d = 2;
+   required MatrixMsg w_3d = 3;
+   required double curvature = 4;
+   required double steering = 5;
+   required double time = 6;
+   required int32 source = 7;
+}
+
+message ControlCommandMsg {
+  required double force = 1;
+  required double phi = 2;
+  required double curvature = 3;
+  required double dt = 4;
+  required double time = 5;
+  required MatrixMsg torque_3d = 6;
+}
+
+message MotionSampleMsg {
+    repeated VehicleStateMsg states = 1;
+    repeated ControlCommandMsg command = 2;
+}
+
+message SegmentsMsg {
+    repeated MotionSampleMsg segments = 1;
+}
+
+message ControlPlanMsg{
+    required double startTime = 1;
+    required double endTime = 2;
+    required MotionSampleMsg sample = 3;
+    required VehicleStateMsg startState = 4;
+    required VehicleStateMsg endState = 5;
+    required int32 startSampleIndex = 6;
+    required int32 startSegmentIndex = 7;
+    required int32 endSampleIndex = 8;
+    required int32 endSegmentIndex = 9;
+}
+

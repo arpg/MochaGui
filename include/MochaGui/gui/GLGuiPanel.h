@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <iomanip>
 #include "MochaGui/GLWidgetPanel.h"
 #include "Eigen/Eigen"
 
@@ -44,7 +45,11 @@ public:
                         m_Ui.doLabel(m_Rect, "Paused:");
                         m_Ui.doLabel(m_Rect, (*GetVar<bool*>("interface:Paused")) ? "Yes" : "No", 0,0.1,0.8,0.8);
                         m_Ui.doLabel(m_Rect, "FPS:");
-                        //m_Ui.doLabel(m_Rect,  (boost::format("%.2f") % (*GetVar<double*>("interface:Fps"))).str().c_str(), 0,0.1,0.8,0.8); //crh
+                        std::stringstream oss;
+                        oss << std::fixed << std::setprecision(2) << *GetVar<double*>("interface:Fps");
+                        m_Ui.doLabel(m_Rect, oss.str().c_str(), 0, 0.1, 0.8, 0.8);
+                        // clear the string stream
+                        oss.str("");
                     m_Ui.endGroup();
                 m_Ui.endFrame();
                 // Filter parameters panel
@@ -52,23 +57,34 @@ public:
                     m_Ui.doLabel(m_Rect, "Filter Parameters");
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect,"Size:");
-                        //m_Ui.doLabel(m_Rect, (boost::format("%d") % *GetVar<int*>("fusion:FilterSize")).str().c_str() ,0,0.1,0.8,0.8); //crh
+                        oss << *GetVar<int*>("fusion:FilterSize");
+                        m_Ui.doLabel(m_Rect, oss.str().c_str(),0,0.1,0.8,0.8);
+                        oss.str("");
                         m_Ui.doLabel(m_Rect,"RMSE:");
-                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:RMSE")).str().c_str() ,0,0.1,0.8,0.8 ); //crh
+                        oss << *GetVar<double*>("fusion:RMSE");
+                        m_Ui.doLabel(m_Rect, oss.str().c_str(),0,0.1,0.8,0.8 );
                     m_Ui.endGroup();
 
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect,"Freq: IMU:");
-                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ImuFreq")).str().c_str() ,0,0.1,0.8,0.8); //crh
-                        m_Ui.doLabel(m_Rect,"Vicon:");
-                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:ViconFreq")).str().c_str() ,0,0.1,0.8,0.8 ); //crh
+                        oss << *GetVar<double*>("fusion:ImuFreq");
+                        m_Ui.doLabel(m_Rect, oss.str().c_str(),0,0.1,0.8,0.8);
+                        oss.str("");
+                        m_Ui.doLabel(m_Rect,"Localizer:");
+                        oss << *GetVar<double*>("fusion:LocalizerFreq");
+                        m_Ui.doLabel(m_Rect, oss.str().c_str(),0,0.1,0.8,0.8);
+                        oss.str("");
                     m_Ui.endGroup();
 
                     m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
                         m_Ui.doLabel(m_Rect,"V:");
-                        //m_Ui.doLabel(m_Rect, (boost::format("%.2f") % *GetVar<double*>("fusion:Vel")).str().c_str() ,0,0.1,0.8,0.8); //crh
+                        oss << *GetVar<double*>("fusion:Vel");
+                        m_Ui.doLabel(m_Rect, oss.str().c_str(),0,0.1,0.8,0.8);
+                        oss.str("");
                         m_Ui.doLabel(m_Rect,"X:");
-                        //m_Ui.doLabel(m_Rect, (boost::format("%s") % GetVar<Eigen::Vector3d*>("fusion:Pos")->transpose().format(CleanFmt)).str().c_str() ,0,0.1,0.8,0.8 ); //crh
+                        oss << GetVar<Eigen::Vector3d*>("fusion:Pos")->transpose().format(CleanFmt);
+                        m_Ui.doLabel(m_Rect, oss.str().c_str(),0,0.1,0.8,0.8);
+                        oss.str("");
                     m_Ui.endGroup();
                 m_Ui.endFrame();
 
@@ -134,7 +150,7 @@ public:
                             fileNames[ii] = vFileNames->at(ii).c_str();
                         }
 
-                        m_Ui.doComboBox(comboRect,vFileNames->size(),fileNames,GetVar<int*>("planner:SelectedFileName"));
+                        //m_Ui.doComboBox(comboRect,vFileNames->size(),fileNames,GetVar<int*>("planner:SelectedFileName")); //crh
                         delete[] fileNames;
                         m_Ui.doButton(buttonRect,"Load",GetVar<bool*>("planner:LoadWaypoints"));
                     m_Ui.endGroup();

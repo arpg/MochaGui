@@ -51,10 +51,7 @@ void CalculateCubic(Eigen::VectorPose dStartPose,double bi, double ti, double ci
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )
 {
-  //boost::threadpool::pool threadPool;
-  threadPool.size_controller().resize(8);
-
-
+  ThreadPool::ThreadPool threadPool(8);
 
   //double xMin = 1;
   //double xMax = 11;//11;
@@ -109,13 +106,13 @@ int main( int argc, char** argv )
 
       //dGoalPose << xi,yi,ti,0,0;
       for(double ci = ciMin ; ci <= ciMax ; ci += ciStep) {
-        threadPool.schedule(std::bind(CalculateCubic, dStartPose,bi,ti,ci,index));
+        threadPool.enqueue(std::bind(CalculateCubic, dStartPose,bi,ti,ci,index));
         index++;
       }
     }
 
     //wait for  this batch to finish
-    while(threadPool.pending() > 0){
+    while(threadPool.pending_tasks() > 0){
       if(CarPlanner::Toc(lastTime) > 1.0  ){
         std::unique_lock<std::mutex> loc(m_resultLock);
 
@@ -125,7 +122,7 @@ int main( int argc, char** argv )
         dout("[" << percentage << "%] - (" << currentItem << ") complete. Processing " << rate << " cubics/second - " << timeRemaining << " seconds remaining.");
         lastTime = CarPlanner::Tic();
       }
-      usleep(1000);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }
 

@@ -2,13 +2,13 @@
 
 LearningGui *g_pLearningGuiInstance = NULL;
 
-//static int& g_nViconDownsampler = CVarUtils::CreateGetCVar("debug.ViconDownsampler",0);
+//static int& g_nLocalizerDownsampler = CVarUtils::CreateGetCVar("debug.ViconDownsampler",0);
 /////////////////////////////////////////////////////////////////////////////////////////
 LearningGui::LearningGui() :
   m_sCarObjectName("CAR"),
   m_dT(CreateCVar("learning.TimeInteval", 0.005, "")),
   m_dImuRate(0),
-  m_dViconRate(0),
+  m_dLocalizerRate(0),
   m_bLearn(CreateCVar("learning.Active", false, "")),
   m_bLearningRunning(false),
   m_pRegressionSample(NULL),
@@ -133,8 +133,8 @@ void LearningGui::_JoystickReadFunc()
     //if we are in experiment mode, send these to the ppm
     if(m_eMode  == Mode_Experiment){
       //send the messages to the control-daemon
-      CommandMsg Req;
-      CommandReply Rep;
+      ninjacar::CommandMsg Req;
+      ninjacar::CommandReply Rep;
 
       Req.set_accel(command.m_dForce);
       Req.set_phi(command.m_dPhi);
@@ -159,7 +159,7 @@ void LearningGui::_JoystickReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_SetPoseFromFusion()
 {
-  //update state from vicon
+  //update state from localizer
   VehicleState state;
   if(m_bProcessModelEnabled == false){
     fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
@@ -170,7 +170,7 @@ void LearningGui::_SetPoseFromFusion()
   }else{
     m_Fusion.GetVehicleState(state);
   }
-  //fix the vicon offset
+  //fix the localizer offset
   if(m_bPlayback == false){
     m_Gui.SetCarState(m_nDriveCarId,state,m_bLearn);
   }
@@ -205,12 +205,15 @@ void LearningGui::_ImuReadFunc()
   int nNumImu = 0;
   double lastTime = -1;
   while(1){
-    Imu_Accel_Gyro Msg;
+    ninjacar::ImuMsg Msg;
     if(m_Node.receive("nc_node/status",Msg)){ // crh node call
       //double time = (double)Msg.timer()/62500.0;
       double sysTime = CarPlanner::Tic();
-      m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
-                               Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
+      Eigen::VectorXd Accel,Gyro;
+      ninjacar::ReadVector(Msg.accel(),&Accel);
+      ninjacar::ReadVector(Msg.gyro(),&Gyro);
+      m_Fusion.RegisterImuPose(Accel(0)*G_ACCEL,Accel(1)*G_ACCEL,Accel(2)*G_ACCEL,
+                               Gyro(0),Gyro(1),Gyro(2),sysTime,sysTime);
 
       if(lastTime == -1){
         lastTime = sysTime;
@@ -227,18 +230,18 @@ void LearningGui::_ImuReadFunc()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void LearningGui::_ViconReadFunc()
+void LearningGui::_LocalizerReadFunc()
 {
-  int nNumVicon = 0;
+  int nNumLocalizer = 0;
   double lastTime = -1;
-  int nViconSkip = 0;
+  int nLocalizerSkip = 0;
   while(1){
     //this is a blocking call
-    double viconTime;
-    Sophus::SE3d pose = m_Vicon.GetPose(m_sCarObjectName,true,&viconTime);
-    nViconSkip++;
+    double localizerTime;
+    Sophus::SE3d pose = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
+    nLocalizerSkip++;
 
-    //offset the vicon measurements
+    //offset the localizer measurements
     double sysTime = CarPlanner::Tic();
 
     ControlCommand command;
@@ -255,14 +258,14 @@ void LearningGui::_ViconReadFunc()
 
     if(lastTime == -1){
       lastTime = sysTime;
-      nNumVicon = 0;
+      nNumLocalizer = 0;
     }else if( (sysTime - lastTime) > 1 ){
-      m_dViconRate = nNumVicon / (sysTime - lastTime);
-      //dout("Vicon rate is " << m_dViconRate << " based on " << nNumVicon);
-      nNumVicon = 0;
+      m_dLocalizerRate = nNumLocalizer / (sysTime - lastTime);
+      //dout("Localizer rate is " << m_dLocalizerRate << " based on " << nNumLocalizer);
+      nNumLocalizer = 0;
       lastTime = sysTime;
     }
-    nNumVicon++;
+    nNumLocalizer++;
   }
 }
 
@@ -280,7 +283,7 @@ bool LearningGui::_SaveData(std::vector<std::string> *vArgs)
   m_Logger.SetIsReady(true);
 
   for(size_t ii = 0 ; ii < m_pRegressionSample->m_vStates.size() && ii < m_pRegressionSample->m_vCommands.size() ; ii++){
-    m_Logger.LogPoseUpdate(m_pRegressionSample->m_vStates[ii],EventLogger::eVicon);
+    m_Logger.LogPoseUpdate(m_pRegressionSample->m_vStates[ii],EventLogger::eLocalizer);
     m_Logger.LogControlCommand(m_pRegressionSample->m_vCommands[ii]);
   }
   m_Logger.CloseLogFile();
@@ -303,7 +306,7 @@ bool LearningGui::_LoadData(std::vector<std::string> *vArgs)
 
   int counter = 0;
   m_Logger.ReadLogFile(vArgs->at(0));
-  msg_Log msg;
+  ninjacar::LogMsg msg;
   while(m_Logger.ReadMessage(msg))
   {
     if(msg.has_vehiclestate() == false || msg.has_controlcommand() == false){
@@ -333,7 +336,7 @@ bool LearningGui::_LoadData(std::vector<std::string> *vArgs)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bViconTransform, Mode eMode)
+void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode)
 {
   m_eMode = eMode;
 
@@ -344,9 +347,14 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
   if (pScene == nullptr) {
     std::cerr << "Failed to import file: " << aiGetErrorString() << std::endl;
   }
-  if(bViconTransform){ //crh vicon
+  if(bLocalizerTransform){ //crh localizer
     pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                      0,-1,0,0,
+                                                     0,0,-1,0,
+                                                     0,0,0,1);
+  } else {
+    pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                     0,1,0,0,
                                                      0,0,-1,0,
                                                      0,0,0,1);
   }
@@ -392,7 +400,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
 
   //initialize the fusion
   if(m_eMode == Mode_Experiment){
-    Eigen::Matrix4d dT_vicon_ref = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4d dT_localizer_ref = Eigen::Matrix4d::Identity();
     if(sRefPlane.empty() == false){
       std::string word;
       std::stringstream stream(sRefPlane);
@@ -406,7 +414,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
 
         for(int ii = 0 ; ii < 4 ; ii++){
           for(int jj = 0 ; jj < 4 ; jj++){
-            dT_vicon_ref(ii,jj) = vals[ii*4 + jj];
+            dT_localizer_ref(ii,jj) = vals[ii*4 + jj];
           }
         }
         std::cout << "Ref plane matrix successfully read" << std::endl;
@@ -419,13 +427,21 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
     m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
     m_Fusion.SetCalibrationActive(false);
 
-    m_Node.subscribe("ninja_commander/IMU");
-    //dT_vicon_ref.block<3,3>(0,0).transposeInPlace();
-    m_Vicon.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true); //crh vicon
-    m_Vicon.Start();
+    /// Take care of all Node calls with Localizer object rather than direct
+    /// Node calls here.
+
+    //m_Node.subscribe("ninja_commander/IMU");
+    //dT_localizer_ref.block<3,3>(0,0).transposeInPlace();
+
+    /// Assume there can be multiple objects, and there's a node that is
+    /// publishing information on each object (but only one node that tracks
+    /// them all). That node is called "object_tracker", and the object being
+    /// tracked is provided in a separate argument to construct the full URI.
+    m_Localizer.TrackObject("object_tracker", "ninja_car", Sophus::SE3d(dT_localizer_ref).inverse(),true); //crh localizer
+    m_Localizer.Start();
 
     m_pImuThread = new std::thread(std::bind(&LearningGui::_ImuReadFunc,this));
-    m_pViconThread = new std::thread(std::bind(&LearningGui::_ViconReadFunc,this));
+    m_pLocalizerThread = new std::thread(std::bind(&LearningGui::_LocalizerReadFunc,this));
     m_pLearningCaptureThread = new std::thread(std::bind(&LearningGui::_LearningCaptureFunc,this));
 
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
@@ -502,7 +518,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
       .SetVar("learning:LearningParams",&m_vLearningParams)
       .SetVar("learning:DriveParams",&m_vDriveLearningParams)
       .SetVar("learning:ImuRate",&m_dImuRate)
-      .SetVar("learning:ViconRate",&m_dViconRate)
+      .SetVar("learning:LocalizerRate",&m_dLocalizerRate)
       .SetVar("learning:ProcessModelEnabled",&m_bProcessModelEnabled)
       .SetVar("learning:Refresh",&m_bRefresh)
       .SetVar("learning:Regress",&m_bRegress);
