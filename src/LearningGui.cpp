@@ -55,7 +55,7 @@ void LearningGui::Run()
     }
 
     {
-      std::unique_lock<std::mutex> renderMutex(m_RenderkMutex);
+      std::unique_lock<std::mutex> renderMutex(m_RenderMutex);
       m_Gui.Render();
     }
 
@@ -90,7 +90,7 @@ void LearningGui::_UpdateTrajectories()
   //now update the GLLines to sohw the trajectory
   for(size_t ii = 0 ; ii < m_vSamples.size(); ii++ ){
     if(m_lGLLineSegments.size() <= ii){
-      std::unique_lock<std::mutex> renderMutex(m_RenderkMutex);
+      std::unique_lock<std::mutex> renderMutex(m_RenderMutex);
       m_lGLLineSegments.push_back(GLCachedPrimitives());
       m_lGLLineSegments.back().SetColor(GLColor(1.0f,0.0f,0.0f,1.0f));
       m_Gui.AddGLObject(&m_lGLLineSegments.back());
@@ -461,8 +461,8 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
   state.m_dTwv = Sophus::SE3d(Cart2T(-5,0,-0.05,0,0,0));
   m_DriveCarModel.SetState(0,state);
 
-  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(&LearningGui::_CommandHandler, this, eMochaRestart) );
-  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(&LearningGui::_CommandHandler, this, eMochaClear) );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', [&]() {LearningGui::_CommandHandler(eMochaRestart);} );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', [&]() {LearningGui::_CommandHandler(eMochaClear);} );
   pangolin::RegisterKeyPressCallback( '\r', [this]() {this->m_bStep = true;} );
   pangolin::RegisterKeyPressCallback( ' ', [this]() {this->m_bPaused = !this->m_bPaused;} );
   pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(LEARNING_PARAMS_FILE_NAME),m_mParameters);} );
@@ -787,9 +787,12 @@ void LearningGui::_CommandHandler(const MochaCommands& command)
     break;
 
   case eMochaClear:
-    m_Gui.ClearCarTrajectory(m_nDriveCarId);
-    for (GLCachedPrimitives& lineStrip : m_lGLLineSegments) {
-      lineStrip.Clear();
+    {
+      std::unique_lock<std::mutex> lock(m_RenderMutex);
+      m_Gui.ClearCarTrajectory(m_nDriveCarId);
+      for (GLCachedPrimitives& lineStrip : m_lGLLineSegments) {
+        lineStrip.Clear();
+      }
     }
     break;
 

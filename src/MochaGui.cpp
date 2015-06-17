@@ -251,27 +251,6 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   m_bPause = false;
   m_bStep = false;
 
-  printf("****************\nall keyboard is disabled until you fix std::bind issues with pangolin! MochaGui.cpp line 254\n");
-
-  /*
-
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(CommandHandler, eMochaClear ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + '1', std::bind(CommandHandler, eMochaToggleTrajectory ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + '2', std::bind(CommandHandler, eMochaTogglePlans ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters);} );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters);} );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(CommandHandler, eMochaRestart ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 't', std::bind(CommandHandler, eMochaSolve ) );
-    //pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'v', std::bind(CommandHandler, eMochaPpmControl ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'b', std::bind(CommandHandler, eMochaSimulationControl ) );
-    pangolin::RegisterKeyPressCallback( '\r', std::bind(CommandHandler, eMochaStep ) );
-    pangolin::RegisterKeyPressCallback( ' ', std::bind(CommandHandler, eMochaPause ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'd', std::bind(&MochaGui::_LoadDefaultParams, this ) );
-    pangolin::RegisterKeyPressCallback( 'G', [this] {this->m_pGraphView->Show(!this->m_pGraphView->IsShown());} );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'f', [] {g_bFreezeControl = !g_bFreezeControl;} );
-
-    */
-
 
   //create CVars
   CVarUtils::CreateCVar("refresh", RefreshHandler, "Refresh all the waypoints.");
@@ -431,6 +410,21 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
 
   //populate all the objects
   _PopulateSceneGraph();
+
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', [&]() { CommandHandler(eMochaClear); } );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + '1', [&]() { CommandHandler(eMochaToggleTrajectory); } );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + '2', [&]() { CommandHandler(eMochaTogglePlans); } );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters); } );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters); } );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', [&]() { CommandHandler(eMochaRestart); } );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 't', [&]() { CommandHandler(eMochaSolve); } );
+  //pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'v', std::bind(CommandHandler, eMochaPpmControl ) );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'b', [&]() {CommandHandler(eMochaSimulationControl); } );
+  pangolin::RegisterKeyPressCallback( '\r', [&]() { CommandHandler(eMochaStep); } );
+  pangolin::RegisterKeyPressCallback( ' ', [&]() { CommandHandler(eMochaPause); } );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'd', [&]() { _LoadDefaultParams(); } );
+  pangolin::RegisterKeyPressCallback( 'G', [this] {this->m_pGraphView->Show(!this->m_pGraphView->IsShown());} );
+  pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'f', [] {g_bFreezeControl = !g_bFreezeControl;} );
 
   /// Populate an empty set of States for each of the PlanStates (also empty).
   m_lPlanStates.resize(25);
@@ -708,10 +702,10 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
   case eMochaRestart:
     m_bControl3dPath = false;
     while(m_bControllerRunning == true) {
-      usleep(1000);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   {
-    std::unique_lock<std::mutex> lock(m_DrawMutex); //crh uncommented
+    //std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_pControlLine->Clear();
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->Clear();
@@ -729,7 +723,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
   case eMochaTogglePlans:
   {
-    std::unique_lock<std::mutex> lock(m_DrawMutex); //crh uncommented
+    //std::unique_lock<std::mutex> lock(m_DrawMutex);
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->SetVisible(!(*iter)->IsVisible());
     }
@@ -738,7 +732,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
   case eMochaClear:
   {
-    std::unique_lock<std::mutex> lock(m_DrawMutex); //crh uncommented
+    //std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_Gui.ClearCarTrajectory(m_nDriveCarId);
     m_pControlLine->Clear();
     for (GLCachedPrimitives*& strip: m_lPlanLineSegments) {

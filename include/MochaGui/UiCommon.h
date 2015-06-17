@@ -3,7 +3,7 @@
 #include <pangolin/pangolin.h>
 #include "SceneGraph/SceneGraph.h"
 #include "GLWidgetPanel.h"
-#include "CVars/CVar.h"
+#include <CVars/CVar.h>
 #include <CarPlanner/CVarHelpers.h>
 #define VICON_CAR_HEIGHT_OFFSET 0.02
 
