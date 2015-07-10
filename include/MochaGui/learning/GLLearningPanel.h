@@ -51,10 +51,12 @@ public:
                 m_Ui.endGroup();
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowLeftFromTop); {
-                    //m_Ui.doLabel(m_Rect, (boost::format("dt:%ds") % *GetVar<double*>("learning:dt")).str().c_str() ); //crh
-
-                    nv::Rect leRect(0,0,50,0) ;
-                    DoNumericLineEdit(leRect,"Samples: ",GetVar<int*>("learning:TotalRegressionSamples"));
+                  m_Ui.doLabel(m_Rect, "dt: ");
+                  std::stringstream oss;
+                  oss << std::fixed << std::setprecision(2) << *GetVar<double*>("learning:dt");
+                  m_Ui.doLabel(m_Rect, oss.str().c_str());
+                  nv::Rect leRect(0,0,50,0) ;
+                  DoNumericLineEdit(leRect,"Samples: ",GetVar<int*>("learning:TotalRegressionSamples"));
                 }
                 m_Ui.endGroup();
 
@@ -62,7 +64,7 @@ public:
 
                 //show the number of collected samples
                 m_Ui.beginGroup(nv::GroupFlags_GrowLeftFromTop); {
-                    m_Ui.doLabel(m_Rect, "Collected :" );
+                    m_Ui.doLabel(m_Rect, "Collected:" );
 
                     float val = *GetVar<int*>("learning:CollectedRegressionSamples");
                     m_Ui.doProgressBar(m_Rect,0,*GetVar<int*>("learning:TotalRegressionSamples"),&val);
@@ -83,9 +85,14 @@ public:
                 }
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowLeftFromTop); {
-                    //m_Ui.doLabel(m_Rect, (boost::format("Rates IMU:%.2f") % *GetVar<double*>("learning:ImuRate")).str().c_str() );//crh
-                    //m_Ui.doLabel(m_Rect, (boost::format(" Vicon:%.2f") % *GetVar<double*>("learning:ViconRate")).str().c_str() );//crh
-
+                  m_Ui.doLabel(m_Rect, "Rates IMU: ");
+                  std::stringstream oss;
+                  oss << std::fixed << std::setprecision(2) << *GetVar<double*>("learning:ImuRate");
+                  m_Ui.doLabel(m_Rect, oss.str().c_str());
+                  oss.str("");
+                  m_Ui.doLabel(m_Rect, " Localizer: ");
+                  oss << std::fixed << std::setprecision(2) << *GetVar<double*>("learning:LocalizerRate");
+                  m_Ui.doLabel(m_Rect, oss.str().c_str());
                 }
                 m_Ui.endGroup();
 

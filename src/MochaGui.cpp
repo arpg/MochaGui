@@ -813,7 +813,7 @@ void MochaGui::_UpdateVisuals()
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 {
-  std::unique_lock<std::mutex> lock(m_DrawMutex); //crh uncommented
+  //std::unique_lock<std::mutex> lock(m_DrawMutex);
   //get the current plans and draw them
   Sophus::SE3d dTwv1,dTwv2;
   *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
@@ -832,6 +832,7 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
     }
     m_lPlanLineSegments.back()->AddVerticesFromTrajectory(vPts);
     m_lPlanLineSegments.back()->SetColor(GLColor::HsvColor(m_dCurrentHue,1.0,0.8));
+    m_lPlanLineSegments.back()->SetIgnoreDepth(true);
     m_dCurrentHue += 0.05;
     if(m_dCurrentHue > 1.0){
       m_dCurrentHue = 0;
@@ -843,6 +844,7 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
     m_pControlLine->Clear();
     m_pControlLine->AddVertex(pPlan->m_StartState.m_dTwv.translation());
     m_pControlLine->AddVertex(pPlan->m_GoalState.m_dTwv.translation());
+    m_pControlLine->SetIgnoreDepth(true);
     m_pControlLine->SetColor(GLColor(1.0f,1.0f,1.0f));
 
     m_DestAxis.SetPose(pPlan->m_GoalState.m_dTwv.matrix());
@@ -1583,7 +1585,7 @@ void MochaGui::_PopulateSceneGraph() {
 
   m_vGLLineSegments.resize(m_Path.size() - 1);
   for (size_t ii = 0; ii < m_vGLLineSegments.size(); ii++) {
-    m_vGLLineSegments[ii].SetColor(GLColor(0.0f,0.0f,0.0f));
+    m_vGLLineSegments[ii].SetColor(GLColor(1.0f,1.0f,1.0f));
     m_vGLLineSegments[ii].SetIgnoreDepth(true);
     m_Gui.AddGLObject(&m_vGLLineSegments[ii],true);
   }
@@ -1593,6 +1595,7 @@ void MochaGui::_PopulateSceneGraph() {
   for (size_t ii = 0; ii < m_vTerrainLineSegments.size(); ii++) {
     m_Gui.AddGLObject(&m_vTerrainLineSegments[ii]);
     m_vTerrainLineSegments[ii].SetColor(GLColor(1.0f, 0.0f, 0.0f));
+    m_vTerrainLineSegments[ii].SetIgnoreDepth(true);
   }
 
   //maximum number of plans

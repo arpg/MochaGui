@@ -5,27 +5,27 @@ LearningGui *g_pLearningGuiInstance = NULL;
 //static int& g_nLocalizerDownsampler = CVarUtils::CreateGetCVar("debug.ViconDownsampler",0);
 /////////////////////////////////////////////////////////////////////////////////////////
 LearningGui::LearningGui() :
-  m_sCarObjectName("CAR"),
-  m_dT(CreateCVar("learning.TimeInteval", 0.005, "")),
-  m_dImuRate(0),
-  m_dLocalizerRate(0),
-  m_bLearn(CreateCVar("learning.Active", false, "")),
-  m_bLearningRunning(false),
-  m_pRegressionSample(NULL),
-  m_Regressor(),
-  m_dLearnEps(CreateCVar("learning.Epsilon", 1e-4, "")),
-  m_nCollectedRegressionSamples(0),
-  m_nTotalRegressionSamples(CreateCVar("learning.TotalSamples", 8000, "")),
+        m_sCarObjectName("CAR"),
+        m_dT(CreateCVar("learning.TimeInteval", 0.005, "")),
+        m_dImuRate(0),
+        m_dLocalizerRate(0),
+        m_bLearn(CreateCVar("learning.Active", false, "")),
+        m_bLearningRunning(false),
+        m_pRegressionSample(NULL),
+        m_Regressor(),
+        m_dLearnEps(CreateCVar("learning.Epsilon", 1e-4, "")),
+        m_nCollectedRegressionSamples(0),
+        m_nTotalRegressionSamples(CreateCVar("learning.TotalSamples", 888, "")), //crh: should be 8000.
 
-  m_pLearningThread(NULL),
-  m_LearningPanel(),
-  m_Fusion(50,&m_FusionCarModel),
-  m_bPlayback(CreateCVar("learning.Playback", false, "")),
-  m_bStep(false),
-  m_bPaused(false),
-  m_bProcessModelEnabled(false),
-  m_bRefresh(false),
-  m_bRegress(false)
+        m_pLearningThread(NULL),
+        m_LearningPanel(),
+        m_Fusion(50,&m_FusionCarModel),
+        m_bPlayback(CreateCVar("learning.Playback", false, "")),
+        m_bStep(false),
+        m_bPaused(false),
+        m_bProcessModelEnabled(false),
+        m_bRefresh(false),
+        m_bRegress(false)
 {
   m_Node.init("LearningGui");
   m_bPlayback = false;
@@ -87,10 +87,10 @@ void LearningGui::_UpdateTrajectories()
   }
 
   std::list<GLCachedPrimitives>::iterator iter = m_lGLLineSegments.begin();
-  //now update the GLLines to sohw the trajectory
+  //now update the GLLines to show the trajectory
   for(size_t ii = 0 ; ii < m_vSamples.size(); ii++ ){
     if(m_lGLLineSegments.size() <= ii){
-      std::unique_lock<std::mutex> renderMutex(m_RenderMutex);
+      std::unique_lock<std::mutex> renderMutex(m_RenderMutex);//,std::try_to_lock);
       m_lGLLineSegments.push_back(GLCachedPrimitives());
       m_lGLLineSegments.back().SetColor(GLColor(1.0f,0.0f,0.0f,1.0f));
       m_Gui.AddGLObject(&m_lGLLineSegments.back());
@@ -112,21 +112,21 @@ void LearningGui::_UpdateTrajectories()
 void LearningGui::_JoystickReadFunc()
 {
   while(1){
-    usleep(10);
-    continue;
+    //sleep for a little while to start
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
     //update the joystick
     m_Joystick.UpdateJoystick();
     ControlCommand command;
     {
-
       command.m_dForce = (((double)m_Joystick.GetAxisValue(1)/JOYSTICK_AXIS_MAX)*-100.0);
       command.m_dPhi = (((double)m_Joystick.GetAxisValue(2)/(double)JOYSTICK_AXIS_MAX)*m_DriveCarModel.GetParameters(0)[CarParameters::MaxSteering] );
+      //std::cout <<  command.m_dForce << ", " << command.m_dPhi << std::endl;
     }
 
     command.m_dForce += m_DriveCarModel.GetParameters(0)[CarParameters::AccelOffset]*SERVO_RANGE;
     command.m_dCurvature = tan(command.m_dPhi)/m_DriveCarModel.GetParameters(0)[CarParameters::WheelBase];
     command.m_dPhi = command.m_dPhi*m_DriveCarModel.GetParameters(0)[CarParameters::SteeringCoef]*SERVO_RANGE +
-        m_DriveCarModel.GetParameters(0)[CarParameters::SteeringOffset]*SERVO_RANGE;
+                    m_DriveCarModel.GetParameters(0)[CarParameters::SteeringOffset]*SERVO_RANGE;
     //command.m_dPhi = std::max(0.0,std::min(500.0,command.m_dPhi));
     //command.m_dForce = std::max(0.0,std::min(500.0,command.m_dForce));
 
@@ -150,8 +150,6 @@ void LearningGui::_JoystickReadFunc()
       m_Fusion.RegisterInputCommands(command);
     }
 
-    //sleep for a little while
-    usleep(1000);
   }
 
 }
@@ -510,18 +508,18 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
   }
 
   m_LearningPanel.SetVar("learning:LearnOn",&m_bLearn)
-      .SetVar("learning:Playback",&m_bPlayback)
-      .SetVar("learning:MapSteering",&m_bMapSteering)
-      .SetVar("learning:dt",&m_dT)
-      .SetVar("learning:TotalRegressionSamples",&m_nTotalRegressionSamples)
-      .SetVar("learning:CollectedRegressionSamples",&m_nCollectedRegressionSamples)
-      .SetVar("learning:LearningParams",&m_vLearningParams)
-      .SetVar("learning:DriveParams",&m_vDriveLearningParams)
-      .SetVar("learning:ImuRate",&m_dImuRate)
-      .SetVar("learning:LocalizerRate",&m_dLocalizerRate)
-      .SetVar("learning:ProcessModelEnabled",&m_bProcessModelEnabled)
-      .SetVar("learning:Refresh",&m_bRefresh)
-      .SetVar("learning:Regress",&m_bRegress);
+                  .SetVar("learning:Playback",&m_bPlayback)
+                  .SetVar("learning:MapSteering",&m_bMapSteering)
+                  .SetVar("learning:dt",&m_dT)
+                  .SetVar("learning:TotalRegressionSamples",&m_nTotalRegressionSamples)
+                  .SetVar("learning:CollectedRegressionSamples",&m_nCollectedRegressionSamples)
+                  .SetVar("learning:LearningParams",&m_vLearningParams)
+                  .SetVar("learning:DriveParams",&m_vDriveLearningParams)
+                  .SetVar("learning:ImuRate",&m_dImuRate)
+                  .SetVar("learning:LocalizerRate",&m_dLocalizerRate)
+                  .SetVar("learning:ProcessModelEnabled",&m_bProcessModelEnabled)
+                  .SetVar("learning:Refresh",&m_bRefresh)
+                  .SetVar("learning:Regress",&m_bRegress);
 
   m_LearningPanel.Init();
 }
@@ -540,7 +538,7 @@ void LearningGui::_PhysicsFunc()
   double dT;
   int playBackSegment = 0, playBackSample = 0;
   m_Gui.SetCarVisibility(m_nDriveCarId,true);
-  m_Gui.SetCarVisibility(m_nPlayBackCarId,true);
+  m_Gui.SetCarVisibility(m_nPlayBackCarId,false);
   while(1){
     if(m_bPlayback){
       while(m_bPaused == true){
@@ -548,7 +546,7 @@ void LearningGui::_PhysicsFunc()
           m_bStep = false;
           break;
         }
-        usleep(1000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
       playBackSample++;
       MotionSample::FixSampleIndexOverflow(m_vSamples,playBackSegment,playBackSample);
@@ -556,7 +554,7 @@ void LearningGui::_PhysicsFunc()
       int dataIndex = m_vSampleIndices[playBackSegment] + playBackSample;
       //wait for the dT
       while((CarPlanner::Toc(dCurrentTime)) < m_PlaybackSample.m_vCommands[dataIndex].m_dT) {
-        usleep(100);
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
       }
 
       dCurrentTime = CarPlanner::Tic();
@@ -571,10 +569,11 @@ void LearningGui::_PhysicsFunc()
       //m_Gui.SetCarVisibility(m_nPlayBackCarId,false);
       if(m_eMode == Mode_Simulation){
         // boost::this_thread::interruption_point(); //crh commented
+
         //update the drive car position based on the car model
         ControlCommand currentCommand;
         while((CarPlanner::Toc(dCurrentTime)) < m_dT) {
-          usleep(100);
+          std::this_thread::sleep_for(std::chrono::microseconds(100));
         }
 
         dT = CarPlanner::Toc(dCurrentTime);
@@ -603,7 +602,7 @@ void LearningGui::_PhysicsFunc()
           _CommandHandler(eMochaRestart);
         }
       }else{
-        usleep(100000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
       }
     }
   }
@@ -628,7 +627,7 @@ void LearningGui::_UpdateLearning(ControlCommand command, VehicleState& state)
         logFile.open("steeringmap.csv", std::ios::out | std::ios::in | std::ios::trunc);
         for(size_t ii = 0 ; ii < m_vSteeringPairs.size() ; ii++){
           std::pair<double,double> pair = m_vSteeringPairs[ii];
-          logFile << pair.first << "," << pair.second << std::endl; //crh "<< std::setprecision(15) <<" removed after logFile
+          logFile << std::setprecision(15) << pair.first << "," << pair.second << std::endl; //crh "<< std::setprecision(15) <<" removed after logFile
         }
         logFile.close();
         m_vSteeringPairs.clear();
@@ -693,7 +692,7 @@ void LearningGui::_LearningCaptureFunc()
   while(1)
   {
     _SetPoseFromFusion();
-    usleep(1E6*0.005);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
 }
 
@@ -719,10 +718,11 @@ void LearningGui::_LearningFunc(MotionSample* pRegressionPlan)
 
   std::vector<RegressionParameter> currentParams = m_vLearningParams;
 
-  //    if(m_bLoggerEnabled){
-  //        _CreateLogFilesIfNeeded();
-  //        //m_fLearningLogFile << Tic() - m_dStartTime << " " << currentParams.transpose() << " " <<  pRegressionPlan->m_vCommands.size() << std::endl;
-  //    }
+  // originally commented by nimski:
+  //  if(m_bLoggerEnabled){
+  //      _CreateLogFilesIfNeeded();
+  //      //m_fLearningLogFile << Tic() - m_dStartTime << " " << currentParams.transpose() << " " <<  pRegressionPlan->m_vCommands.size() << std::endl;
+  //  }
 
   //m_Gui.SetStatusLineText(m_nLearningStatusId,(boost::format("Learning: starting with [%s]") % currentParams.transpose()).str());
   ApplyVelocitesFunctor5d functor(&m_LearningCarModel,Eigen::Vector3d::Zero());
@@ -736,7 +736,7 @@ void LearningGui::_LearningFunc(MotionSample* pRegressionPlan)
   m_Regressor.CalculateParamNorms(functor,(MotionSample&)*pRegressionPlan,newParams,&m_vSamples,&m_vSampleIndices);
 
 
-
+  std::cout << "Running _UpdateTrajectories." << std::endl;
   _UpdateTrajectories();
 
   //and now set the params on the car
@@ -787,13 +787,13 @@ void LearningGui::_CommandHandler(const MochaCommands& command)
     break;
 
   case eMochaClear:
-    {
-      std::unique_lock<std::mutex> lock(m_RenderMutex);
-      m_Gui.ClearCarTrajectory(m_nDriveCarId);
-      for (GLCachedPrimitives& lineStrip : m_lGLLineSegments) {
-        lineStrip.Clear();
-      }
+  {
+    std::unique_lock<std::mutex> lock(m_RenderMutex);
+    m_Gui.ClearCarTrajectory(m_nDriveCarId);
+    for (GLCachedPrimitives& lineStrip : m_lGLLineSegments) {
+      lineStrip.Clear();
     }
+  }
     break;
 
   default:

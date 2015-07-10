@@ -26,7 +26,7 @@ int main( int argc, char** argv )
     std::string res = ss.str();
     std::string::iterator end_pos = std::remove(res.begin(), res.end(), ' ');
     res.erase(end_pos, res.end());
-    std::cout << res  << std::endl;
+    std::cout << "Residual is: " << res  << std::endl;
 
     return 0;
 }
