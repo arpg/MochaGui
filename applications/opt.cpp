@@ -83,6 +83,12 @@ int main( int argc, char** argv )
     GLWayPoint* pWaypoint1 = &(gui.GetWaypoint(1)->m_Waypoint);
     GLWayPoint* pCarWaypoint = &(gui.GetWaypoint(2)->m_Waypoint);
 
+    pangolin::Var<int>::Attach("planner.IterationLimit", g_nIterationLimit);
+    pangolin::Var<double>::Attach("planner.TimeInteval", g_dT);
+    pangolin::Var<bool>::Attach("planner.InertialControlActive", g_bInertialControlActive);
+    pangolin::Var<bool>::Attach("controller.PointCost", g_bPointCost);
+    pangolin::Var<double>::Attach("debug.SuccessNorm",g_dSuccessNorm);
+
     //register keystrokes
     pangolin::RegisterKeyPressCallback( ' ', [&bPaused] {bPaused = !bPaused;} );
     pangolin::RegisterKeyPressCallback( '\r', [&bStep] {bStep = true;} );

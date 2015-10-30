@@ -11,7 +11,7 @@ PlannerGui::PlannerGui():
 {
     int argc = 0;
     //glutInit(&argc,0);
-    pangolin::CreateGlutWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
+    pangolin::CreateWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
     glewInit();
 }
 
@@ -47,7 +47,7 @@ void PlannerGui::Render()
     }
 
     // Swap frames and Process Events
-    pangolin::FinishGlutFrame();
+    pangolin::FinishFrame();
 
     //handle waypoints
 

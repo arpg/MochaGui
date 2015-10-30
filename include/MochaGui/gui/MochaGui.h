@@ -18,7 +18,6 @@
 #include "CarPlanner/CarController.h"
 #include "CarPlanner/LocalPlanner.h"
 #include "CarPlanner/CarRegressor.h"
-#include "CarPlanner/CVarHelpers.h"
 #include "SensorFusion/SensorFusionCeres.h"
 
 #include "Messages.pb.h"
@@ -29,7 +28,6 @@
 #include "MochaGui/ProcessModelFusion.h"
 #include "MochaGui/Localizer.h"
 
-using namespace CVarUtils;
 using namespace std;
 using namespace Eigen;
 

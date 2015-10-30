@@ -11,7 +11,6 @@
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLMesh.h>
-#include <CVars/CVar.h>
 #include <node/Node.h>
 
 #include "CarPlanner/CarPlannerCommon.h"

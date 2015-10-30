@@ -31,7 +31,7 @@ pangolin::DataLog m_Log;
 EventLogger m_Logger;
 fusion::SensorFusionCeres g_fusion(m_nFilterSize);
 int m_nImuSkip = 0;
-static int& g_nGlobalSkip = CVarUtils::CreateGetCVar("debug.GlobalSkip",0);
+static int g_nGlobalSkip = 0;
 
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
@@ -247,6 +247,8 @@ int main( int argc, char** argv )
 {
     //enable floating point exceptions
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    pangolin::Var<int>::Attach("debug.GlobalSkip",g_nGlobalSkip);
+
 
     GetPot cl( argc, argv );
     std::string sLog = cl.follow("20130226_142837",1,"-log"); //crh filename
@@ -269,7 +271,7 @@ int main( int argc, char** argv )
 
 
     // Create OpenGL window in single line thanks to GLUT
-    pangolin::CreateGlutWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
+    pangolin::CreateWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
     SceneGraph::GLSceneGraph::ApplyPreferredGlSettings();
     glewInit();
 

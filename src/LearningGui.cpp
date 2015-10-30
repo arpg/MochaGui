@@ -29,6 +29,8 @@ LearningGui::LearningGui() :
 {
   m_Node.init("LearningGui");
   m_bPlayback = false;
+  //pangolin::CreateGlutWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
+  glewInit();
 }
 
 ////////////////////////////////////////////////////////////////
