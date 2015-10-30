@@ -25,7 +25,6 @@
 #include "MochaGui/GLCar.h"
 #include "MochaGui/PlannerGui.h"
 #include "MochaGui/GLBulletDebugDrawer.h"
-#include "MochaGui/gui/GLGuiPanel.h"
 #include "MochaGui/EventLogger.h"
 #include "MochaGui/ProcessModelFusion.h"
 #include "MochaGui/Localizer.h"

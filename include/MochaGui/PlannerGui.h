@@ -13,7 +13,6 @@
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"
 #include "MochaGui/GLCar.h"
-#include "MochaGui/GLWidgetPanel.h"
 #include "MochaGui/UiCommon.h"
 
 
@@ -71,8 +70,6 @@ public:
     void AddGLObject(GLObject* pObject, bool bCastShadows = false) { m_SceneGraph.AddChild(pObject); m_pLight->AddShadowCaster(pObject); }
     /// Adds a new 2D object to the scenegraph
     void Add2DGLObject(GLObject* pObject) { m_SceneGraph2d.AddChild(pObject); }
-    /// Adds a GLPanel object to the 2D scenegraph and hooks up its events
-    void AddPanel(GLWidgetPanel* pPanel);
 
     /// Adds a new status line to the gui, to allow the user to add text, Returns the ID of this status line
     int AddStatusLine(StatusLineLocation location);
@@ -134,9 +131,6 @@ private:
 
     std::vector<StatusLine*> m_vStatusLines;
     std::vector<Car*> m_vCars;
-
-    //vector of widgets panels
-    std::vector<GLWidgetPanel*> m_vWidgetPanels;
 
     Car* m_pFollowCar;
     std::mutex m_DrawMutex;

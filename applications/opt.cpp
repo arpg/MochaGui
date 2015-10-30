@@ -8,63 +8,13 @@
 #include "MochaGui/GetPot"
 #include "MochaGui/PlannerGui.h"
 
-static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.IterationLimit", 10, "");
-static double& g_dT = CVarUtils::CreateGetUnsavedCVar("planner.TimeInteval", 0.01, "");
-static bool& g_bInertialControlActive = CVarUtils::CreateGetUnsavedCVar("planner.InertialControlActive", false, "");
-static bool& g_bPointCost(CVarUtils::CreateGetUnsavedCVar("controller.PointCost",false,""));
-static double& g_dSuccessNorm = CVarUtils::CreateGetUnsavedCVar("debug.SuccessNorm",1e-10);
 
-class GlOptPanel : public GLWidgetPanel {
-    virtual void DrawUI() {
-        //Eigen::IOFormat CleanFmt(2, 0, ", ", "\n" , "[" , "]");
-        nv::Rect frameRect(0,0,200,0);
-        m_Ui.begin();
-            m_Ui.beginFrame(nv::GroupFlags_GrowDownFromLeft,m_Rect);
-                m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
-                    m_Ui.doLabel(m_Rect, "Paused:");
-                    m_Ui.doLabel(m_Rect, (*GetVar<bool*>("interface:Paused")) ? "Yes" : "No", 0,0.1,0.8,0.8);
-                m_Ui.endFrame();
+static int g_nIterationLimit = 10;
+static double g_dT =  0.01;
+static bool g_bInertialControlActive = false;
+static bool g_bPointCost = false;
+static double g_dSuccessNorm =  1e-10;
 
-                m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
-                    m_Ui.doLabel(m_Rect,"Norm:");
-                    std::stringstream oss;
-                    oss << std::fixed << std::setprecision(2) << *GetVar<double*>("planner:Norm");
-                    m_Ui.doLabel(m_Rect, oss.str().c_str() ,0,0.1,0.8,0.8);
-                    // clear the string stream
-                    oss.str("");
-                m_Ui.endGroup();
-
-                // Planner parameters panel
-                m_Ui.beginFrame(nv::GroupFlags_GrowDownFromLeft,frameRect);
-                    m_Ui.doLabel(m_Rect, "Planner Parameters");
-                    m_Ui.doCheckButton(m_Rect,"Planner On",GetVar<bool*>("planner:PlannerOn"));
-                m_Ui.endFrame();
-
-                // Control parameters panel
-                m_Ui.beginFrame(nv::GroupFlags_GrowDownFromLeft,frameRect);
-                    m_Ui.doLabel(m_Rect, "Control Parameters");
-                    m_Ui.doCheckButton(m_Rect,"Controller On",GetVar<bool*>("planner:ControllerOn"));
-                    m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
-                        m_Ui.doLabel(m_Rect, "Lookahead T:");
-                        m_Ui.doProgressBar(m_Rect,0.0,5.0,GetVar<float*>("control:LookaheadTime"));
-                    m_Ui.endGroup();
-                    m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
-                    m_Ui.doLabel(m_Rect,"Actual Lookahead:");
-                    oss << *GetVar<double*>("planner:ActualLookahead");
-                    m_Ui.doLabel(m_Rect, oss.str().c_str() ,0,0.1,0.8,0.8);
-                    oss.str("");
-                    m_Ui.endGroup();
-                    m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
-                        m_Ui.doLabel(m_Rect, "StartCurvature T:");
-                        m_Ui.doProgressBar(m_Rect,-2.0,2.0,GetVar<float*>("control:StartCurvature"));
-                    m_Ui.endGroup();
-                m_Ui.endFrame();
-                // planner parameters panel
-                m_Ui.beginFrame(nv::GroupFlags_GrowDownFromLeft,frameRect);
-            m_Ui.endFrame();
-        m_Ui.end();
-    }
-};
 
 bool CanContinue(const bool bPaused, bool& bStep){
     if(bPaused == true){
@@ -101,7 +51,6 @@ int main( int argc, char** argv )
     LocalPlanner planner;
     //initialize the Gui
     PlannerGui gui;
-    GlOptPanel panel;
     BulletCarModel carModel;
     GLCachedPrimitives trajectoryStrip,trajectoryBezierStrip,controlStrip,controlBezierStrip;
     trajectoryStrip.SetColor(GLColor(0.5f,0.0f,0.0f));

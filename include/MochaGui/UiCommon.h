@@ -1,58 +1,26 @@
 #pragma once
 
 #include <pangolin/pangolin.h>
-#include "SceneGraph/SceneGraph.h"
-#include "GLWidgetPanel.h"
-#include <CVars/CVar.h>
-#include <CarPlanner/CVarHelpers.h>
+#include <SceneGraph/SceneGraph.h>
+#include "VarHelpers.h"
 #define VICON_CAR_HEIGHT_OFFSET 0.02
 
 struct PlannerHandler : public SceneGraph::HandlerSceneGraph
 {
-    PlannerHandler(SceneGraph::GLSceneGraph& graph, pangolin::OpenGlRenderState& cam_state, pangolin::AxisDirection enforce_up=pangolin::AxisNone, float trans_scale=0.01f, std::vector<GLWidgetPanel*>* pPanels = NULL) :
+    PlannerHandler(SceneGraph::GLSceneGraph& graph, pangolin::OpenGlRenderState& cam_state, pangolin::AxisDirection enforce_up=pangolin::AxisNone, float trans_scale=0.01f) :
         HandlerSceneGraph(graph,cam_state,enforce_up,trans_scale)
-    {
-        m_pWidgetPanels = pPanels;
-    }
+    { }
 
     void Mouse(pangolin::View& view, pangolin::MouseButton button, int x, int y, bool pressed, int button_state)
     {
-        if( m_pWidgetPanels != NULL) {
-            //convert pangolin button to GLUT button
-            int glutButton = (int)button;
-            int log2 = 0;
-            while (glutButton >>= 1) ++log2;
-            for(size_t ii = 0; ii < m_pWidgetPanels->size() ; ii++){
-                m_pWidgetPanels->at(ii)->GetUIContext()->mouse(log2,(int)!pressed,x,view.v.h - y);
-            }
-        }
-
-       HandlerSceneGraph::Mouse(view,button,x,y,pressed,button_state);
+      HandlerSceneGraph::Mouse(view,button,x,y,pressed,button_state);
     }
 
     void MouseMotion(pangolin::View& view, int x, int y, int button_state)
     {
-        if( m_pWidgetPanels != NULL) {
-            for(size_t ii = 0; ii < m_pWidgetPanels->size() ; ii++){
-                m_pWidgetPanels->at(ii)->GetUIContext()->mouseMotion(x,view.v.h - y);
-            }
-        }
-
-       HandlerSceneGraph::MouseMotion(view,x,y,button_state);
+      HandlerSceneGraph::MouseMotion(view,x,y,button_state);
     }
 
-    void Keyboard(View& view, unsigned char key, int x, int y, bool pressed)
-    {
-        if( m_pWidgetPanels != NULL && pressed) {
-            for(size_t ii = 0; ii < m_pWidgetPanels->size() ; ii++){
-                m_pWidgetPanels->at(ii)->GetUIContext()->keyboard(key,x,y);
-            }
-        }
-
-        HandlerSceneGraph::Keyboard(view,key,x,y,pressed);
-    }
-
-    std::vector<GLWidgetPanel*>* m_pWidgetPanels;
 };
 
 struct ActivateScissorBlendedDrawFunctor

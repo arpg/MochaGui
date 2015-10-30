@@ -125,7 +125,7 @@ void PlannerGui::Init(SceneGraph::GLObject* pTerrain)
 
     m_pPanelView = &pangolin::CreateDisplay()
             .SetBounds(1.0-(double)UI_PANEL_HEIGHT/(double)WINDOW_HEIGHT,1.0,0, (double)UI_PANEL_WIDTH/(double)WINDOW_WIDTH)
-            .SetHandler(new PlannerHandler(m_SceneGraphWidgets,m_RenderState2d,pangolin::AxisNegZ,0.01f,&m_vWidgetPanels))
+            .SetHandler(new PlannerHandler(m_SceneGraphWidgets,m_RenderState2d,pangolin::AxisNegZ,0.01f))
             .SetDrawFunction(ActivateScissorBlendedDrawFunctor(m_SceneGraphWidgets,m_RenderState2d));
 
     pangolin::RegisterKeyPressCallback( 'v', std::bind(&PlannerGui::_CommandHandler, this, eChangeView) );
@@ -136,14 +136,6 @@ void PlannerGui::Init(SceneGraph::GLObject* pTerrain)
     _PopulateSceneGraph();
 
     CheckForGLErrors();
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-void PlannerGui::AddPanel(GLWidgetPanel* pPanel)
-{
-    m_vWidgetPanels.push_back(pPanel);
-    pPanel->Init(UI_PANEL_WIDTH,UI_PANEL_HEIGHT);
-    m_SceneGraphWidgets.AddChild(pPanel);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

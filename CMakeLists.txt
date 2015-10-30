@@ -34,8 +34,8 @@ find_package( Node REQUIRED )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 
-set( NV_CMAKE_DIR ${CMAKE_MODULE_PATH} )
-add_subdirectory(NvWidgets)
+#set( NV_CMAKE_DIR ${CMAKE_MODULE_PATH} )
+#add_subdirectory(NvWidgets)
 add_subdirectory(Gamepad)
 
 
@@ -81,7 +81,7 @@ set( LIBRARIES
      ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
      ${CVars_LIBRARIES}
      ${ASSIMP_LIBRARIES}
-     nvwidgets #this is built with MochaGui. No finding is required
+     # nvwidgets #this is built with MochaGui. No finding is required
      Gamepad # this is also built with the solution
      )
 
@@ -117,7 +117,6 @@ list(APPEND SHARED_SRC ${PROTO_SRCS})
 
 
 set( GUI_HDRS
-    include/MochaGui/gui/GLGuiPanel.h
     include/MochaGui/gui/MochaGui.h
    )
 
@@ -128,7 +127,6 @@ set( GUI_SRC
 
 set( LEARNING_HDRS
     include/MochaGui/learning/JoystickHandler.h
-    include/MochaGui/learning/GLLearningPanel.h
     include/MochaGui/learning/LearningGui.h
    )
 
