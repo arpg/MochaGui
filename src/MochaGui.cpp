@@ -641,6 +641,7 @@ bool MochaGui::_Refresh(std::vector<std::string> *vArgs)
 ////////////////////////////////////////////////////////////////
 void MochaGui::_RefreshWaypoints()
 {
+  std::unique_lock<std::mutex> lock(m_DrawMutex);
   //first clear all waypoints
   m_Gui.ClearWaypoints();
 
@@ -705,7 +706,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   {
-    //std::unique_lock<std::mutex> lock(m_DrawMutex);
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_pControlLine->Clear();
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->Clear();
@@ -723,7 +724,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
   case eMochaTogglePlans:
   {
-    //std::unique_lock<std::mutex> lock(m_DrawMutex);
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->SetVisible(!(*iter)->IsVisible());
     }
@@ -732,7 +733,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
   case eMochaClear:
   {
-    //std::unique_lock<std::mutex> lock(m_DrawMutex);
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_Gui.ClearCarTrajectory(m_nDriveCarId);
     m_pControlLine->Clear();
     for (GLCachedPrimitives*& strip: m_lPlanLineSegments) {
@@ -768,10 +769,15 @@ bool MochaGui::_IteratePlanner(
 
   if(only2d == false) {
     if( m_bPlannerOn == true && m_bSimulate3dPath == false ){
+      // `problem` is changing midway through evaluation.
+      // this is a massive bug and needs to be repaired. Tried:
+      // 1) lock_guard on m_PlanMutex (in caller: _PlannerFunc).
+      std::unique_lock<std::mutex> plan_lock(m_PlanMutex);
       res = m_Planner.Iterate(problem);
       m_Planner.SimulateTrajectory(sample,problem,0,true);
     }else{
       res = true;
+      std::unique_lock<std::mutex> plan_lock(m_PlanMutex);
       m_Planner.SimulateTrajectory(sample,problem,0,true);
       if(problem.m_bInertialControlActive){
         m_Planner.CalculateTorqueCoefficients(problem,&sample);
@@ -813,7 +819,7 @@ void MochaGui::_UpdateVisuals()
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 {
-  //std::unique_lock<std::mutex> lock(m_DrawMutex);
+  std::unique_lock<std::mutex> lock(m_DrawMutex);
   //get the current plans and draw them
   Sophus::SE3d dTwv1,dTwv2;
   *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
@@ -1061,6 +1067,7 @@ void MochaGui::_ControlFunc()
 
     while(1) {
 
+      std::unique_lock<std::mutex> lock(m_DrawMutex);
       m_pControlLine->Clear();
       for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
         pStrip->Clear();
@@ -1077,7 +1084,7 @@ void MochaGui::_ControlFunc()
       //        dout("Waiting for control input and completed plan");
       while(m_bControl3dPath == false || m_bAllClean == false ||
             (m_bSimulate3dPath == false && m_eControlTarget != eTargetExperiment)){
-        usleep(1000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
 
       //write the segments to the log
@@ -1122,7 +1129,7 @@ void MochaGui::_ControlFunc()
         while((m_eControlTarget != eTargetExperiment &&
                m_bSimulate3dPath == false
                && m_StillControl )){
-          usleep(1000);
+          std::this_thread::sleep_for(std::chrono::milliseconds(1);
           //boost::this_thread::interruption_point();
         }
 
@@ -1450,7 +1457,7 @@ void MochaGui::_PlannerFunc() {
 
         {
           //lock the drawing look as we will be modifying things here
-          std::unique_lock<std::mutex> lock(m_DrawMutex);
+          std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock);
           if(a->GetDirty()) {
             Sophus::SE3d pose(a->GetPose4x4_po());
             if(m_DriveCarModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
@@ -1531,7 +1538,7 @@ void MochaGui::_PlannerFunc() {
             numInterations++;
 
             //lock the mutex as this next bit will modify object
-            std::unique_lock<std::mutex> lock(m_DrawMutex );
+            std::unique_lock<std::mutex> draw_lock(m_DrawMutex);
 
             if (m_bCompute3dPath == true ) {
               success =  res;
@@ -1581,7 +1588,10 @@ void MochaGui::_PlannerFunc() {
 
 ////////////////////////////////////////////////////////////////
 void MochaGui::_PopulateSceneGraph() {
+
   _RefreshWaypoints();
+
+  std::unique_lock<std::mutex> lock(m_DrawMutex);
 
   m_vGLLineSegments.resize(m_Path.size() - 1);
   for (size_t ii = 0; ii < m_vGLLineSegments.size(); ii++) {

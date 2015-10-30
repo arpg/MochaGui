@@ -51,7 +51,7 @@ void CalculateCubic(Eigen::VectorPose dStartPose,double bi, double ti, double ci
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )
 {
-  ThreadPool::ThreadPool threadPool(8);
+  ThreadPool threadPool(8);
 
   //double xMin = 1;
   //double xMax = 11;//11;
@@ -112,7 +112,7 @@ int main( int argc, char** argv )
     }
 
     //wait for  this batch to finish
-    while(threadPool.pending_tasks() > 0){
+    while(threadPool.busy_threads() > 0){
       if(CarPlanner::Toc(lastTime) > 1.0  ){
         std::unique_lock<std::mutex> loc(m_resultLock);
 
@@ -195,7 +195,10 @@ int main( int argc, char** argv )
   }
 
   //wait for all threads
-  threadPool.wait();
+
+  while(threadPool.busy_threads() > 0) {
+    std::this_thread::sleep_for(std::chrono::microseconds(10));
+  }
 
   dout("LUT complete! writing to file...");
 

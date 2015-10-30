@@ -191,7 +191,7 @@ int PlannerGui::AddStatusLine(StatusLineLocation location)
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::SetStatusLineText(int id, std::string text)
 {
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
+    std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_vStatusLines[id]->m_GLText.SetText(text);
 }
 

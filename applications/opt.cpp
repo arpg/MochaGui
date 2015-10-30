@@ -269,7 +269,7 @@ int main( int argc, char** argv )
     while( !pangolin::ShouldQuit() )
     {
         {
-            //std::unique_lock<std::mutex> lock(m_DrawMutex); //crh old boost code was commented
+            std::unique_lock<std::mutex> lock(m_DrawMutex); //was previously commented.
             gui.Render();
         }
     }

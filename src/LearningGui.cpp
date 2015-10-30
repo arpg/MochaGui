@@ -75,7 +75,7 @@ void LearningGui::Run()
     }
 
 
-    usleep(1e6/100.0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
 
@@ -83,6 +83,7 @@ void LearningGui::Run()
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_UpdateTrajectories()
 {
+  std::unique_lock<std::mutex> lock(m_RenderMutex);
   //clear all line segmenst
   for (GLCachedPrimitives& strip: m_lGLLineSegments) {
     strip.Clear();
