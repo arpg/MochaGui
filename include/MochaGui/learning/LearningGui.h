@@ -7,6 +7,7 @@
 #include <tuple>
 #include <thread>
 #include <functional>
+#include <iomanip>
 
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
@@ -29,8 +30,6 @@
 #include "MochaGui/EventLogger.h"
 
 #define LEARNING_PARAMS_FILE_NAME "learning_params.csv"
-
-using namespace CVarUtils;
 
 enum Mode
 {
@@ -98,18 +97,18 @@ private:
     int m_nDriveCarId;
     int m_nPlayBackCarId;
 
-    double& m_dT;
+    double m_dT;
     double m_dImuRate;
     double m_dLocalizerRate;
 
-    bool& m_bLearn;
+    bool m_bLearn;
     bool m_bLearningRunning;
     MotionSample m_PlaybackSample;
     MotionSample* m_pRegressionSample;
     CarRegressor m_Regressor;
-    double& m_dLearnEps;
+    double m_dLearnEps;
     int m_nCollectedRegressionSamples;
-    int& m_nTotalRegressionSamples;
+    int m_nTotalRegressionSamples;
 
     std::thread* m_pPhysicsThread;
     std::thread* m_pLearningThread;

@@ -5,8 +5,8 @@
 #include <xmmintrin.h>
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
+#include <SensorFusion/SensorFusionCeres.h>
 #include "CarPlanner/CarPlannerCommon.h"
-#include "SensorFusionCeres.h"
 #include "MochaGui/GetPot"
 #include "MochaGui/EventLogger.h"
 #include "MochaGui/SE3.h"

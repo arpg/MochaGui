@@ -9,7 +9,7 @@ std::mutex m_resultLock;
 std::vector<Eigen::Matrix<double,8,1> >m_vResults;
 std::vector<bool> m_vFailures;
 unsigned int nTotalNum;
-CarPlanner6d planner;
+//CarPlanner6d planner;
 unsigned int currentItem = 0;
 
 void SetResult(int index, Eigen::Matrix<double,8,1> val)
@@ -206,42 +206,26 @@ int main( int argc, char** argv )
   std::ofstream file;
   file.open("lut.txt", std::ofstream::trunc);
 
-  //    std::string sHeader = boost::str(boost::format("#ifndef _CAR_PLANNER_LUT_H_\n"
-  //                                                   "#define _CAR_PLANNER_LUT_H_\n"
-  //                                                   "const double g_xmin=%f;\n"
-  //                                                   "const double g_xmax=%f;\n"
-  //                                                   "const double g_xstep=%f;\n"
-  //                                                   "const double g_ymin=%f;\n"
-  //                                                   "const double g_ymax=%f;\n"
-  //                                                   "const double g_ystep=%f;\n"
-  //                                                   "const double g_tmin=%f;\n"
-  //                                                   "const double g_tmax=%f;\n"
-  //                                                   "const double g_tstep=%f;\n"
-  //                                                   "const double g_cimin=%f;\n"
-  //                                                   "const double g_cimax=%f;\n"
-  //                                                   "const double g_cistep=%f;\n"
-  //                                                   "const double g_CarPlannerLut[%d][8] = {\n")
-  //                                     % xMin % xMax % xStep % yMin % yMax % yStep
-  //                                     % tiMin % tiMax % tiStep % ciMin % ciMax % ciStep % m_vResults.size());
-
-  std::string sHeader = "Fix sHeader"; //crh
-
-  /*
-std::string sHeader = boost::str(boost::format("#ifndef _CAR_PLANNER_LUT_H_\n"
-                                                   "#define _CAR_PLANNER_LUT_H_\n"
-                                                   "const double g_bmin=%f;\n"
-                                                   "const double g_bmax=%f;\n"
-                                                   "const double g_bstep=%f;\n"
-                                                   "const double g_tmin=%f;\n"
-                                                   "const double g_tmax=%f;\n"
-                                                   "const double g_tstep=%f;\n"
-                                                   "const double g_cimin=%f;\n"
-                                                   "const double g_cimax=%f;\n"
-                                                   "const double g_cistep=%f;\n"
-                                                   "const double g_CarPlannerLut[%d][8] = {\n")
-                                     % biMin % biMax % biStep
-                                     % tiMin % tiMax % tiStep % ciMin % ciMax % ciStep % m_vResults.size());
-*/
+  std::stringstream oss;
+    oss << "#ifndef _CAR_PLANNER_LUT_H_\n"
+        << "#define _CAR_PLANNER_LUT_H_\n"
+//      << "const double g_xmin=" << xMin << "\n"
+//      << "const double g_xmax=" << xMax << "\n"
+//      << "const double g_xstep=" << xStep << "\n"
+//      << "const double g_ymin=" << yMin << "\n"
+//      << "const double g_ymax=" << yMax << "\n"
+//      << "const double g_ystep=" << yStep << "\n"
+      << "const double g_ymin=" << biMin << "\n"
+      << "const double g_ymax=" << biMax << "\n"
+      << "const double g_ystep=" << biStep << "\n"
+      << "const double g_tmin=" << tiMin << "\n"
+      << "const double g_tmax=" << tiMax << "\n"
+      << "const double g_tstep=" << tiStep << "\n"
+      << "const double g_cimin=" << ciMin << "\n"
+      << "const double g_cimax=" << ciMax << "\n"
+      << "const double g_cistep=" << ciStep << "\n"
+      << "const double g_CarPlannerLut[" << m_vResults.size() << "][8] = {\n";
+   std::string sHeader = oss.str();
 
   file.write(sHeader.c_str(),sHeader.length());
 

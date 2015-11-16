@@ -23,7 +23,6 @@ find_package( GLOG REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
-find_package( CVars REQUIRED )
 find_package( Protobuf REQUIRED )
 find_package( Bullet REQUIRED )
 find_package( SensorFusion REQUIRED )
@@ -40,6 +39,10 @@ add_subdirectory(Gamepad)
 
 
 include_directories( ${CMAKE_CURRENT_BINARY_DIR} )
+include_directories( ${CMAKE_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    )
 
 set( PROTO_DIR src/Messages )
 set( _PROTO_SRCS
@@ -61,7 +64,6 @@ set( _INCLUDE_DIRS
     ${LIBAO_INCLUDE_DIR}
     ${Pangolin_INCLUDE_DIRS}
     ${CarPlanner_INCLUDE_DIRS}
-    ${CVars_INCLUDE_DIRS}
     ${ZeroMQ_INCLUDE_DIRS}
     ${PROTOBUF_INCLUDE_DIRS}
     ${SceneGraph_INCLUDE_DIRS}
@@ -78,9 +80,10 @@ set( LIBRARIES
      ${LIBAO_LIBRARY}
      ${SceneGraph_LIBRARIES}
      ${CarPlanner_LIBRARIES}
-     ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
-     ${CVars_LIBRARIES}
+     ${ZeroMQ_LIBRARIES}
+     ${PROTOBUF_LIBRARIES}
      ${ASSIMP_LIBRARIES}
+     ${BULLET_LIBRARIES}
      # nvwidgets #this is built with MochaGui. No finding is required
      Gamepad # this is also built with the solution
      )
@@ -110,6 +113,8 @@ set( SHARED_SRC
     src/JoystickHandler.cpp
     src/EventLogger.cpp
     src/Localizer.cpp
+    src/VarHelpers.h
+    src/RpgUtils.h
    )
 
 list(APPEND SHARED_SRC ${PROTO_SRCS})

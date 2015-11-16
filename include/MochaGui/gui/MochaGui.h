@@ -119,7 +119,7 @@ protected:
 
     double m_dDiagTime;
 
-    std::vector<Eigen::MatrixXd*> m_vWayPoints;
+    std::vector<Eigen::MatrixXd> m_vWayPoints;
     //vector<GLWayPoint*> m_vGLWayPoints;
     const GLWayPoint*m_pCurrentlySolving[2];
     std::vector<GLCachedPrimitives> m_vGLLineSegments;
@@ -137,7 +137,7 @@ protected:
     BulletCarModel m_ControlCarModel;
 
     //CVars
-    std::vector<int>& m_Path;
+    std::vector<int> m_Path;
 #define WAYPOINT_VEL_INDEX 6
 #define WAYPOINT_AIR_INDEX 7
 
@@ -147,20 +147,20 @@ protected:
     std::atomic<bool> m_bStillImu;
     std::atomic<bool> m_bStillControl;
     std::atomic<bool> m_bStillLocalize;
-    bool& m_bPlannerOn;
-    bool& m_bShowProjectedPath;
-    bool& m_bCompute3dPath;
-    bool& m_bSimulate3dPath;
-    int& m_eControlTarget;
-    bool& m_bControl3dPath;
+    bool m_bPlannerOn;
+    bool m_bShowProjectedPath;
+    bool m_bCompute3dPath;
+    bool m_bSimulate3dPath;
+    int m_eControlTarget;
+    bool m_bControl3dPath;
 
 
     bool& m_bFuseImu;
     bool m_bPlanning;
     bool m_bControllerRunning;
     bool m_bLearningRunning;
-    unsigned int& m_nPathSegments;
-    double& m_dTimeInterval;
+    unsigned int m_nPathSegments;
+    double m_dTimeInterval;
     double m_dFps;
     bool m_bPause;
     bool m_bStep;
@@ -196,10 +196,10 @@ protected:
     EventLogger m_Logger;
     EventLogger m_FusionLogger;
     double m_dStartTime;
-    bool& m_bLoggerEnabled;
-    std::string& m_sLogFileName;
-    bool& m_bFusionLoggerEnabled;
-    bool& m_bLoggerPlayback;
+    bool m_bLoggerEnabled;
+    std::string m_sLogFileName;
+    bool m_bFusionLoggerEnabled;
+    bool m_bLoggerPlayback;
     unsigned int m_nNumControlSignals;
     unsigned int m_nNumPoseUpdates;
     std::string m_sPlaybackLogFile;
@@ -209,6 +209,7 @@ protected:
     ProcessModelFusion m_Fusion;
 
     std::mutex m_ControlMutex;
+    std::mutex m_PlanMutex;
     std::mutex m_DrawMutex;
 
     PlannerGui m_Gui;
@@ -222,8 +223,7 @@ protected:
     //load/save of files
     bool m_bLoadWaypoints;
     bool m_bSaveWaypoints;
-    char m_pSaveFileName[100];
-    int m_nSaveFileNameLen;
+    string m_sSaveFileName;
     int m_nSelectedFileName;
     std::vector<std::string> m_vFileNames;
 

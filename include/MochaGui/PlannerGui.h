@@ -8,12 +8,12 @@
 #define UI_PANEL_HEIGHT WINDOW_HEIGHT
 
 #include <stdio.h>
-#include "CarPlanner/CarPlannerCommon.h"
-#include "CarPlanner/BulletCarModel.h"
-#include "pangolin/pangolin.h"
-#include "SceneGraph/SceneGraph.h"
-#include "MochaGui/GLCar.h"
-#include "MochaGui/UiCommon.h"
+#include <CarPlanner/CarPlannerCommon.h>
+#include <CarPlanner/BulletCarModel.h>
+#include <pangolin/pangolin.h>
+#include <SceneGraph/SceneGraph.h>
+#include <MochaGui/GLCar.h>
+#include <MochaGui/UiCommon.h>
 
 
 
@@ -100,6 +100,8 @@ public:
     /// Sets the dirty flag on all waypoints to true
     void SetWaypointDirtyFlag(bool bFlag);
 
+    std::mutex m_DrawMutex;
+
 
 private:
     /// Populates the initial scenegraph items
@@ -133,7 +135,6 @@ private:
     std::vector<Car*> m_vCars;
 
     Car* m_pFollowCar;
-    std::mutex m_DrawMutex;
     PlannerViewType m_eViewType;
     int m_nSelectedWaypoint;
 };

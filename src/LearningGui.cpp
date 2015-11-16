@@ -1,4 +1,5 @@
 #include "MochaGui/learning/LearningGui.h"
+#include "RpgUtils.h"
 
 LearningGui *g_pLearningGuiInstance = NULL;
 
@@ -6,27 +7,32 @@ LearningGui *g_pLearningGuiInstance = NULL;
 /////////////////////////////////////////////////////////////////////////////////////////
 LearningGui::LearningGui() :
         m_sCarObjectName("CAR"),
-        m_dT(CreateCVar("learning.TimeInteval", 0.005, "")),
+        m_dT(0.005),
         m_dImuRate(0),
         m_dLocalizerRate(0),
-        m_bLearn(CreateCVar("learning.Active", false, "")),
+        m_bLearn(false),
         m_bLearningRunning(false),
         m_pRegressionSample(NULL),
         m_Regressor(),
-        m_dLearnEps(CreateCVar("learning.Epsilon", 1e-4, "")),
+        m_dLearnEps(1e-4),
         m_nCollectedRegressionSamples(0),
-        m_nTotalRegressionSamples(CreateCVar("learning.TotalSamples", 888, "")), //crh: should be 8000.
+        m_nTotalRegressionSamples(8000),
 
         m_pLearningThread(NULL),
-        m_LearningPanel(),
         m_Fusion(50,&m_FusionCarModel),
-        m_bPlayback(CreateCVar("learning.Playback", false, "")),
+        m_bPlayback(false),
         m_bStep(false),
         m_bPaused(false),
         m_bProcessModelEnabled(false),
         m_bRefresh(false),
         m_bRegress(false)
 {
+  pangolin::Var<double>::Attach("learning.TimeInteval", m_dT);
+  pangolin::Var<bool>::Attach("learning.Active", m_bLearn);
+  pangolin::Var<double>::Attach("learning.Epsilon",m_dLearnEps);
+  pangolin::Var<int>::Attach("learning.TotalSamples",m_nTotalRegressionSamples);
+  pangolin::Var<bool>::Attach("learning.Playback", m_bPlayback);
+
   m_Node.init("LearningGui");
   m_bPlayback = false;
   //pangolin::CreateGlutWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
@@ -92,6 +98,9 @@ void LearningGui::_UpdateTrajectories()
   std::list<GLCachedPrimitives>::iterator iter = m_lGLLineSegments.begin();
   //now update the GLLines to show the trajectory
   for(size_t ii = 0 ; ii < m_vSamples.size(); ii++ ){
+    // crh commented the next section due to race condition issues.
+
+    /*
     if(m_lGLLineSegments.size() <= ii){
       std::unique_lock<std::mutex> renderMutex(m_RenderMutex);//,std::try_to_lock);
       m_lGLLineSegments.push_back(GLCachedPrimitives());
@@ -100,6 +109,7 @@ void LearningGui::_UpdateTrajectories()
       iter = m_lGLLineSegments.end();
       iter--;
     }
+  */
 
     const std::vector<Sophus::SE3d> v3dPts = m_vSamples[ii].GetMotionSample();
     Eigen::Vector3dAlignedVec vPts;
@@ -213,8 +223,6 @@ void LearningGui::_ImuReadFunc()
       Eigen::VectorXd Accel,Gyro;
       ninjacar::ReadVector(Msg.accel(),&Accel);
       ninjacar::ReadVector(Msg.gyro(),&Gyro);
-      m_Fusion.RegisterImuPose(Accel(0)*G_ACCEL,Accel(1)*G_ACCEL,Accel(2)*G_ACCEL,
-                               Gyro(0),Gyro(1),Gyro(2),sysTime,sysTime);
 
       if(lastTime == -1){
         lastTime = sysTime;
@@ -393,11 +401,12 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
   for(RegressionParameter& param : m_vTweakParams){
     std::string name("learning.Params.");
     name += param.m_sName;
-    AttachCVar(name,&param,"");
+    pangolin::Var<double>::Attach(name,param.m_dVal);
   }
 
-  CVarUtils::CreateCVar("learning.Save", SaveDataHandler, "");
-  CVarUtils::CreateCVar("learning.Load", LoadDataHandler, "");
+  // This is a Save/Load Data Handler; does it need to be attached to a CVar? --crh save
+  //pangolin::Var<bool>::Attach("learning.Save", SaveDataHandler);
+  //pangolin::Var<bool>::Attach("learning.Load", LoadDataHandler);
 
   //initialize the fusion
   if(m_eMode == Mode_Experiment){
@@ -510,28 +519,26 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
     m_vLearningParams.push_back(RegressionParameter(m_LearningCarModel.GetParameters(0),parameter.m_nKey));
   }
 
-  m_LearningPanel.SetVar("learning:LearnOn",&m_bLearn)
-                  .SetVar("learning:Playback",&m_bPlayback)
-                  .SetVar("learning:MapSteering",&m_bMapSteering)
-                  .SetVar("learning:dt",&m_dT)
-                  .SetVar("learning:TotalRegressionSamples",&m_nTotalRegressionSamples)
-                  .SetVar("learning:CollectedRegressionSamples",&m_nCollectedRegressionSamples)
-                  .SetVar("learning:LearningParams",&m_vLearningParams)
-                  .SetVar("learning:DriveParams",&m_vDriveLearningParams)
-                  .SetVar("learning:ImuRate",&m_dImuRate)
-                  .SetVar("learning:LocalizerRate",&m_dLocalizerRate)
-                  .SetVar("learning:ProcessModelEnabled",&m_bProcessModelEnabled)
-                  .SetVar("learning:Refresh",&m_bRefresh)
-                  .SetVar("learning:Regress",&m_bRegress);
+  pangolin::Var<bool>::Attach("learning:LearnOn",m_bLearn);
+  pangolin::Var<bool>::Attach("learning:Playback",m_bPlayback);
+  pangolin::Var<bool>::Attach("learning:MapSteering",m_bMapSteering);
+  pangolin::Var<double>::Attach("learning:dt",m_dT);
+  pangolin::Var<int>::Attach("learning:TotalRegressionSamples",m_nTotalRegressionSamples);
+  pangolin::Var<int>::Attach("learning:CollectedRegressionSamples",m_nCollectedRegressionSamples);
+  //pangolin::Var<vector<RegressionParameter>>::Attach("learning:LearningParams",m_vLearningParams);
+  //pangolin::Var<vector<RegressionParameter>>::Attach("learning:DriveParams",m_vDriveLearningParams);
+  pangolin::Var<double>::Attach("learning:ImuRate",m_dImuRate);
+  pangolin::Var<double>::Attach("learning:LocalizerRate",m_dLocalizerRate);
+  pangolin::Var<bool>::Attach("learning:ProcessModelEnabled",m_bProcessModelEnabled);
+  pangolin::Var<bool>::Attach("learning:Refresh",m_bRefresh);
+  pangolin::Var<bool>::Attach("learning:Regress",m_bRegress);
 
-  m_LearningPanel.Init();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_PopulateSceneGraph()
 {
   //m_Gui.AddGLObject(&m_BulletDebugDrawer);
-  m_Gui.AddPanel(&m_LearningPanel);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

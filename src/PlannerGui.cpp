@@ -74,7 +74,10 @@ void PlannerGui::Render()
 void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh, const bool bLocalizerCoords /* = false */)
 {
     const aiScene *pScene = aiImportFile( sTerrainMeshFileName.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-    std::cout << aiGetErrorString() << std::endl;
+
+    if( strncmp(aiGetErrorString(),"",10) ) {
+      std::cout << "aiGetErrorString() is: " << aiGetErrorString() << std::endl;
+    }
 
     if(bLocalizerCoords){
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,

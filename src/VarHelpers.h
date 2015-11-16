@@ -5,6 +5,34 @@
 #include <Eigen/Core>
 
 ////////////////////////////////////////////////////////////////////////////
+// Overloading std::vector for Pangolin Vars.
+template <typename T>
+inline std::ostream& operator<<(std::ostream& os, const std::vector<T>& v)
+{
+  os << "[";
+  for (typename std::vector<T>::const_iterator ii = v.begin(); ii != v.end(); ++ii)
+  {
+    os << " " << *ii;
+  }
+  os << " ]";
+  return os;
+}
+/*
+template <typename T>
+inline std::istream& operator>>(const std::istream& os, std::vector<T>& v)
+{
+  os << "[";
+  for (std::vector<T>::const_iterator ii = v.begin(); ii != v.end(); ++ii)
+  {
+    os << " " << *ii;
+  }
+  os << " ]";
+  return os;
+}
+*/
+////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////
 // Overloading Eigen for Pangolin Vars
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////

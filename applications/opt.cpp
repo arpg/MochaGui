@@ -1,8 +1,8 @@
 #include <thread>
 #include <iomanip>
 #include <fenv.h>
-#include "CarPlanner/LocalPlanner.h"
-#include "CarPlanner/CarController.h"
+#include <CarPlanner/LocalPlanner.h>
+#include <CarPlanner/CarController.h>
 
 #include "config.h"
 #include "MochaGui/GetPot"
@@ -10,10 +10,10 @@
 
 
 static int g_nIterationLimit = 10;
-static double g_dT =  0.01;
+static double g_dT = 0.01;
 static bool g_bInertialControlActive = false;
 static bool g_bPointCost = false;
-static double g_dSuccessNorm =  1e-10;
+static double g_dSuccessNorm = 1e-10;
 
 
 bool CanContinue(const bool bPaused, bool& bStep){
@@ -59,6 +59,13 @@ int main( int argc, char** argv )
     controlBezierStrip.SetColor(GLColor(0.8f,0.8f,0.8f));
     gui.Init(sMesh,&terrainMesh,bLocalizer);
 
+    pangolin::Var<bool>::Attach("planner:PlannerOn",bPlannerOn);
+    pangolin::Var<float>::Attach("control:LookaheadTime",fLookaheadTime);
+    pangolin::Var<float>::Attach("control:StartCurvature",fStartCurvature);
+    pangolin::Var<bool>::Attach("planner:ControllerOn",bControllerOn);
+    pangolin::Var<double>::Attach("planner:ActualLookahead",dActualLookahead);
+    pangolin::Var<double>::Attach("planner:Norm",dNorm);
+    pangolin::Var<bool>::Attach("interface:Paused",bPaused);
 
     //add some waypoints
     Eigen::Vector6d wp0Pose, wp1Pose, wp2Pose;
@@ -259,7 +266,7 @@ int main( int argc, char** argv )
     while( !pangolin::ShouldQuit() )
     {
         {
-            std::unique_lock<std::mutex> lock(m_DrawMutex); //was previously commented.
+            std::unique_lock<std::mutex> lock(gui.m_DrawMutex); //was previously commented.
             gui.Render();
         }
     }

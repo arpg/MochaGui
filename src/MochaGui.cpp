@@ -1,4 +1,6 @@
 #include <stdio.h>
+
+#include "VarHelpers.h"
 #include "MochaGui/gui/MochaGui.h"
 
 //car control variables
@@ -15,48 +17,74 @@ using namespace pangolin;
 #define MIN_ACCEL_PPM 20.0
 
 MochaGui *g_pMochaGuiInstance = NULL;
-static bool& g_bContinuousPathPlanning = CVarUtils::CreateGetUnsavedCVar("debug.ContinuousPathPlanning",false);
-static bool& g_bImuIntegrationOnly = CVarUtils::CreateGetUnsavedCVar("debug.ImuIntegrationOnly",false);
-static bool& g_bPlaybackControlPaths = CVarUtils::CreateGetUnsavedCVar("debug.PlaybackControlPaths",false);
-static bool& g_bProcessModelActive = CVarUtils::CreateGetUnsavedCVar("debug.ProcessModelActive",false);
-static int& g_nStartSegmentIndex = CVarUtils::CreateGetUnsavedCVar("debug.StartSegmentIndex",0);
-static bool& g_bFreezeControl(CVarUtils::CreateGetUnsavedCVar("debug.FreezeControl",false,""));
-static bool& g_bInertialControl = CVarUtils::CreateGetUnsavedCVar("debug.InertialControl",true);
-static bool& g_bInfiniteTime = CVarUtils::CreateGetUnsavedCVar("debug.InfiniteTime",false);
-static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.IterationLimit", 10, "");
+static bool g_bContinuousPathPlanning = false;
+static bool g_bPlaybackControlPaths = false;
+static bool g_bProcessModelActive = false;
+static int g_nStartSegmentIndex = 0;
+static bool g_bFreezeControl = false;
+static bool g_bInertialControl = true;
+static bool g_bInfiniteTime = false;
+static int g_nIterationLimit = 10;
 
 
 
 ////////////////////////////////////////////////////////////////
-MochaGui::MochaGui() :
-  //m_ActiveHeightMap(m_KHeightMap),
-  m_Path(CreateCVar("path", vector<int>(), "Path vector.")),
-  m_bPlannerOn(CreateUnsavedCVar("planner.PlannerOn", false, "if true, the car model will only follow the control law from the 2D path.")),
-  m_bShowProjectedPath(CreateCVar("planner.ShowProjected2dPath", true, "how the 2D path z-projected onto the surface")),
-  m_bCompute3dPath(CreateCVar("planner.Compute3DPath", true, "Compute path using terrain driven simulation")),
-  m_bSimulate3dPath(CreateUnsavedCVar("planner.Simulate3DPath", false, "Drive the car over the path to see the results in real-time")),
-  m_eControlTarget(CreateCVar("controller.ControlTarget", (int)eTargetSimulation, "Drive the car over the path to see the results in real-time")),
-  m_bControl3dPath(CreateUnsavedCVar("planner.Control3DPath", false, "Drive the car over the path to see the results in real-time")),
-  m_bFuseImu(CreateCVar("planner.FuseImu", true)),
-  m_nPathSegments(CreateCVar("planner.PathSegments", 20u, "how many segments to draw")),
-  m_dTimeInterval(CreateCVar("planner.TimeInteval", 0.01, "")),
+/// \brief MochaGui::MochaGui
+///  m_Path: path vector.
+///  m_bPlannerOn: if true, the car model will only follow the control law from the 2D path
+///  m_bShowProjectedPath: how the 2D path z-projected onto the surface
+///  m_bCompute3dPath: Compute path using terrain driven simulation
+///  m_bSimulate3dPath: Drive the car over the path to see the results in real-time
+///  m_eControlTarget: Drive the car over the path to see the results in real-time
+///  m_bControl3dPath: Drive the car over the path to see the results in real-time
+///  m_nPathSegments: how many segments to draw
 
+MochaGui::MochaGui() :
+  m_Path(vector<int>()),
+  m_bPlannerOn(false),
+  m_bShowProjectedPath(true),
+  m_bCompute3dPath(true),
+  m_bSimulate3dPath(false),
+  m_eControlTarget((int)eTargetSimulation),
+  m_bControl3dPath(false),
+  m_nPathSegments(20u),
+  m_dTimeInterval(0.01),
   m_pPlannerThread(0),
   m_pPhysicsThread(0),
   m_pControlThread(0),
   m_pCommandThread(0),
-  m_pImuThread(0),
   m_pLocalizerThread(0),
-  m_bLoggerEnabled(CreateUnsavedCVar("logger.Enabled", false, "")),
-  m_sLogFileName(CreateUnsavedCVar("logger.FileName", std::string(), "")),
-  m_bFusionLoggerEnabled(CreateUnsavedCVar("logger.FusionEnabled", false, "")),
-  m_bLoggerPlayback(CreateUnsavedCVar("logger.Playback", false, "")),
+  m_bLoggerEnabled(false),
+  m_sLogFileName(std::string()),
+  m_bFusionLoggerEnabled(false),
+  m_bLoggerPlayback(false),
   m_nNumControlSignals(0),
   m_nNumPoseUpdates(0),
   m_dPlaybackTimer(-1),
   m_Fusion(30,&m_DriveCarModel),
   m_dPlanTime(CarPlanner::Tic())//the size of the fusion sensor
 {
+  //pangolin::Var<vector<int>>::Attach("path", m_Path);
+  pangolin::Var<bool>::Attach("planner.PlannerOn", m_bPlannerOn);
+  pangolin::Var<bool>::Attach("planner.ShowProjected2dPath", m_bShowProjectedPath);
+  pangolin::Var<bool>::Attach("planner.Compute3DPath", m_bCompute3dPath);
+  pangolin::Var<bool>::Attach("planner.Simulate3DPath", m_bSimulate3dPath);
+  pangolin::Var<int>::Attach("controller.ControlTarget", m_eControlTarget);
+  pangolin::Var<bool>::Attach("planner.Control3DPath", m_bControl3dPath);
+  pangolin::Var<unsigned int>::Attach("planner.PathSegments", m_nPathSegments);
+  pangolin::Var<double>::Attach("planner.TimeInteval", m_dTimeInterval);
+  pangolin::Var<bool>::Attach("logger.Enabled",m_bLoggerEnabled);
+  pangolin::Var<string>::Attach("logger.FileName", m_sLogFileName);
+  pangolin::Var<bool>::Attach("logger.FusionEnabled", m_bFusionLoggerEnabled);
+  pangolin::Var<bool>::Attach("logger.Playback", m_bLoggerPlayback);
+  pangolin::Var<bool>::Attach("debug.ContinuousPathPlanning",g_bContinuousPathPlanning);
+  pangolin::Var<bool>::Attach("debug.PlaybackControlPaths",g_bPlaybackControlPaths);
+  pangolin::Var<bool>::Attach("debug.ProcessModelActive",g_bProcessModelActive);
+  pangolin::Var<int>::Attach("debug.StartSegmentIndex",g_nStartSegmentIndex);
+  pangolin::Var<bool>::Attach("debug.FreezeControl",g_bFreezeControl);
+  pangolin::Var<bool>::Attach("debug.InertialControl",g_bInertialControl);
+  pangolin::Var<bool>::Attach("debug.InfiniteTime",g_bInfiniteTime);
+  pangolin::Var<int>::Attach("planner.IterationLimit", g_nIterationLimit);
   m_Node.init("bushido");
 }
 
@@ -126,15 +154,15 @@ void MochaGui::Run() {
     //save/load files if necessary
     if(m_bLoadWaypoints == true){
       m_bLoadWaypoints = false;
-      CVarUtils::Load(m_vFileNames[m_nSelectedFileName],filter);
-      sprintf(m_pSaveFileName,"%s",m_vFileNames[m_nSelectedFileName].c_str());
+      pangolin::ParseVarsFile(m_vFileNames[m_nSelectedFileName]);
+      m_sSaveFileName = m_vFileNames[m_nSelectedFileName];
       _RefreshWaypoints();
       _UpdateWaypointFiles();
     }
 
     if(m_bSaveWaypoints == true){
       m_bSaveWaypoints = false;
-      CVarUtils::Save(m_pSaveFileName,filter);
+      pangolin::SaveJsonFile(m_sSaveFileName);
       _UpdateWaypointFiles();
     }
   }
@@ -204,7 +232,7 @@ void MochaGui::_PlaybackLog(double dt)
         ControlPlan plan;
         m_Logger.ReadControlPlan(plan,msg.controlplan());
         _UpdateControlPathVisuals(&plan);
-        *m_Controller.GetLookaheadTimePtr() = plan.m_dEndTime-plan.m_dStartTime;
+        m_Controller.m_dLookaheadTime = plan.m_dEndTime-plan.m_dStartTime;
         //after reading the control plan,
       }else if(msg.has_controlcommand()){
         dout("sending command accel: " << msg.controlcommand().force() << " | steering: " << msg.controlcommand().phi());
@@ -253,8 +281,9 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
 
 
   //create CVars
-  CVarUtils::CreateCVar("refresh", RefreshHandler, "Refresh all the waypoints.");
-  CVarUtils::CreateCVar("SetWaypointVel", SetWaypointVelHandler, "Set a single velocity on all waypoints.");
+  //TODO(crh): these functions are helpful for running quick tasks in the console.
+  //pangolin::Var<bool>::Attach("refresh", RefreshHandler); // Refresh all the waypoints.
+  //pangolin::Var<bool>::Attach("SetWaypointVel", SetWaypointVelHandler); // Set a single velocity on all waypoints.
 
 
   //initialize the heightmap
@@ -264,7 +293,11 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   //initialize the car model -- first import the environment model.
 
   const aiScene *pScene = aiImportFile( sMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-  std::cout << aiGetErrorString() << std::endl;
+
+
+  if( strncmp(aiGetErrorString(),"",10) ) {
+    std::cout << "aiGetErrorString() is: " << aiGetErrorString() << std::endl;
+  }
 
   if(bLocalizer){
     pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
@@ -344,7 +377,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   for(RegressionParameter& param : m_vControlParams){
     std::string name("controller.Params.");
     name += param.m_sName;
-    AttachCVar(name,&param,"");
+    pangolin::Var<double>::Attach(name,param.m_dVal);
   }
 
   /// Copy the MochaGui's ControlParams into the PlanCar.
@@ -354,7 +387,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
     param.m_pModel = &m_PlanCarModel;
     std::string name("planner.Params.");
     name += param.m_sName;
-    AttachCVar(name,&param,"");
+    pangolin::Var<double>::Attach(name,param.m_dVal);
   }
 
   /// Do the same for the DriveCar.
@@ -364,7 +397,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
     param.m_pModel = &m_DriveCarModel;
     std::string name("sim.Params.");
     name += param.m_sName;
-    AttachCVar(name,&param,"");
+    pangolin::Var<double>::Attach(name,param.m_dVal);
   }
 
   //initialize the debug drawer on the DriveCar.
@@ -375,16 +408,20 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   for(int ii = 0; ii < numWaypoints ; ii++){
     char buf[100];
     snprintf( buf, 100, "waypnt.%d", ii );
-    m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+    m_vWayPoints.push_back(Eigen::MatrixXd(8,1));
     /// Linear waypoints.
 //    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
 
     /// Waypoints in a circle.
-    (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints),
+    m_vWayPoints.back() << sin(ii*2*M_PI/numWaypoints),
         cos(ii*2*M_PI/numWaypoints),
         0, 0, 0, -ii*2*M_PI/numWaypoints, 1,0;
     /// Load this segment ID into a vector that enumerates the path elements.
     m_Path.push_back(ii);
+  }
+
+  for(size_t ii = 0; ii < m_vWayPoints.size(); ii++) {
+    pangolin::Var<Eigen::MatrixXd>::Attach("sim.Params.waypnts", m_vWayPoints[ii]);
   }
 
   /// Make the 1st entry also the last, so the path is a loop.
@@ -458,42 +495,29 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   m_sCarObjectName = "ninja_car"; // crh convert to node uri
   m_Localizer.TrackObject("object_tracker", m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse()); //crh convert to node call
 
-  //initialize the panel
-  m_GuiPanel.Init();
-
-  //fusion parameters
-  m_GuiPanel.SetVar("fusion:FilterSize",m_Fusion.GetFilterSizePtr())
-      .SetVar("fusion:RMSE",m_Fusion.GetRMSEPtr())
-      .SetVar("fusion:LocalizerFreq",&m_dLocalizerFreq)
-      .SetVar("fusion:ImuFreq",&m_dImuFreq)
-      .SetVar("fusion:Vel",&m_dVel)
-      .SetVar("fusion:Pos",&m_dPos);
+  //TODO(crh): Provide access fusion parameters via Pangolin::Var::Attach.
 
   //control parameters
-  m_GuiPanel.SetVar("control:ControlOn",&m_bControl3dPath)
-      .SetVar("control:ControlTarget",&m_eControlTarget)
-      .SetVar("control:MaxControlPlanTime",m_Controller.GetMaxControlPlanTimePtr())
-      .SetVar("control:PlansPerS",&m_dControlPlansPerS)
-      .SetVar("control:VelocityError",&m_dVelError)
-      .SetVar("control:Accel", &m_ControlCommand.m_dForce)
-      .SetVar("control:Steering", &m_ControlCommand.m_dPhi)
-      .SetVar("control:LookaheadTime",m_Controller.GetLookaheadTimePtr());
-
+  pangolin::Var<int>::Attach("control:ControlTarget",m_eControlTarget);
+  pangolin::Var<double>::Attach("control:PlansPerS",m_dControlPlansPerS);
+  pangolin::Var<double>::Attach("control:VelocityError",m_dVelError);
+  pangolin::Var<double>::Attach("control:Accel", m_ControlCommand.m_dForce);
+  pangolin::Var<double>::Attach("control:Steering", m_ControlCommand.m_dPhi);
 
   //planner parameters
-  m_GuiPanel.SetVar("planner:PlannerOn",&m_bPlannerOn)
-      .SetVar("planner:ContinuousPlanning", &g_bContinuousPathPlanning)
-      .SetVar("planner:SimulatePath",&m_bSimulate3dPath)
-      .SetVar("planner:LoadWaypoints",&m_bLoadWaypoints)
-      .SetVar("planner:SaveWaypoints",&m_bSaveWaypoints)
-      .SetVar("planner:SaveFileName",(char*)&m_pSaveFileName)
-      .SetVar("planner:SaveFileNameLen",&m_nSaveFileNameLen)
-      .SetVar("planner:SelectedFileName",&m_nSelectedFileName)
-      .SetVar("planner:FileNames",&m_vFileNames)
-      .SetVar("planner:InertialControl",&g_bInertialControl);
+  pangolin::Var<bool>::Attach("planner:PlannerOn",m_bPlannerOn);
+  pangolin::Var<bool>::Attach("planner:ContinuousPlanning", g_bContinuousPathPlanning);
+  pangolin::Var<bool>::Attach("planner:SimulatePath",m_bSimulate3dPath);
+  pangolin::Var<bool>::Attach("planner:LoadWaypoints",m_bLoadWaypoints);
+  pangolin::Var<bool>::Attach("planner:SaveWaypoints",m_bSaveWaypoints);
+  //pangolin::Var<string>::Attach("planner:SaveFileName",m_sSaveFileName);
+  pangolin::Var<int>::Attach("planner:SelectedFileName",m_nSelectedFileName);
+  //pangolin::Var<vector<string>>::Attach("planner:FileNames",m_vFileNames);
+  pangolin::Var<bool>::Attach("planner:InertialControl",g_bInertialControl);
 
-  m_GuiPanel.SetVar("interface:Paused",&m_bPause)
-      .SetVar("interface:Fps",&m_dFps);
+  //interface parameters
+  pangolin::Var<bool>::Attach("interface:Paused",m_bPause);
+  pangolin::Var<double>::Attach("interface:Fps",m_dFps);
 
   //update the file names
   _UpdateWaypointFiles();
@@ -647,10 +671,10 @@ void MochaGui::_RefreshWaypoints()
 
   //add waypoints for any newly added path points
   for (size_t ii = 0; ii < m_Path.size(); ii++) {
-    Eigen::Vector6d dPose = (*m_vWayPoints[m_Path[ii]]).block<6,1>(0,0);
+    Eigen::Vector6d dPose = (m_vWayPoints[m_Path[ii]]).block<6,1>(0,0);
     if(m_Gui.WaypointCount() <= (int)m_Path[ii])
     {
-      m_Gui.AddWaypoint(dPose,(*m_vWayPoints[m_Path[ii]])(WAYPOINT_VEL_INDEX));
+      m_Gui.AddWaypoint(dPose,(m_vWayPoints[m_Path[ii]])(WAYPOINT_VEL_INDEX));
     }
   }
 
@@ -673,7 +697,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
   switch (command){
   case eMochaSolve:
     m_Controller.Reset();
-    CVarUtils::Load("cvars.xml");
+    pangolin::ParseVarsFile("cvars.xml");
     _RefreshWaypoints();
     m_bPlannerOn = true;
     m_bAllClean = false;
@@ -1129,7 +1153,7 @@ void MochaGui::_ControlFunc()
         while((m_eControlTarget != eTargetExperiment &&
                m_bSimulate3dPath == false
                && m_StillControl )){
-          std::this_thread::sleep_for(std::chrono::milliseconds(1);
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
           //boost::this_thread::interruption_point();
         }
 
@@ -1464,7 +1488,7 @@ void MochaGui::_PlannerFunc() {
               pose.translation() = dIntersect;
               a->SetPose(pose.matrix());
             }
-            *m_vWayPoints[nStartIdx] << a->GetPose(), a->GetVelocity(), a->GetAerial();
+            m_vWayPoints[nStartIdx] << a->GetPose(), a->GetVelocity(), a->GetAerial();
           }
           if(b->GetDirty()) {
             Sophus::SE3d pose(b->GetPose4x4_po());
@@ -1472,7 +1496,7 @@ void MochaGui::_PlannerFunc() {
               pose.translation() = dIntersect;
               b->SetPose(pose.matrix());
             }
-            *m_vWayPoints[nEndIdx] << b->GetPose(), b->GetVelocity(), a->GetAerial();
+            m_vWayPoints[nEndIdx] << b->GetPose(), b->GetVelocity(), a->GetAerial();
           }
         }
 
@@ -1619,7 +1643,6 @@ void MochaGui::_PopulateSceneGraph() {
 
   m_Gui.AddGLObject(&m_DestAxis);
   //m_Gui.AddGLObject(m_pControlLine);
-  m_Gui.AddPanel(&m_GuiPanel);
 }
 
 

@@ -5,6 +5,7 @@
 
 #include "CarPlanner/CarPlannerCommon.h"
 #include "CarPlanner/MochaException.h"
+#include "RpgUtils.h"
 
 //////////////////////////////////////////////////////////////////
 Eigen::Vector3d Quat2Euler( double *Q )
