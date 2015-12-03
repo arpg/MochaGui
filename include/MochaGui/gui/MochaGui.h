@@ -214,7 +214,6 @@ protected:
     PlannerGui m_Gui;
 
     //ui widgets
-    GLGuiPanel m_GuiPanel;
     double m_dLocalizerFreq;
     double m_dImuFreq;
     double m_dVel;

@@ -22,7 +22,6 @@
 #include "MochaGui/Matrix.h"
 #include "MochaGui/gui/MochaGui.h"
 #include "MochaGui/learning/JoystickHandler.h"
-#include "MochaGui/learning/GLLearningPanel.h"
 #include "MochaGui/PlannerGui.h"
 #include "MochaGui/GLBulletDebugDrawer.h"
 #include "MochaGui/Localizer.h"
@@ -123,8 +122,6 @@ private:
 
     ControlCommand m_JoystickCommand;
 
-    //ui widgets
-    GLLearningPanel m_LearningPanel;
 
     ProcessModelFusion m_Fusion;
     Mode m_eMode;

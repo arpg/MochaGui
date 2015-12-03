@@ -345,7 +345,7 @@ int main( int argc, char** argv )
 
             // Swap frames and Process Events
 
-            pangolin::FinishGlutFrame();
+            pangolin::FinishFrame();
         }
         m_DrawMutex.unlock();
 

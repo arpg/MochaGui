@@ -2,7 +2,6 @@
 
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
-#include "VarHelpers.h"
 #define VICON_CAR_HEIGHT_OFFSET 0.02
 
 struct PlannerHandler : public SceneGraph::HandlerSceneGraph

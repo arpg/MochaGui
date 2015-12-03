@@ -59,16 +59,6 @@ int main( int argc, char** argv )
     controlBezierStrip.SetColor(GLColor(0.8f,0.8f,0.8f));
     gui.Init(sMesh,&terrainMesh,bLocalizer);
 
-    gui.AddPanel(&panel);
-
-    panel.SetVar("planner:PlannerOn",&bPlannerOn);
-    panel.SetVar("control:LookaheadTime",&fLookaheadTime);
-    panel.SetVar("control:StartCurvature",&fStartCurvature);
-    panel.SetVar("planner:ControllerOn",&bControllerOn);
-    panel.SetVar("planner:ActualLookahead",&dActualLookahead);
-    panel.SetVar("planner:Norm",&dNorm);
-    panel.SetVar("interface:Paused",&bPaused);
-
 
     //add some waypoints
     Eigen::Vector6d wp0Pose, wp1Pose, wp2Pose;
