@@ -18,6 +18,7 @@ public:
     JoystickHandler();
     bool InitializeJoystick();
     void UpdateJoystick();
+    void JoinThread();
 
     double GetAxisValue(int id) { return id < (int)m_vAxes.size() ? m_vAxes[id] : 0; }
     bool IsButtonPressed(int id){ return id < (int)m_vButtonStates.size() ? m_vButtonStates[id] == 1 : false; }

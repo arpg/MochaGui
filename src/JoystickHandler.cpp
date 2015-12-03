@@ -95,6 +95,10 @@ bool JoystickHandler::InitializeJoystick()
     return true;
 }
 
+void JoystickHandler::JoinThread() {
+  m_pJoystickThread->join();
+}
+
 void JoystickHandler::_ThreadFunc()
 {
     Gamepad_eventDispatcher()->registerForEvent(Gamepad_eventDispatcher(), GAMEPAD_EVENT_DEVICE_ATTACHED, _OnDeviceAttached, this);
