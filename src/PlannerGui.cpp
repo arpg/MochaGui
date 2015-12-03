@@ -39,7 +39,7 @@ PlannerGui::~PlannerGui()
 void PlannerGui::Render()
 {
     // this lock wasn't used by nimski previously.
-    std::unique_lock<std::mutex> lock(m_DrawMutex);
+    //std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_pView->ActivateScissorAndClear();
 
     if(m_pFollowCar != NULL){

@@ -25,6 +25,7 @@ static bool g_bFreezeControl = false;
 static bool g_bInertialControl = true;
 static bool g_bInfiniteTime = false;
 static int g_nIterationLimit = 10;
+static bool g_bImuIntegrationOnly = false;
 
 
 
@@ -59,6 +60,7 @@ MochaGui::MochaGui() :
   m_bFusionLoggerEnabled(false),
   m_bLoggerPlayback(false),
   m_nNumControlSignals(0),
+  m_bFuseImu(true),
   m_nNumPoseUpdates(0),
   m_dPlaybackTimer(-1),
   m_Fusion(30,&m_DriveCarModel),
@@ -126,7 +128,7 @@ void MochaGui::Run() {
   {
 
     {
-      std::unique_lock<std::mutex> lock(m_DrawMutex);
+      //std::unique_lock<std::mutex> lock(m_DrawMutex);
       m_Gui.Render();
     }
 
@@ -420,8 +422,12 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
     m_Path.push_back(ii);
   }
 
+  std::stringstream stream;
+
   for(size_t ii = 0; ii < m_vWayPoints.size(); ii++) {
-    pangolin::Var<Eigen::MatrixXd>::Attach("sim.Params.waypnts", m_vWayPoints[ii]);
+    stream.clear();
+    stream << "sim.Params.waypnts" << ii;
+    pangolin::Var<Eigen::MatrixXd>::Attach(stream.str(), m_vWayPoints[ii]);
   }
 
   /// Make the 1st entry also the last, so the path is a loop.

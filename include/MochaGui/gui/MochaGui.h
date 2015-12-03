@@ -155,7 +155,7 @@ protected:
     bool m_bControl3dPath;
 
 
-    bool& m_bFuseImu;
+    bool m_bFuseImu;
     bool m_bPlanning;
     bool m_bControllerRunning;
     bool m_bLearningRunning;
