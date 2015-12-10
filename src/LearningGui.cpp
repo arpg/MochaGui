@@ -62,10 +62,7 @@ void LearningGui::Run()
       m_Gui.SetCarState(m_nDriveCarId,currentState,m_bLearn);
     }
 
-    {
-      std::unique_lock<std::mutex> renderMutex(m_RenderMutex);
-      m_Gui.Render();
-    }
+    m_Gui.Render();
 
     if(m_bRefresh){
       if(m_pRegressionSample != NULL && m_bLearningRunning == false && m_bLearn == false){
@@ -89,7 +86,6 @@ void LearningGui::Run()
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_UpdateTrajectories()
 {
-  std::unique_lock<std::mutex> lock(m_RenderMutex);
   //clear all line segmenst
   for (GLCachedPrimitives& strip: m_lGLLineSegments) {
     strip.Clear();
@@ -798,7 +794,6 @@ void LearningGui::_CommandHandler(const MochaCommands& command)
 
   case eMochaClear:
   {
-    std::unique_lock<std::mutex> lock(m_RenderMutex);
     m_Gui.ClearCarTrajectory(m_nDriveCarId);
     for (GLCachedPrimitives& lineStrip : m_lGLLineSegments) {
       lineStrip.Clear();

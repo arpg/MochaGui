@@ -7,18 +7,20 @@
 #include "CarPlanner/BulletCarModel.h"
 
 #include "config.h"
-#include "MochaGui/GetPot"
 #include "MochaGui/Localizer.h"
 #include "Messages.pb.h"
 #include "MochaGui/learning/JoystickHandler.h"
 #include "MochaGui/EventLogger.h"
 
 double g_dStartTime = CarPlanner::Tic();
-std::atomic<bool> g_StillRun(true);
 Localizer g_localizer;
 node::node g_node;
 EventLogger logger;
 bool g_bLog = false;
+bool g_bImu = true;
+bool g_bLocalize = true;
+bool g_bJoystick = true;
+
 JoystickHandler joystick;
 
 #define DEFAULT_ACCEL_COEF 5.65
@@ -29,7 +31,7 @@ JoystickHandler joystick;
 
 void JoystickFunc()
 {
-    while(g_StillRun){
+    while(g_bJoystick){
         joystick.UpdateJoystick();
         double joystickAccel,joystickPhi;
         joystickAccel = (((double)joystick.GetAxisValue(1)/JOYSTICK_AXIS_MAX)*-40.0);
@@ -43,7 +45,7 @@ void JoystickFunc()
         command.m_dPhi = joystickPhi;
         if(g_bLog ){
             logger.LogControlCommand(command);
-            std::cout << "Joystick commands logged at:" << CarPlanner::Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]" << std::endl;
+            LOG(INFO) << "Joystick commands logged at:" << CarPlanner::Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]";
         }
 
         ninjacar::CommandMsg Req;
@@ -59,7 +61,7 @@ void JoystickFunc()
 
 void ImuReadFunc()
 {
-    while(g_StillRun){
+    while(g_bImu){
         ninjacar::ImuMsg Msg;
         if(g_node.receive("nc_node/state",Msg)){ //crh node api
             //double time = (double)Msg.timer()/62500.0; //crh old (int32)Msg.timer in Imu_Accel_Gyro
@@ -68,7 +70,7 @@ void ImuReadFunc()
                 Eigen::VectorXd Accel,Gyro;
                 ninjacar::ReadVector(Msg.accel(),&Accel);
                 ninjacar::ReadVector(Msg.gyro(),&Gyro);
-                std::cout << "IMU pose received at:" << time << "seconds [" << Accel(1) << " " <<  -Accel(0) << " " << Accel(2) << "]" << std::endl;
+                LOG(INFO) << "IMU pose received at:" << time << "seconds [" << Accel(1) << " " <<  -Accel(0) << " " << Accel(2) << "]";
                 fflush(stdout);
                 logger.LogImuData(CarPlanner::Tic(),time,Eigen::Vector3d(Accel(0),Accel(1),Accel(2)),Eigen::Vector3d(Gyro(0),Gyro(1),Gyro(2)));
             }
@@ -79,14 +81,14 @@ void ImuReadFunc()
 
 void LocalizerReadFunc()
 {
-    while(g_StillRun){
+    while(g_bLocalize){
         //this is a blocking call
         double localizerTime;
         Sophus::SE3d Twb = g_localizer.GetPose("CAR",true,&localizerTime);
         Eigen::Vector6d pose = CarPlanner::T2Cart(Twb.matrix());
 
         if(g_bLog ){
-            std::cout << "Localizer pose received at:" << localizerTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
+            LOG(INFO) << "Localizer pose received at:" << localizerTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]";
             fflush(stdout);
             logger.LogLocalizerData(CarPlanner::Tic(),localizerTime,Twb);
         }
@@ -96,11 +98,8 @@ void LocalizerReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )
 {
-
-
-    GetPot cl( argc, argv );
-    std::string sRef = cl.follow( "", 1, "-ref" );
-    bool bLogCommands = cl.search("-logCommands");
+    std::string sRef = "";
+    bool bLogCommands = false;
 
     Eigen::Matrix4d dT_localizer_ref = Eigen::Matrix4d::Identity();
     if(sRef.empty() == false){
@@ -129,18 +128,17 @@ int main( int argc, char** argv )
     g_localizer.TrackObject("object_tracker", "ninja_car",Sophus::SE3d(dT_localizer_ref).inverse(),true); //crh straight-up node call?
     g_localizer.Start();
 
-    std::thread* pImuThread = new std::thread(std::bind(ImuReadFunc));
-    std::thread* pLocalizerThread = new std::thread(std::bind(LocalizerReadFunc));
+    std::thread* pImuThread = new std::thread([&] () { ImuReadFunc(); });
+    std::thread* pLocalizerThread = new std::thread([&] () { LocalizerReadFunc(); });
     std::thread* pJoystickThread = NULL;
     if(bLogCommands){
         //initialize the joystick
         if(joystick.InitializeJoystick()) {
-            std::cout << "Successfully initialized joystick" << std::endl;
+            LOG(INFO) << "Successfully initialized joystick";
         }else{
-            std::cout << "Failed to initialized joystick" << std::endl;
+            LOG(INFO) << "Failed to initialized joystick";
         }
-
-         pJoystickThread = new std::thread(std::bind(JoystickFunc));
+         pJoystickThread = new std::thread([&]() { JoystickFunc(); });
     }
 
 
@@ -160,12 +158,12 @@ int main( int argc, char** argv )
 
     getchar();
     g_bLog = false;
-    g_StillRun = false;
 
+    g_bImu = false;
+    g_bLocalize = false;
+    g_bJoystick = false;
     pImuThread->join();
-
     pLocalizerThread->join();
-
     pJoystickThread->join();
 
     //g_vicon.Stop();

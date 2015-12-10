@@ -143,10 +143,13 @@ protected:
 
 
     //flags
-    std::atomic<bool> m_bStillRun;
-    std::atomic<bool> m_bStillImu;
-    std::atomic<bool> m_bStillControl;
-    std::atomic<bool> m_bStillLocalize;
+    std::atomic<bool> m_abPhysics;
+    std::atomic<bool> m_abPlanner;
+    std::atomic<bool> m_abLearning;
+    std::atomic<bool> m_abImu;
+    std::atomic<bool> m_abLocalizer;
+    std::atomic<bool> m_abCommand;
+    std::atomic<bool> m_abControl;
     bool m_bPlannerOn;
     bool m_bShowProjectedPath;
     bool m_bCompute3dPath;

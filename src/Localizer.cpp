@@ -27,7 +27,7 @@ Eigen::Vector3d Quat2Euler( double *Q )
 Localizer::Localizer()
 {
   m_bIsStarted = false;
-  m_abStopLocalizer = false;
+  m_abLocalize = false;
   m_pNode.reset(new node::node( false ));
   m_NodeReceiverName = "bushido";
   m_pNode->init(m_NodeReceiverName);
@@ -69,7 +69,6 @@ Localizer::~Localizer()
   for( it = m_mObjects.begin(); it != m_mObjects.end(); it++ ){
     delete( it->second.m_pLocalizerObject );
   }
-// std::shared_ptr deletes itself.
 }
 
 //////////////////////////////////////////////////////////////////
@@ -79,18 +78,19 @@ void Localizer::Start()
     throw MochaException("The Localizer thread has already started.");
   }
 
-  m_pThread = new std::thread(Localizer::_ThreadFunction, this);
   m_bIsStarted = true;
+  m_pThread = new std::thread([this]() { Localizer::_ThreadFunction(this); });
 }
 
 //////////////////////////////////////////////////////////////////
 void Localizer::Stop()
 {
   if( m_bIsStarted == false ) {
-    throw MochaException("No thread is running!"); //crh uncommented
+    throw MochaException("No thread is running!");
     return;
   }
 
+  m_abLocalize = false;
   m_pThread->join();
 
   m_bIsStarted = false;
@@ -154,16 +154,13 @@ eLocType Localizer::WhereAmI( Eigen::Matrix<double, 6, 1 > P )
 //////////////////////////////////////////////////////////////////
 void Localizer::_ThreadFunction(Localizer *pL)
 {
-  while (1) {
+  while (m_abLocalize) {
     std::map< std::string, TrackerObject >::iterator it;
     for( it = pL->m_mObjects.begin(); it != pL->m_mObjects.end(); it++ ) {
       ninjacar::PoseMsg msg;
-      pL->m_pNode->receive(it->second.m_sUri,msg); //crh replaced vrpn_Tracker_Remote.mainloop()
+      pL->m_pNode->receive(it->second.m_sUri,msg);
       ninjacar::ReadPoseSE3(msg,&it->second.m_dSensorPose);
-      std::cout << "Blocking call needed? Localizer.cpp l. 163." << std::endl;
-      //boost::this_thread::interruption_point(); //crh replaced with next line
-      if(pL->m_abStopLocalizer) { return; }
-
+      if(pL->m_abLocalize == false) { return; }
     }
 
     //small sleep to not eat up all the cpu

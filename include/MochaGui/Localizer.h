@@ -33,7 +33,7 @@ class Localizer
         eLocType WhereAmI( Eigen::Vector6d P );
 
     private:
-        static void _ThreadFunction(Localizer *pVT);
+        void _ThreadFunction(Localizer *pVT);
 
     private:
 
@@ -71,8 +71,7 @@ class Localizer
         std::map< std::string,  TrackerObject >     m_mObjects;
         std::shared_ptr<node::node>  				m_pNode;
         std::string													m_NodeReceiverName;
-
-        std::atomic<bool>														m_abStopLocalizer;
+        std::atomic<bool>										m_abLocalize;
         bool                                        m_bIsStarted;
         std::thread*                                m_pThread;
 };

@@ -1,17 +1,15 @@
 #include "config.h"
 #include <fenv.h>
-#include "MochaGui/GetPot"
 #include "MochaGui/learning/LearningGui.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )
 {
-  GetPot cl( argc, argv );
 
-  std::string sMesh = cl.follow("lab.ply",1,"-mesh");
-  bool localizer = cl.search("-localizer");
-  std::string sRef = cl.follow( "", 1, "-ref" );
-  std::string sMode = cl.follow( "Simulation", 1, "-mode" );
+  std::string sMesh = "/Users/crh/data/lab.ply";
+  bool localizer = false;
+  std::string sRef = "";
+  std::string sMode = "Simulation";
   Mode eMode = Mode_Simulation;
   if(sMode == "Experiment"){
     std::cerr << "Setting experimental mode."  << std::endl;

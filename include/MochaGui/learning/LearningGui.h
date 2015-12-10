@@ -117,7 +117,6 @@ private:
     std::thread* m_pLocalizerThread;
     std::thread* m_pJoystickThread;
     std::mutex m_JoystickMutex;
-    std::mutex m_RenderMutex;
 
     ControlCommand m_JoystickCommand;
 

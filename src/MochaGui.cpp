@@ -6,8 +6,7 @@
 //car control variables
 float g_fTurnrate = 0;
 float g_fSpeed = 0;
-std::atomic<bool> m_StillControl(true);
-std::atomic<bool> m_StillRun(true);
+
 using namespace SceneGraph;
 using namespace pangolin;
 #define WINDOW_WIDTH 1024
@@ -42,12 +41,20 @@ static bool g_bImuIntegrationOnly = false;
 
 MochaGui::MochaGui() :
   m_Path(vector<int>()),
+  m_abPhysics(false),
+  m_abPlanner(false),
+  m_abLearning(false),
+  m_abImu(false),
+  m_abLocalizer(false),
+  m_abCommand(false),
+  m_abControl(false),
   m_bPlannerOn(false),
   m_bShowProjectedPath(true),
   m_bCompute3dPath(true),
   m_bSimulate3dPath(false),
   m_eControlTarget((int)eTargetSimulation),
   m_bControl3dPath(false),
+  m_bFuseImu(true),
   m_nPathSegments(20u),
   m_dTimeInterval(0.01),
   m_pPlannerThread(0),
@@ -60,7 +67,6 @@ MochaGui::MochaGui() :
   m_bFusionLoggerEnabled(false),
   m_bLoggerPlayback(false),
   m_nNumControlSignals(0),
-  m_bFuseImu(true),
   m_nNumPoseUpdates(0),
   m_dPlaybackTimer(-1),
   m_Fusion(30,&m_DriveCarModel),
@@ -121,18 +127,16 @@ void MochaGui::Run() {
   int frameCount = 0;
   double lastTime = CarPlanner::Tic();
   m_dDiagTime = CarPlanner::Tic();
-  //SetThreadName("Main thread");
+  SetThreadName("Main thread");
   _StartThreads();
   double lastFrameTime = CarPlanner::Tic();
+
+  usleep(1e6);
   while( !pangolin::ShouldQuit() )
   {
+    //std::unique_lock<std::mutex> lock(m_DrawMutex);
+    m_Gui.Render();
 
-    {
-      //std::unique_lock<std::mutex> lock(m_DrawMutex);
-      m_Gui.Render();
-    }
-
-    usleep(1e6/100.0);
 
     //calcualte Fps
     frameCount++;
@@ -141,7 +145,6 @@ void MochaGui::Run() {
       frameCount = 0;
       lastTime = CarPlanner::Tic();
     }
-
 
 
 
@@ -168,6 +171,7 @@ void MochaGui::Run() {
       _UpdateWaypointFiles();
     }
   }
+  _KillThreads();
 }
 
 ////////////////////////////////////////////////////////////////
@@ -273,7 +277,7 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
 {
   m_sPlaybackLogFile = sLogFile;
 
-  dout ("Initializing MochaGui");
+  DLOG(INFO) << "Initializing MochaGui";
   m_Node.subscribe("ninja_car/state"); //crh node api
 
   m_dStartTime = CarPlanner::Tic();
@@ -511,7 +515,6 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   pangolin::Var<double>::Attach("control:Steering", m_ControlCommand.m_dPhi);
 
   //planner parameters
-  pangolin::Var<bool>::Attach("planner:PlannerOn",m_bPlannerOn);
   pangolin::Var<bool>::Attach("planner:ContinuousPlanning", g_bContinuousPathPlanning);
   pangolin::Var<bool>::Attach("planner:SimulatePath",m_bSimulate3dPath);
   pangolin::Var<bool>::Attach("planner:LoadWaypoints",m_bLoadWaypoints);
@@ -528,7 +531,6 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   //update the file names
   _UpdateWaypointFiles();
 
-  //CVarUtils::Load("cvars.xml");
   //_RefreshWaypoints();
 
   m_Fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
@@ -537,50 +539,64 @@ void MochaGui::Init(std::string sRefPlane, std::string sMesh, bool bLocalizer, s
   m_Fusion.SetCalibrationPose(Sophus::SE3d(Cart2T(T_ic)));
   m_Fusion.SetCalibrationActive(false);
   m_pControlLine = new GLCachedPrimitives();
+  DLOG(INFO) << "Reached the end of MochaGui::Init() without error.";
 }
 
 ////////////////////////////////////////////////////////////////
 void MochaGui::_StartThreads()
 {
   //recreate the threads
-  m_pPlannerThread = new std::thread(std::bind(&MochaGui::_PlannerFunc,this));
-  m_pPhysicsThread = new std::thread(std::bind(&MochaGui::_PhysicsFunc,this));
-  m_pControlThread = new std::thread(std::bind(&MochaGui::_ControlFunc,this));
+  m_abPhysics = true;
+  m_abPlanner = true;
+  m_abLearning = true;
+  m_abImu = true;
+  m_abLocalizer = true;
+  m_abCommand = true;
+  m_abControl = true;
+  //m_pPlannerThread = new std::thread(std::bind(&MochaGui::_PlannerFunc,this));
+  //m_pPhysicsThread = new std::thread(std::bind(&MochaGui::_PhysicsFunc,this));
+  //m_pControlThread = new std::thread(std::bind(&MochaGui::_ControlFunc,this));
+  m_pPlannerThread = new std::thread([this]() { MochaGui::_PlannerFunc(); });
+  m_pPhysicsThread = new std::thread([this]() { MochaGui::_PhysicsFunc(); });
+  m_pControlThread = new std::thread([this]() { MochaGui::_ControlFunc(); });
+
   if(m_eControlTarget == eTargetExperiment){
-    m_pCommandThread = new std::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
+    //m_pCommandThread = new std::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
+    m_pCommandThread = new std::thread([this]() { MochaGui::_ControlCommandFunc(); });
   }
   if(m_eControlTarget == eTargetSimulation){
     if(m_pImuThread != NULL){
-      m_bStillImu = false;
-      // m_pImuThread->interrupt();
+      m_abImu = false;
       m_pImuThread->join();
     }
 
     if(m_pLocalizerThread) {
-      m_bStillLocalize = false;
-      // m_pLocalizerThread->interrupt();
+      m_abLocalizer = false;
       m_pLocalizerThread->join();
     }
   }else{
     m_Localizer.Start();
 
     if(m_pImuThread == NULL){
-      m_pImuThread = new std::thread(std::bind(&MochaGui::_ImuReadFunc,this));
+      //m_pImuThread = new std::thread(std::bind(&MochaGui::_ImuReadFunc,this));
+      m_pImuThread = new std::thread([this]() { MochaGui::_ImuReadFunc(); });
     }
 
     if(m_pLocalizerThread == NULL){
-      m_pLocalizerThread = new std::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
+      //m_pLocalizerThread = new std::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
+      m_pLocalizerThread = new std::thread([this]() { MochaGui::_LocalizerReadFunc(); });
     }
   }
 
 
 }
 
+////////////////////////////////////////////////////////////////
 void MochaGui::_KillController()
 {
   //reset the threads
   if(m_pControlThread) {
-    //m_pControlThread->interrupt();
+    m_abControl = false;
     m_pControlThread->join();
   }
   m_bControl3dPath = false;
@@ -593,33 +609,33 @@ void MochaGui::_KillThreads()
   _KillController();
 
   if(m_pPhysicsThread) {
-      //m_pPhysicsThread->interrupt();
-      m_pPhysicsThread->join();
+    m_abPhysics = false;
+    m_pPhysicsThread->join();
   }
 
   if(m_pPlannerThread) {
-      //m_pPlannerThread->interrupt();
-      m_pPlannerThread->join();
+    m_abPlanner = false;
+    m_pPlannerThread->join();
   }
 
   if(m_pLearningThread){
-      //m_pLearningThread->interrupt();
-      m_pLearningThread->join();
+    m_abLearning = false;
+    m_pLearningThread->join();
   }
 
   if(m_pImuThread) {
-      //m_pImuThread->interrupt();
-      m_pImuThread->join();
+    m_abImu = false;
+    m_pImuThread->join();
   }
 
   if(m_pLocalizerThread) {
-      //m_pLocalizerThread->interrupt();
-      m_pLocalizerThread->join();
+    m_abLocalizer = false;
+    m_pLocalizerThread->join();
   }
 
   if(m_pCommandThread) {
-      //m_pCommandThread->interrupt();
-      m_pCommandThread->join();
+    m_abCommand = false;
+    m_pCommandThread->join();
   }
 
   delete m_pControlThread;
@@ -672,6 +688,7 @@ bool MochaGui::_Refresh(std::vector<std::string> *vArgs)
 void MochaGui::_RefreshWaypoints()
 {
   std::unique_lock<std::mutex> lock(m_DrawMutex);
+
   //first clear all waypoints
   m_Gui.ClearWaypoints();
 
@@ -754,7 +771,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
   case eMochaTogglePlans:
   {
-    std::unique_lock<std::mutex> lock(m_DrawMutex);
+    //std::unique_lock<std::mutex> lock(m_DrawMutex);
     for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
       (*iter)->SetVisible(!(*iter)->IsVisible());
     }
@@ -988,48 +1005,49 @@ void MochaGui::_LocalizerReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ImuReadFunc()
 {
-  double lastTime = CarPlanner::Tic();
-  int numPoses = 0;
+  LOG(INFO) << "_ImuReadFunc() disabled.";
+//  double lastTime = CarPlanner::Tic();
+//  int numPoses = 0;
 
-  while(1){
-    ninjacar::ImuMsg Msg;
-    //this needs to be a blocking call .. not sure it is!!!
-    if(m_Node.receive("nc_node/state",Msg)){ //crh node api
-      //double dImuTime = (double)Msg.timer()/62500.0; //crh old (int32)timer
-      double dImuTime = Msg.device_time();
-      double sysTime = CarPlanner::Tic();
-      Eigen::VectorXd Accel,Gyro;
-      ninjacar::ReadVector(Msg.accel(),&Accel);
-      ninjacar::ReadVector(Msg.gyro(),&Gyro);
-      m_Fusion.RegisterImuPose(Accel(0)*G_ACCEL,Accel(1)*G_ACCEL,Accel(2)*G_ACCEL,
-                               Gyro(0),Gyro(1),Gyro(2),sysTime,sysTime);
+//  while(1){
+//    ninjacar::ImuMsg Msg;
+//    //this needs to be a blocking call .. not sure it is!!!
+//    if(m_Node.receive("nc_node/state",Msg)){ //crh node api
+//      //double dImuTime = (double)Msg.timer()/62500.0; //crh old (int32)timer
+//      double dImuTime = Msg.device_time();
+//      double sysTime = CarPlanner::Tic();
+//      Eigen::VectorXd Accel,Gyro;
+//      ninjacar::ReadVector(Msg.accel(),&Accel);
+//      ninjacar::ReadVector(Msg.gyro(),&Gyro);
+//      m_Fusion.RegisterImuPose(Accel(0)*G_ACCEL,Accel(1)*G_ACCEL,Accel(2)*G_ACCEL,
+//                               Gyro(0),Gyro(1),Gyro(2),sysTime,sysTime);
 
-      if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-        m_FusionLogger.LogImuData(sysTime,dImuTime,Eigen::Vector3d(Accel(0),Accel(1),Accel(2)),Eigen::Vector3d(Gyro(0),Gyro(1),Gyro(2)));
-      }
-      //std::cout << "IMU pose received at:" << sysTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
-      //            if(m_bLoggerEnabled && m_Logger.IsReady()){
-      //                VehicleState state;
-      //                _UpdateVehicleStateFromFusion(state);
-      //                m_Logger.LogPoseUpdate(state,EventLogger::eIMU);
-      //            }
+//      if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
+//        m_FusionLogger.LogImuData(sysTime,dImuTime,Eigen::Vector3d(Accel(0),Accel(1),Accel(2)),Eigen::Vector3d(Gyro(0),Gyro(1),Gyro(2)));
+//      }
+//      //std::cout << "IMU pose received at:" << sysTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
+//      //            if(m_bLoggerEnabled && m_Logger.IsReady()){
+//      //                VehicleState state;
+//      //                _UpdateVehicleStateFromFusion(state);
+//      //                m_Logger.LogPoseUpdate(state,EventLogger::eIMU);
+//      //            }
 
-      double dt = CarPlanner::Tic()-lastTime;
-      if(dt > 0.5){
-        m_dImuFreq = numPoses/dt;
-        lastTime = CarPlanner::Tic();
-        numPoses = 0;
-      }
-      numPoses++;
-    }
-  }
+//      double dt = CarPlanner::Tic()-lastTime;
+//      if(dt > 0.5){
+//        m_dImuFreq = numPoses/dt;
+//        lastTime = CarPlanner::Tic();
+//        numPoses = 0;
+//      }
+//      numPoses++;
+//    }
+//  }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlCommandFunc()
 {
   double dLastTime = CarPlanner::Tic();
-  while(1)
+  while(m_abControl)
   {
     //only go ahead if the controller is running, and we are targeting the real vehicle
     if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false){
@@ -1075,8 +1093,7 @@ void MochaGui::_ControlCommandFunc()
     }
 
     //about 100 commands/sec
-    usleep(1E6 * 0.008);
-    //usleep(1E6 * 0.016);
+    std::this_thread::sleep_for(std::chrono::milliseconds(8));
   }
 }
 
@@ -1095,12 +1112,14 @@ void MochaGui::_ControlFunc()
   {
     m_bControllerRunning = false;
 
-    while(1) {
+    while(m_abControl) {
 
-      std::unique_lock<std::mutex> lock(m_DrawMutex);
-      m_pControlLine->Clear();
-      for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
-        pStrip->Clear();
+      {
+        std::unique_lock<std::mutex> lock(m_DrawMutex);
+        m_pControlLine->Clear();
+        for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
+          pStrip->Clear();
+        }
       }
       m_bControllerRunning = false;
 
@@ -1123,7 +1142,7 @@ void MochaGui::_ControlFunc()
         m_sPlaybackLogFile = m_Logger.OpenNewLogFile("");
         m_Logger.WriteSegmentSamples(m_vSegmentSamples);
         m_Logger.SetIsReady(true);
-        dout("Created new log file at " << m_sPlaybackLogFile << ". Enabling logging.");
+        DLOG(INFO) << "Created new log file at " << m_sPlaybackLogFile << ". Enabling logging.";
       }
 
       if(m_bFusionLoggerEnabled){
@@ -1154,16 +1173,14 @@ void MochaGui::_ControlFunc()
       //m_ControlCommand = ControlCommand();
       m_bControllerRunning = true;
       VehicleState currentState;
-      while(1)
+      while(m_abControl)
       {
         while((m_eControlTarget != eTargetExperiment &&
                m_bSimulate3dPath == false
-               && m_StillControl )){
+               && m_abControl )){
           std::this_thread::sleep_for(std::chrono::milliseconds(1));
-          //boost::this_thread::interruption_point();
         }
 
-        //boost::this_thread::interruption_point();
 
         if(m_bSimulate3dPath ){
           m_DriveCarModel.GetVehicleState(0,currentState);
@@ -1224,7 +1241,7 @@ void MochaGui::_ControlFunc()
           m_FusionLogger.CloseLogFile();
           m_Controller.Reset();
           m_bControllerRunning = false;
-          dout("Controller terminated. Closing log file if needed.");
+          DLOG(INFO) << "Controller terminated. Closing log file if needed.";
           break;
         }
       }
@@ -1235,10 +1252,9 @@ void MochaGui::_ControlFunc()
       }
 
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      //usleep(10000);
     }
   }catch(...){
-    dout("Control thread exception caught...");
+    DLOG(INFO) << "Control thread exception caught.";
   }
 }
 
@@ -1272,22 +1288,20 @@ void MochaGui::_PhysicsFunc()
   double dCurrentTic = -1;
   double dPlanTimer = 0;
 
-  while(1){
+  while(m_abPhysics){
     //boost::this_thread::interruption_point();
 
-    while(m_bSimulate3dPath == false){
+    while(m_bSimulate3dPath == false && m_abPhysics ){
       dCurrentTic = CarPlanner::Tic();
-      //boost::this_thread::interruption_point();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       //usleep(10000);
     }
 
     //this is so pausing doesn't shoot the car in the air
     double pauseStartTime = CarPlanner::Tic();
-    while(m_bPause == true && m_bSimulate3dPath == true) {
+    while(m_bPause == true && m_bSimulate3dPath == true && m_abPhysics ) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       //usleep(1000);
-      //boost::this_thread::interruption_point();
 
       //This section will play back control paths, if the user has elected to do so
       if(g_bPlaybackControlPaths){
@@ -1446,9 +1460,7 @@ void MochaGui::_PlannerFunc() {
   m_bPlanning = false;
   // now add line segments
   bool previousOpenLoopSetting = m_bPlannerOn;
-  while (1) {
-    //std::this_thread::interruption_point();
-
+  while (m_abPlanner) {
     //if the use has changed the openloop setting, dirty all
     //the waypoints
     if( previousOpenLoopSetting != m_bPlannerOn) {
@@ -1475,7 +1487,7 @@ void MochaGui::_PlannerFunc() {
         //if the controller is running, we have to stop it
         if(m_bControllerRunning){
           m_bControl3dPath = false;
-          while(m_bControllerRunning == true) {
+          while(m_bControllerRunning == true && m_abPlanner) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             //usleep(1000);
           }
@@ -1548,14 +1560,12 @@ void MochaGui::_PlannerFunc() {
           while(m_bPause == true) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             //usleep(1000);
-            //boost::this_thread::interruption_point;
             if(m_bStep == true){
               m_bStep = false;
               break;
             }
           }
 
-          //boost::this_thread::interruption_point;
           Eigen::Vector3dAlignedVec vActualTrajectory, vControlTrajectory;
           bool res;
           if(numInterations > g_nIterationLimit){
@@ -1611,7 +1621,6 @@ void MochaGui::_PlannerFunc() {
 
     if(m_bPlanning == false) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      //usleep(10000);
     }
   }
 }
@@ -1648,6 +1657,7 @@ void MochaGui::_PopulateSceneGraph() {
 
 
   m_Gui.AddGLObject(&m_DestAxis);
+  DLOG(INFO) << "Unlocking m_DrawMutex in _PopulateSceneGraph().";
   //m_Gui.AddGLObject(m_pControlLine);
 }
 

@@ -7,7 +7,6 @@
 #include <SceneGraph/SceneGraph.h>
 #include <SensorFusion/SensorFusionCeres.h>
 #include "CarPlanner/CarPlannerCommon.h"
-#include "MochaGui/GetPot"
 #include "MochaGui/EventLogger.h"
 #include "MochaGui/SE3.h"
 
@@ -233,9 +232,10 @@ void DoFusion()
             }
         }
 
-        m_DrawMutex.lock();
-        glpos.SetPose((g_fusion.m_CurrentPose.m_dPose*g_fusion.m_dTic).matrix());
-        m_DrawMutex.unlock();
+        {
+          std::unique_lock<std::mutex> lock(m_DrawMutex);
+          glpos.SetPose((g_fusion.m_CurrentPose.m_dPose*g_fusion.m_dTic).matrix());
+        }
 
         time += 0.001;
         //usleep(1E6/4000.0);
@@ -250,10 +250,9 @@ int main( int argc, char** argv )
     pangolin::Var<int>::Attach("debug.GlobalSkip",g_nGlobalSkip);
 
 
-    GetPot cl( argc, argv );
-    std::string sLog = cl.follow("20130226_142837",1,"-log"); //crh filename
-    m_nFilterSize = cl.follow(50,1,"-length");
-    m_bCalibrateActive = (bool)cl.follow(0,1,"-calib");
+    std::string sLog = "/Users/crh/data/logs/log_test.txt";
+    m_nFilterSize = 50;
+    m_bCalibrateActive = false;
 
     g_fusion.SetFilterSize(m_nFilterSize);
 
@@ -266,7 +265,7 @@ int main( int argc, char** argv )
     //imuData = LoadCsv("Matlab/imu_data.csv");
     //imuData = LoadCsv("/Users/nimski/Code/Build/MochaGui/logs_imu_20121211_205530.txt");
     char imuLog[500];
-    sprintf(imuLog,"/Users/crh/Projects/MochaGui-build/logs/%s",sLog.c_str()); //crh filename
+    sprintf(imuLog,"/Users/crh/data/logs/imu_fusion_test.txt");
     m_Logger.ReadLogFile(imuLog);
 
 
@@ -288,11 +287,11 @@ int main( int argc, char** argv )
     pangolin::View& graphView = pangolin::Plotter( &m_Log)
             .SetBounds(0.0, 0.3, 0.6, 1.0);
 
-    pangolin::RegisterKeyPressCallback( '\r' , std::bind(CommandHandler, Step ) );
-    pangolin::RegisterKeyPressCallback( ' ', std::bind(CommandHandler, Pause ) );
-    pangolin::RegisterKeyPressCallback( 'f', std::bind(CommandHandler, FastForward ) );
+    pangolin::RegisterKeyPressCallback( '\r', [=] () { CommandHandler(Step); } );
+    pangolin::RegisterKeyPressCallback( ' ', [=] () { CommandHandler(Pause); } );
+    pangolin::RegisterKeyPressCallback( 'f', [=] () { CommandHandler(FastForward); } );
     pangolin::RegisterKeyPressCallback( 'v', [] { m_bLocalizerActive = !m_bLocalizerActive;
-                                                                 std::cout << "Localizer poses " << (m_bLocalizerActive ? "active" : "inactive") << std::endl; });
+      LOG(INFO) << "Localizer poses " << (m_bLocalizerActive ? "active" : "inactive"); });
 
 
     pangolin::DisplayBase().AddDisplay(view3d);
@@ -337,20 +336,15 @@ int main( int argc, char** argv )
     // Default hooks for exiting (Esc) and fullscreen (tab).
     while( !pangolin::ShouldQuit() )
     {
-        m_DrawMutex.lock();
+      {
+        std::unique_lock<std::mutex> lock(m_DrawMutex);
+        view3d.ActivateScissorAndClear();
+        // Swap frames and Process Events
 
-        {
-
-            view3d.ActivateScissorAndClear();
-
-            // Swap frames and Process Events
-
-            pangolin::FinishFrame();
-        }
-        m_DrawMutex.unlock();
-
-        // Pause for 1/60th of a second.
-        usleep(1E6/100.0);
+        pangolin::FinishFrame();
+      }
+      // Pause for 1/60th of a second.
+      usleep(1E6/100.0);
     }
     return 0;
 }

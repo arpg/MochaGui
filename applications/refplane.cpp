@@ -5,20 +5,18 @@
 #include "MochaGui/SE3.h"
 
 #include "config.h"
-#include "MochaGui/GetPot"
 #include "Messages.pb.h"
 
-Localizer g_localizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )
 {
-    GetPot cl( argc, argv );
+    Localizer localizer;
 
-    g_localizer.TrackObject("object_tracker", "refplane",false); //crh node call
-    g_localizer.Start();
+    localizer.TrackObject("object_tracker", "refplane",false); //crh node call
+    localizer.Start();
     //wait for the pose
-    Eigen::Vector6d pose = T2Cart(g_localizer.GetPose("refplane",true).matrix());
+    Eigen::Vector6d pose = T2Cart(localizer.GetPose("refplane",true).matrix());
     //now show the pose
     std::stringstream ss;
     Eigen::IOFormat CleanFmt(10, 0, ",", ",", "", "");
@@ -26,7 +24,7 @@ int main( int argc, char** argv )
     std::string res = ss.str();
     std::string::iterator end_pos = std::remove(res.begin(), res.end(), ' ');
     res.erase(end_pos, res.end());
-    std::cout << "Residual is: " << res  << std::endl;
+    LOG(INFO) << "Residual is: " << res;
 
     return 0;
 }

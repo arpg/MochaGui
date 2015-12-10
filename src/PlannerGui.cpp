@@ -10,9 +10,8 @@ PlannerGui::PlannerGui():
     m_nSelectedWaypoint(-1)
 {
     int argc = 0;
-    //glutInit(&argc,0);
     pangolin::CreateWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
-    glewInit();
+    glEnable(GL_DEPTH_TEST);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -38,8 +37,6 @@ PlannerGui::~PlannerGui()
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::Render()
 {
-    // this lock wasn't used by nimski previously.
-    //std::unique_lock<std::mutex> lock(m_DrawMutex);
     m_pView->ActivateScissorAndClear();
 
     if(m_pFollowCar != NULL){
@@ -47,8 +44,9 @@ void PlannerGui::Render()
     }
 
     // Swap frames and Process Events
-    pangolin::FinishFrame();
-
+    {
+      pangolin::FinishFrame();
+    }
     //handle waypoints
 
     for(size_t ii = 0 ; ii < m_vWaypoints.size() ; ii++){
@@ -68,6 +66,7 @@ void PlannerGui::Render()
             }
         }
     }
+    DLOG(INFO) << "Reached the end of Render()";
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
