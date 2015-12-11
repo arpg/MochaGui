@@ -12,7 +12,7 @@ int main( int argc, char** argv )
   std::string sMode = "Simulation";
   Mode eMode = Mode_Simulation;
   if(sMode == "Experiment"){
-    std::cerr << "Setting experimental mode."  << std::endl;
+    LOG(INFO) << "Setting experimental mode.";
     eMode = Mode_Experiment;
   }
   LearningGui* pGui = LearningGui::GetInstance();

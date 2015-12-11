@@ -94,18 +94,14 @@ void LearningGui::_UpdateTrajectories()
   std::list<GLCachedPrimitives>::iterator iter = m_lGLLineSegments.begin();
   //now update the GLLines to show the trajectory
   for(size_t ii = 0 ; ii < m_vSamples.size(); ii++ ){
-    // crh commented the next section due to race condition issues.
 
-    /*
     if(m_lGLLineSegments.size() <= ii){
-      std::unique_lock<std::mutex> renderMutex(m_RenderMutex);//,std::try_to_lock);
       m_lGLLineSegments.push_back(GLCachedPrimitives());
       m_lGLLineSegments.back().SetColor(GLColor(1.0f,0.0f,0.0f,1.0f));
       m_Gui.AddGLObject(&m_lGLLineSegments.back());
       iter = m_lGLLineSegments.end();
       iter--;
     }
-  */
 
     const std::vector<Sophus::SE3d> v3dPts = m_vSamples[ii].GetMotionSample();
     Eigen::Vector3dAlignedVec vPts;
@@ -742,7 +738,6 @@ void LearningGui::_LearningFunc(MotionSample* pRegressionPlan)
   m_Regressor.CalculateParamNorms(functor,(MotionSample&)*pRegressionPlan,newParams,&m_vSamples,&m_vSampleIndices);
 
 
-  std::cout << "Running _UpdateTrajectories." << std::endl;
   _UpdateTrajectories();
 
   //and now set the params on the car

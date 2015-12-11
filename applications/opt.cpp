@@ -213,7 +213,7 @@ int main( int argc, char** argv )
 
           //now iterate the planner
           while(1){
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             if(CanContinue(bPaused,bStep) == true){
               MotionSample* pSample;
               bool bRes;
@@ -231,6 +231,7 @@ int main( int argc, char** argv )
               }
 
               //set the axis position denoting the end of the sample
+              std::cout << "pSample back state is: " << pSample->m_vStates.back().m_dTwv.matrix() << std::endl;
               endPosAxis.SetPose(pSample->m_vStates.back().m_dTwv.matrix());
               endPosAxis.SetAxisSize(pSample->m_vStates.back().m_dV.norm());
 
