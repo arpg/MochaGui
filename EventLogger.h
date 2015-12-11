@@ -13,7 +13,7 @@ public:
     enum PoseUpdateSource
     {
         eIMU = 0,
-        eVicon = 1,
+        eLocalizer = 1,
         eSimulation = 2
     };
 
@@ -39,7 +39,7 @@ public:
     void LogControlCommand(const ControlCommand &command);
     void LogControlPlan(const ControlPlan &plan);
     void LogImuData(const double dSysTime, const double dDeviceTime, const Eigen::Vector3d& dAccel, const Eigen::Vector3d& dGyro);
-    void LogViconData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d& dTwb);
+    void LogLocalizerData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d& dTwb);
 
     std::string OpenNewLogFile(const std::string &sLogDir, const std::string &sPrefix = "");
     void CloseLogFile();

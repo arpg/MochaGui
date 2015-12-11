@@ -13,7 +13,7 @@
 #include <CVars/CVar.h>
 #include <CarPlanner/CarPlannerCommon.h>
 #include <CarPlanner/BulletCarModel.h>
-#include <CarPlanner/Vicon.h>
+#include <CarPlanner/Localizer.h>
 #include <CarPlanner/CarRegressor.h>
 #include <Node/Node.h>
 #include <SensorFusion/SensorFusionCeres.h>
@@ -41,7 +41,7 @@ class LearningGui
 public:
     LearningGui();
     /// Initializes the GUI
-    void Init(std::string sRefPlane, std::string sMeshName, bool bViconTransform, Mode eMode);
+    void Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode);
 
     /// Runs the GUI
     void Run();
@@ -72,15 +72,15 @@ private:
 
     void _JoystickReadFunc();
     void _ImuReadFunc();
-    void _ViconReadFunc();
+    void _LocalizerReadFunc();
 
     void _CommandHandler(const MochaCommands& command);
 
-    /// vicon reader
-    Vicon m_Vicon;
+    /// localizer reader
+    Localizer m_Localizer;
     /// node for capturing IMU data from the car
     node::node m_Node;
-    /// name of the car used for vicon tracking
+    /// name of the car used for localizer tracking
     std::string m_sCarObjectName;
 
     //view related variables
@@ -98,7 +98,7 @@ private:
 
     double& m_dT;
     double m_dImuRate;
-    double m_dViconRate;
+    double m_dLocalizerRate;
 
     bool& m_bLearn;
     bool m_bLearningRunning;
@@ -113,7 +113,7 @@ private:
     boost::thread* m_pLearningThread;
     boost::thread* m_pLearningCaptureThread;
     boost::thread* m_pImuThread;
-    boost::thread* m_pViconThread;
+    boost::thread* m_pLocalizerThread;
     boost::thread* m_pJoystickThread;
     boost::mutex m_JoystickMutex;
     boost::mutex m_RenderkMutex;

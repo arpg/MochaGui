@@ -66,7 +66,7 @@ public:
     /// Initializes the GUI.
     void Init(SceneGraph::GLObject* pTerrain //< The GLObject for the terrain. This will get added to the scenegraph and rendered
               );
-    void Init(const std::string sTerrainMeshFileName, GLMesh *pMesh, const bool bViconCoords = false);
+    void Init(const std::string sTerrainMeshFileName, GLMesh *pMesh, const bool bLocalizerCoords = false);
 
     /// Adds a new GLObject to the scenegraph
     void AddGLObject(GLObject* pObject, bool bCastShadows = false) { m_SceneGraph.AddChild(pObject); m_pLight->AddShadowCaster(pObject); }

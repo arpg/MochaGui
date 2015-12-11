@@ -18,7 +18,7 @@ private:
 public:
     ProcessModelFusion(const int& nFilterSize,BulletCarModel* pFusionModel);
     void RegisterInputCommands(ControlCommand command);
-    void RegisterGlobalPoseWithProcessModel(const Sophus::SE3d &dTwc, double viconTime, double time, ControlCommand commands);
+    void RegisterGlobalPoseWithProcessModel(const Sophus::SE3d &dTwc, double localizerTime, double time, ControlCommand commands);
     void GetVehicleState(VehicleState &state);
 };
 

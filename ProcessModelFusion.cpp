@@ -29,7 +29,7 @@ void ProcessModelFusion::RegisterInputCommands(ControlCommand command)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& dTwc,double viconTime,double time,ControlCommand command)
+void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& dTwc,double localizerTime,double time,ControlCommand command)
 {
     if(m_bFusionCarModelInitialized == true){
         VehicleState currentState;
@@ -51,9 +51,9 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
         delta.m_dV = currentState.m_dV-m_LastVehicleState.m_dV;
         delta.m_dW = currentState.m_dW-m_LastVehicleState.m_dW;
         m_LastVehicleState = currentState;
-        RegisterGlobalPose(dTwc,delta,viconTime,time,true,true);
+        RegisterGlobalPose(dTwc,delta,localizerTime,time,true,true);
     }else{
-        RegisterGlobalPose(dTwc,viconTime,time);
+        RegisterGlobalPose(dTwc,localizerTime,time);
     }
 
 

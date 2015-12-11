@@ -16,7 +16,7 @@
 #include <CarPlanner/CarController.h>
 #include <CarPlanner/LocalPlanner.h>
 #include <CarPlanner/CarRegressor.h>
-#include <CarPlanner/Vicon.h>
+#include <CarPlanner/Localizer.h>
 #include <CarPlanner/CVarHelpers.h>
 #include <Node/Node.h>
 
@@ -53,7 +53,7 @@ public:
     ////////////////////////////////////////////////////////////////
 
     void Run();
-    void Init(string sRefPlane, std::string sMesh, bool bVicon, std::string sMode, string sLogFile);
+    void Init(string sRefPlane, std::string sMesh, bool bLocalizer, std::string sMode, string sLogFile);
 
     static MochaGui *GetInstance();
     ~MochaGui();
@@ -76,7 +76,7 @@ protected:
     void _ControlCommandFunc();
     void _ControlFunc();
     void _ImuReadFunc();
-    void _ViconReadFunc();
+    void _LocalizerReadFunc();
     void _PlannerFunc();
     void _LearningFunc(ControlPlan *m_pRegressionPlan);
     void _UpdateLearning(ControlCommand command,
@@ -173,7 +173,7 @@ protected:
     Vector3dAlignedVec m_vFixGroundSamples;
     //Eigen::Matrix3d m_RfixGround;
 
-    Vicon m_Vicon;
+    Localizer m_Localizer;
     std::string m_sCarObjectName;
     //std::vector<MochaEntity> m_vEntities;
 
@@ -183,7 +183,7 @@ protected:
     std::thread* m_pCommandThread;
     std::thread* m_pLearningThread;
     std::thread* m_pImuThread;
-    std::thread* m_pViconThread;
+    std::thread* m_pLocalizerThread;
 
     ControlCommand m_ControlCommand;
     double m_dTargetVel;
@@ -218,7 +218,7 @@ protected:
 
     //ui widgets
     GLGuiPanel m_GuiPanel;
-    double m_dViconFreq;
+    double m_dLocalizerFreq;
     double m_dImuFreq;
     double m_dVel;
     Eigen::Vector3d m_dPos;

@@ -5,7 +5,7 @@
 #include <boost/lexical_cast.hpp>
 #include <Node/Node.h>
 #include <CarPlanner/BulletCarModel.h>
-#include <CarPlanner/Vicon.h>
+#include <CarPlanner/Localizer.h>
 
 #include "config.h"
 #include "GetPot"
@@ -15,7 +15,7 @@
 #include "EventLogger.h"
 
 double g_dStartTime = Tic();
-Vicon g_vicon;
+Localizer g_localizer;
 node::node g_node;
 EventLogger logger;
 bool g_bLog = false;
@@ -75,19 +75,19 @@ void ImuReadFunc()
 
 }
 
-void ViconReadFunc()
+void LocalizerReadFunc()
 {
     while(1){
         boost::this_thread::interruption_point();
         //this is a blocking call
-        double viconTime;
-        Sophus::SE3d Twb = g_vicon.GetPose("CAR",true,&viconTime);
+        double localizerTime;
+        Sophus::SE3d Twb = g_localizer.GetPose("CAR",true,&localizerTime);
         Eigen::Vector6d pose = fusion::T2Cart(Twb.matrix());
 
         if(g_bLog ){
-            std::cout << "Vicon pose received at:" << viconTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
+            std::cout << "Localizer pose received at:" << localizerTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
             fflush(stdout);
-            logger.LogViconData(Tic(),viconTime,Twb);
+            logger.LogLocalizerData(Tic(),localizerTime,Twb);
         }
     }
 }
@@ -101,7 +101,7 @@ int main( int argc, char** argv )
     std::string sRef = cl.follow( "", 1, "-ref" );
     bool bLogCommands = cl.search("-logCommands");
 
-    Eigen::Matrix4d dT_vicon_ref = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4d dT_localizer_ref = Eigen::Matrix4d::Identity();
     if(sRef.empty() == false){
         std::string word;
         std::stringstream stream(sRef);
@@ -115,7 +115,7 @@ int main( int argc, char** argv )
 
             for(int ii = 0 ; ii < 4 ; ii++){
                 for(int jj = 0 ; jj < 4 ; jj++){
-                    dT_vicon_ref(ii,jj) = vals[ii*4 + jj];
+                    dT_localizer_ref(ii,jj) = vals[ii*4 + jj];
                 }
             }
             std::cout << "Ref plane matrix successfully read" << std::endl;
@@ -125,11 +125,11 @@ int main( int argc, char** argv )
     g_node.init("logger");
 
     g_node.subscribe("herbie/Imu");
-    g_vicon.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_vicon_ref).inverse(),true);
-    g_vicon.Start();
+    g_localizer.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_localizer_ref).inverse(),true);
+    g_localizer.Start();
 
     boost::thread* pImuThread = new boost::thread(boost::bind(ImuReadFunc));
-    boost::thread* pViconThread = new boost::thread(boost::bind(ViconReadFunc));
+    boost::thread* pLocalizerThread = new boost::thread(boost::bind(LocalizerReadFunc));
     boost::thread* pJoystickThread = NULL;
     if(bLogCommands){
         //initialize the joystick
@@ -163,13 +163,13 @@ int main( int argc, char** argv )
     pImuThread->interrupt();
     pImuThread->join();
 
-    pViconThread->interrupt();
-    pViconThread->join();
+    pLocalizerThread->interrupt();
+    pLocalizerThread->join();
 
     pJoystickThread->interrupt();
     pJoystickThread->join();
 
-    //g_vicon.Stop();
+    //g_localizer.Stop();
 
 
     return 0;

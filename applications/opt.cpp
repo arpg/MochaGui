@@ -84,7 +84,7 @@ int main( int argc, char** argv )
     GetPot cl( argc, argv );
 
     std::string sMesh = cl.follow("/Users/crh/data/lab.ply",1,"-mesh");
-    bool bVicon = cl.search("-vicon");
+    bool bLocalizer = cl.search("-localizer");
 
     GLMesh terrainMesh;
     GLAxis endPosAxis;
@@ -98,7 +98,7 @@ int main( int argc, char** argv )
     trajectoryBezierStrip.SetColor(GLColor(0.8f,0.8f,0.8f));
     controlStrip.SetColor(GLColor(0.0f,0.5f,0.0f));
     controlBezierStrip.SetColor(GLColor(0.8f,0.8f,0.8f));
-    gui.Init(sMesh,&terrainMesh,bVicon);
+    gui.Init(sMesh,&terrainMesh,bLocalizer);
     gui.AddPanel(&panel);
 
     panel.SetVar("planner:PlannerOn",&bPlannerOn);

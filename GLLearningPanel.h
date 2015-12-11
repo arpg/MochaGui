@@ -84,7 +84,7 @@ public:
 
                 m_Ui.beginGroup(nv::GroupFlags_GrowLeftFromTop); {
                     //m_Ui.doLabel(m_Rect, (boost::format("Rates IMU:%.2f") % *GetVar<double*>("learning:ImuRate")).str().c_str() );//crh
-                    //m_Ui.doLabel(m_Rect, (boost::format(" Vicon:%.2f") % *GetVar<double*>("learning:ViconRate")).str().c_str() );//crh
+                    //m_Ui.doLabel(m_Rect, (boost::format(" Localizer:%.2f") % *GetVar<double*>("learning:LocalizerRate")).str().c_str() );//crh
 
                 }
                 m_Ui.endGroup();

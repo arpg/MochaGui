@@ -131,8 +131,8 @@ void EventLogger::LogControlPlan(const ControlPlan& plan)
     planMsg.set_starttime(plan.m_dStartTime);
     planMsg.set_endtime(plan.m_dEndTime);
     WriteMotionSample(plan.m_Sample,*planMsg.mutable_sample());
-    WriteVehicleState(plan.m_StartState,eVicon,*planMsg.mutable_startstate());
-    WriteVehicleState(plan.m_GoalState,eVicon,*planMsg.mutable_endstate());
+    WriteVehicleState(plan.m_StartState,eLocalizer,*planMsg.mutable_startstate());
+    WriteVehicleState(plan.m_GoalState,eLocalizer,*planMsg.mutable_endstate());
     planMsg.set_startsampleindex(plan.m_nStartSampleIndex);
     planMsg.set_startsegmentindex(plan.m_nStartSegmentIndex);
     planMsg.set_endsampleindex(plan.m_nEndSampleIndex);
@@ -157,13 +157,13 @@ void EventLogger::LogImuData(const double dSysTime, const double dDeviceTime, co
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void EventLogger::LogViconData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d &dTwb)
+void EventLogger::LogLocalizerData(const double dSysTime, const double dDeviceTime, const Sophus::SE3d &dTwb)
 {
     msg_Log logMsg;
-    msg_ViconLog& viconMsg = *logMsg.mutable_vicon();
-    viconMsg.set_devicetime(dDeviceTime);
-    viconMsg.set_systemtime(dSysTime);
-    WriteMatrix(_GetPoseVector(dTwb),*viconMsg.mutable_pose_7d());
+    msg_LocalizerLog& localizerMsg = *logMsg.mutable_localizer();
+    localizerMsg.set_devicetime(dDeviceTime);
+    localizerMsg.set_systemtime(dSysTime);
+    WriteMatrix(_GetPoseVector(dTwb),*localizerMsg.mutable_pose_7d());
 
     WriteMessage(logMsg);
 }
@@ -270,7 +270,7 @@ void EventLogger::WriteMotionSample(const MotionSample &sample, msg_MotionSample
 {
     for(const VehicleState& state: sample.m_vStates){
         msg_VehicleState& msgState = *msgSample.add_states();
-        WriteVehicleState(state,eVicon,msgState);
+        WriteVehicleState(state,eLocalizer,msgState);
     }
 
     for(const ControlCommand& command: sample.m_vCommands){
