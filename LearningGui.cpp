@@ -343,7 +343,14 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
                                                          0,-1,0,0,
                                                          0,0,-1,0,
                                                          0,0,0,1);
+    } else {
+      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                         0,1,0,0,
+                                                         0,0,-1,0,
+                                                         0,0,0,1);
     }
+
+
     m_TerrainMesh.Init(pScene);
 
     m_Gui.Init(&m_TerrainMesh);
@@ -410,7 +417,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
         m_Fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
         Eigen::Vector6d T_ic;
         T_ic << 0.02095005375,  0.07656248358, -0.02323858462,   0.0433091783,  0.02323399838,    1.574031975;
-        m_Fusion.SetCalibrationPose(Sophus::SE3d(mvl::Cart2T(T_ic)));
+        m_Fusion.SetCalibrationPose(Sophus::SE3d(fusion::Cart2T(T_ic)));
         m_Fusion.SetCalibrationActive(false);
 
         m_Node.subscribe("herbie/Imu");
@@ -436,7 +443,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bVicon
 
     //set default vehicle state
     VehicleState state;
-    state.m_dTwv = Sophus::SE3d(mvl::Cart2T(-5,0,-0.05,0,0,0));
+    state.m_dTwv = Sophus::SE3d(fusion::Cart2T(-5,0,-0.05,0,0,0));
     m_DriveCarModel.SetState(0,state);
 
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', boost::bind(&LearningGui::_CommandHandler, this, eMochaRestart) );
@@ -591,7 +598,7 @@ void LearningGui::_PhysicsFunc()
 void LearningGui::_UpdateLearning(ControlCommand command, VehicleState& state)
 {
     if(m_bMapSteering == true){
-        Eigen::Vector6d vec = mvl::T2Cart(state.m_dTwv.matrix());
+        Eigen::Vector6d vec = fusion::T2Cart(state.m_dTwv.matrix());
         if(m_vSteeringPairs.size() == 0){
             m_dLastSteeringPose = vec;
             m_dLastCurv = 0;
@@ -756,7 +763,7 @@ void LearningGui::_CommandHandler(const MochaCommands& command)
     VehicleState state;
     switch(command){
         case eMochaRestart:
-            state.m_dTwv = Sophus::SE3d(mvl::Cart2T(0,-1.5,-0.01,0,0,0));
+            state.m_dTwv = Sophus::SE3d(fusion::Cart2T(0,-1.5,-0.01,0,0,0));
             m_DriveCarModel.SetState(0,state);
             break;
 

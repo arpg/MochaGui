@@ -39,7 +39,7 @@ set(BOOST_LIBS regex thread date_time system timer  )
 #boost doesn't seem to link to it..
 
 find_package(Pangolin REQUIRED)
-find_package(MINIGLOG REQUIRED)
+find_package( GLog REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
@@ -68,14 +68,14 @@ PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
 
 set( _INCLUDE_DIRS
     #            ${VRPN_INCLUDE_DIRS}
-	    ${MINIGLOG_INCLUDE_DIRS}
+	    ${GLog_INCLUDE_DIRS}
             ${Node_INCLUDE_DIRS}
-            ${Sophus_INCLUDE_DIR}
+            ${Sophus_INCLUDE_DIRS}
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
             ${BOOST_INCLUDE_DIR}
-            ${CarPlanner_INCLUDE_DIRS}
-            ${CVARS_INCLUDE_DIR}
+            ${CAR_PLANNER_INCLUDE_DIRS}
+            ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
             ${PROTOBUF_INCLUDE_DIRS}
             ${SceneGraph_INCLUDE_DIRS}
@@ -88,15 +88,16 @@ set( _INCLUDE_DIRS
 set( LIBRARIES
     #               ${VRPN_LIBRARY}
     #           ${VRPN_SERVER_LIBRARY}
+    ${GLog_LIBRARIES}
                ${Node_LIBRARIES}
                ${SENSORFUSION_LIBRARIES}
                ${Pangolin_LIBRARIES}
                ${LIBAO_LIBRARY}
                ${SceneGraph_LIBRARIES}
-               ${CarPlanner_LIBRARIES}
+               ${CAR_PLANNER_LIBRARIES}
                ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
-               ${CVARS_LIBRARIES}
+               ${CVars_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
                Gamepad # this is also built with the solution
         )

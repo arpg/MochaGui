@@ -2,7 +2,6 @@
 #define	_GL_CAR_
 
 
-#include "SE3.h"
 #include <CarPlanner/RigidBody.h>
 
 
@@ -35,7 +34,7 @@ public:
         m_bPerceptable = false;
     }
 
-    void Init(GLCarDrawType eCarDrawType, std::string bodyMeshName = "./herbie/herbie.blend") {
+    void Init(GLCarDrawType eCarDrawType, std::string bodyMeshName = "/Users/crh/data/herbie.ply") {
         m_eCarDrawType = eCarDrawType;
         m_sBodyMeshName = bodyMeshName;
         m_Color = GLColor();
@@ -44,12 +43,12 @@ public:
         if (m_eCarDrawType != eTriangle) {
             //initialize the body mesh
             const struct aiScene* pBodyMesh;
-            pBodyMesh = aiImportFile("./herbie/herbie.blend", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
+            pBodyMesh = aiImportFile("/Users/crh/data/herbie.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
             m_pScene = pBodyMesh;
             LoadMeshTextures();
 
             const struct aiScene* pWheelMesh;
-            pWheelMesh = aiImportFile("./herbie/wheel.blend", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
+            pWheelMesh = aiImportFile("/Users/crh/data/wheel.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
 
 
             //load the wheels

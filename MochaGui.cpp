@@ -251,10 +251,6 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     m_bPause = false;
     m_bStep = false;
 
-    printf("****************\nall keyboard is disabled until you fix boost::bind issues with pangolin! MocahGui.cpp line 251\n");
-
-    /*
-
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(CommandHandler, eMochaClear ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + '1', std::bind(CommandHandler, eMochaToggleTrajectory ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + '2', std::bind(CommandHandler, eMochaTogglePlans ) );
@@ -269,8 +265,6 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'd', std::bind(&MochaGui::_LoadDefaultParams, this ) );
     pangolin::RegisterKeyPressCallback( 'G', [this] {this->m_pGraphView->Show(!this->m_pGraphView->IsShown());} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'f', [] {g_bFreezeControl = !g_bFreezeControl;} );
-
-    */
 
 
     //create CVars
@@ -478,7 +472,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     m_Fusion.ResetCurrentPose(Sophus::SE3d(),Eigen::Vector3d::Zero(),Eigen::Vector2d::Zero());
     Eigen::Vector6d T_ic;
     T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523;
-    m_Fusion.SetCalibrationPose(Sophus::SE3d(mvl::Cart2T(T_ic)));
+    m_Fusion.SetCalibrationPose(Sophus::SE3d(fusion::Cart2T(T_ic)));
     m_Fusion.SetCalibrationActive(false);
 }
 
@@ -774,7 +768,7 @@ void MochaGui::_UpdateVisuals()
 
         //offset the chasis by the height offset (constant)
         m_Gui.SetCarState(m_nDriveCarId,state,(m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment));
-        //Eigen::Vector6d pose = mvl::T2Cart(state.m_dTwv.matrix());
+        //Eigen::Vector6d pose = fusion::T2Cart(state.m_dTwv.matrix());
     }
 }
 

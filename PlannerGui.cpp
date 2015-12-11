@@ -79,10 +79,16 @@ void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh, con
     std::cout << aiGetErrorString() << std::endl;
 
     if(bViconCoords){
-        pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
-                                                         0,-1,0,0,
-                                                         0,0,-1,0,
-                                                         0,0,0,1);
+      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                       0,-1,0,0,
+                                                       0,0,-1,0,
+                                                       0,0,0,1);
+    } else {
+      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                       0,1,0,0,
+                                                       0,0,-1,0,
+                                                       0,0,0,1);
+
     }
     pMesh->Init(pScene);
     Init(pMesh);

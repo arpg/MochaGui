@@ -82,7 +82,7 @@ int main( int argc, char** argv )
 
     GetPot cl( argc, argv );
 
-    std::string sMesh = cl.follow("jump.blend",1,"-mesh");
+    std::string sMesh = cl.follow("/Users/crh/data/lab.ply",1,"-mesh");
     bool bVicon = cl.search("-vicon");
 
     GLMesh terrainMesh;
@@ -134,7 +134,7 @@ int main( int argc, char** argv )
 
     CarParameterMap params;
     //load te parameters
-    CarParameters::LoadFromFile("gui_params.csv",params);
+    CarParameters::LoadFromFile("/Users/crh/data/gui_params.csv",params);
     carModel.Init((const struct aiScene *)terrainMesh.GetScene(),params,LocalPlanner::GetNumWorldsRequired(OPT_DIM));
 
 

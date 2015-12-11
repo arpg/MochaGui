@@ -82,7 +82,7 @@ void ViconReadFunc()
         //this is a blocking call
         double viconTime;
         Sophus::SE3d Twb = g_vicon.GetPose("CAR",true,&viconTime);
-        Eigen::Vector6d pose = mvl::T2Cart(Twb.matrix());
+        Eigen::Vector6d pose = fusion::T2Cart(Twb.matrix());
 
         if(g_bLog ){
             std::cout << "Vicon pose received at:" << viconTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
