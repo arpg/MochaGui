@@ -127,11 +127,11 @@ protected:
     std::vector<Eigen::MatrixXd*> m_vWayPoints;
     //vector<GLWayPoint*> m_vGLWayPoints;
     const GLWayPoint*m_pCurrentlySolving[2];
-    vector<GLLineStrip> m_vGLLineSegments;
-    vector<GLLineStrip> m_vTerrainLineSegments;
-    list<GLLineStrip*> m_lPlanLineSegments;
+    vector<GLCachedPrimitives> m_vGLLineSegments;
+    vector<GLCachedPrimitives> m_vTerrainLineSegments;
+    list<GLCachedPrimitives*> m_lPlanLineSegments;
     list<std::vector<VehicleState> *> m_lPlanStates;
-    GLLineStrip m_ControlLine;
+    GLCachedPrimitives* m_pControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
 
     LocalPlanner m_Planner; // Car planner for trajectory plotting

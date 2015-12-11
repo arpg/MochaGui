@@ -1,5 +1,6 @@
 #include <CarPlanner/LocalPlanner.h>
 #include <CarPlanner/CarController.h>
+#include <thread>
 
 #include "config.h"
 #include <fenv.h>
@@ -156,7 +157,7 @@ int main( int argc, char** argv )
 
     //this lambda expression captures all local variables by REFERENCE, therefore
     //it cannot go out of local scope (which it won't as we are in main)
-    boost::thread* pWorkThread = new boost::thread([&] {
+    std::thread* pWorkThread = new std::thread([&] {
     bool bComputeNewPath = false;
     while(1){
         usleep(1000);
@@ -308,7 +309,6 @@ int main( int argc, char** argv )
         }
     }
 
-    pWorkThread->interrupt();
     pWorkThread->join();
 
     return 0;

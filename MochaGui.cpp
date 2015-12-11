@@ -63,7 +63,7 @@ MochaGui::MochaGui() :
 ////////////////////////////////////////////////////////////////
 MochaGui::~MochaGui()
 {
-    for (list<GLLineStrip*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
+    for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
         delete *iter;
     }
     _KillThreads();
@@ -177,7 +177,7 @@ void MochaGui::_PlaybackLog(double dt)
             for(const VehicleState& state : m_vSegmentSamples[ii].m_vStates) {
                 vTraj.push_back(state.m_dTwv.translation());
             }
-            m_vTerrainLineSegments[ii].SetPointsFromTrajectory(vTraj);
+            m_vTerrainLineSegments[ii].AddVerticesFromTrajectory(vTraj);
         }
         //set the initial playback timer
         m_dPlaybackTimer = msg.timestamp();
@@ -284,6 +284,11 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bVicon, std::s
     if(bVicon){
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                          0,-1,0,0,
+                                                         0,0,-1,0,
+                                                         0,0,0,1);
+    } else {
+      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+                                                         0,1,0,0,
                                                          0,0,-1,0,
                                                          0,0,0,1);
     }
@@ -616,11 +621,11 @@ void MochaGui::_RefreshWaypoints()
     }
 
     for(size_t ii = 0; ii < m_vGLLineSegments.size() ; ii++){
-        m_vGLLineSegments[ii].ClearLines();
+        m_vGLLineSegments[ii].Clear();
     }
 
     for(size_t ii = 0; ii < m_vTerrainLineSegments.size() ; ii++){
-        m_vTerrainLineSegments[ii].ClearLines();
+        m_vTerrainLineSegments[ii].Clear();
     }
 
     m_vSegmentSamples.resize(m_Path.size()-1);
@@ -668,9 +673,9 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
         }
         {
             //std::unique_lock<std::mutex> lock(m_DrawMutex);
-            m_ControlLine.ClearLines();
-            for (list<GLLineStrip*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
-                (*iter)->ClearLines();
+            m_pControlLine->Clear();
+            for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
+                (*iter)->Clear();
             }
         }
         m_bSimulate3dPath = false;
@@ -686,7 +691,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
     case eMochaTogglePlans:
         {
             //std::unique_lock<std::mutex> lock(m_DrawMutex);
-            for (list<GLLineStrip*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
+            for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
                 (*iter)->SetVisible(!(*iter)->IsVisible());
             }
         }
@@ -696,9 +701,9 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
         {
             //std::unique_lock<std::mutex> lock(m_DrawMutex);
             m_Gui.ClearCarTrajectory(m_nDriveCarId);
-            m_ControlLine.ClearLines();
-            for (GLLineStrip*& strip: m_lPlanLineSegments) {
-                strip->ClearLines();
+            m_pControlLine->Clear();
+            for (GLCachedPrimitives*& strip: m_lPlanLineSegments) {
+                strip->Clear();
             }
 
             for(std::vector<VehicleState>*& pStates : m_lPlanStates){
@@ -781,7 +786,7 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
     *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
     if(m_lPlanStates.front()->size() !=0) {
         //push everything back
-        GLLineStrip* pStrip = m_lPlanLineSegments.front();
+        GLCachedPrimitives* pStrip = m_lPlanLineSegments.front();
         m_lPlanLineSegments.pop_front();
         std::vector<VehicleState>* vStates = m_lPlanStates.front();
         m_lPlanStates.pop_front();
@@ -792,7 +797,7 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
         for(const VehicleState& state : *vStates){
             vPts.push_back(state.m_dTwv.translation());
         }
-        m_lPlanLineSegments.back()->SetPointsFromTrajectory(vPts);
+        m_lPlanLineSegments.back()->AddVerticesFromTrajectory(vPts);
         m_lPlanLineSegments.back()->SetColor(GLColor::HsvColor(m_dCurrentHue,1.0,0.8));
         m_dCurrentHue += 0.05;
         if(m_dCurrentHue > 1.0){
@@ -802,10 +807,10 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 
 
         //create a line that points to the intended destination
-        m_ControlLine.ClearLines();
-        m_ControlLine.SetPoint(pPlan->m_StartState.m_dTwv.translation());
-        m_ControlLine.SetPoint(pPlan->m_GoalState.m_dTwv.translation());
-        m_ControlLine.SetColor(GLColor(1.0f,1.0f,1.0f));
+        m_pControlLine->Clear();
+        m_pControlLine->AddVertex(pPlan->m_StartState.m_dTwv.translation());
+        m_pControlLine->AddVertex(pPlan->m_GoalState.m_dTwv.translation());
+        m_pControlLine->SetColor(GLColor(1.0f,1.0f,1.0f));
 
         m_DestAxis.SetPose(pPlan->m_GoalState.m_dTwv.matrix());
         m_DestAxis.SetAxisSize(pPlan->m_GoalState.m_dV.norm());
@@ -1017,9 +1022,9 @@ void MochaGui::_ControlFunc()
 
         while(m_StillControl) {
 
-            m_ControlLine.ClearLines();
-            for (GLLineStrip*& pStrip: m_lPlanLineSegments) {
-                pStrip->ClearLines();
+            m_pControlLine->Clear();
+            for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
+                pStrip->Clear();
             }
             m_bControllerRunning = false;
 
@@ -1474,17 +1479,17 @@ void MochaGui::_PlannerFunc() {
 
                         if (m_bCompute3dPath == true ) {
                             success =  res;
-                            m_vGLLineSegments[ii].SetPointsFromTrajectory(vControlTrajectory);
-                            m_vTerrainLineSegments[ii].SetPointsFromTrajectory(vActualTrajectory);
+                            m_vGLLineSegments[ii].AddVerticesFromTrajectory(vControlTrajectory);
+                            m_vTerrainLineSegments[ii].AddVerticesFromTrajectory(vActualTrajectory);
                         }else {
                             success = true;
                         }
 
                         // draw simple 2d path projected onto surface first since it's fast
                         if (m_bShowProjectedPath) {
-                            m_vGLLineSegments[ii].SetPointsFromTrajectory(vControlTrajectory);
+                            m_vGLLineSegments[ii].AddVerticesFromTrajectory(vControlTrajectory);
                         }else {
-                            m_vGLLineSegments[ii].ClearLines();
+                            m_vGLLineSegments[ii].Clear();
                         }
                     }
 
@@ -1535,15 +1540,15 @@ void MochaGui::_PopulateSceneGraph() {
 
     //maximum number of plans
     m_lPlanLineSegments.resize(25);
-    for (GLLineStrip*& pStrip: m_lPlanLineSegments) {
-        pStrip = new GLLineStrip();
+    for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
+        pStrip = new GLCachedPrimitives();
         m_Gui.AddGLObject(pStrip);
         pStrip->SetColor(GLColor(0.0f, 1.0f, 0.0f));
     }
 
 
     m_Gui.AddGLObject(&m_DestAxis);
-    m_Gui.AddGLObject(&m_ControlLine);
+    m_Gui.AddGLObject(m_pControlLine);
     m_Gui.AddPanel(&m_GuiPanel);
 }
 

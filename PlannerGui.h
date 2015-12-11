@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include "CarPlanner/CarPlannerCommon.h"
 #include "CarPlanner/BulletCarModel.h"
-#include "boost/thread.hpp"
+#include <mutex>
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"
 #include "GLCar.h"
@@ -48,7 +48,7 @@ public:
         Eigen::Vector2d m_dPos2D;
     };
 
-    struct Car : boost::mutex
+    struct Car : std::mutex
     {
         SceneGraph::GLLineStrip m_CarLineSegments;
         GLCar m_GLCar;
@@ -140,7 +140,7 @@ private:
     std::vector<GLWidgetPanel*> m_vWidgetPanels;
 
     Car* m_pFollowCar;
-    boost::mutex m_DrawMutex;
+    std::mutex m_DrawMutex;
     PlannerViewType m_eViewType;
     int m_nSelectedWaypoint;
 };
