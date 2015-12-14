@@ -11,6 +11,7 @@
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLMesh.h>
 #include <CVars/CVar.h>
+#include "Messages.pb.h"
 #include <CarPlanner/CarPlannerCommon.h>
 #include <CarPlanner/BulletCarModel.h>
 #include <CarPlanner/Localizer.h>

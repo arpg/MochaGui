@@ -3,21 +3,23 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_io.hpp>
 #include <boost/lexical_cast.hpp>
-#include <Node/Node.h>
+#include <node/Node.h>
+
+#include "Messages.pb.h"
 #include <CarPlanner/BulletCarModel.h>
 #include <CarPlanner/Localizer.h>
+#include <SensorFusion/SE3.h>
 
 #include "config.h"
 #include "GetPot"
-#include "Messages.pb.h"
-#include "SE3.h"
 #include "JoystickHandler.h"
 #include "EventLogger.h"
 
+
 double g_dStartTime = Tic();
 Localizer g_localizer;
-node::node g_node;
 EventLogger logger;
+node::node g_node;
 bool g_bLog = false;
 JoystickHandler joystick;
 
@@ -44,7 +46,7 @@ void JoystickFunc()
         command.m_dPhi = joystickPhi;
         if(g_bLog ){
             logger.LogControlCommand(command);
-            std::cout << "Joystick commands logged at:" << Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]" << std::endl;
+            LOG(INFO) << "Joystick commands logged at:" << Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]";
         }
 
         CommandMsg Req;
@@ -125,7 +127,7 @@ int main( int argc, char** argv )
     g_node.init("logger");
 
     g_node.subscribe("herbie/Imu");
-    g_localizer.TrackObject("CAR", "192.168.10.1",Sophus::SE3d(dT_localizer_ref).inverse(),true);
+    g_localizer.TrackObject("CAR", "posetonode",Sophus::SE3d(dT_localizer_ref).inverse(),true);
     g_localizer.Start();
 
     boost::thread* pImuThread = new boost::thread(boost::bind(ImuReadFunc));

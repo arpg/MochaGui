@@ -428,8 +428,8 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
         }
     }
 
-    m_sCarObjectName = "CAR";
-    m_Localizer.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_localizer_ref).inverse());
+    m_sCarObjectName = "NinjaCar";
+    m_Localizer.TrackObject(m_sCarObjectName, "posetonode",Sophus::SE3d(dT_localizer_ref).inverse());
 
     //initialize the panel
     m_GuiPanel.Init();

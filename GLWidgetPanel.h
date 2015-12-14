@@ -3,7 +3,7 @@
 
 
 #include <CarPlanner/RigidBody.h>
-#include "SE3.h"
+#include <SensorFusion/SE3.h>
 
 
 /*

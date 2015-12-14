@@ -13,6 +13,8 @@
 #include <atomic>
 #include <thread>
 
+#include "Messages.pb.h"
+
 #include <CarPlanner/CarController.h>
 #include <CarPlanner/LocalPlanner.h>
 #include <CarPlanner/CarRegressor.h>
@@ -25,7 +27,6 @@
 #include "GLBulletDebugDrawer.h"
 
 
-#include "Messages.pb.h"
 #include "SensorFusion/SensorFusionCeres.h"
 #include "GLGuiPanel.h"
 #include "assimp/DefaultLogger.hpp"

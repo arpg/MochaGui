@@ -5,7 +5,7 @@ LearningGui *g_pLearningGuiInstance = NULL;
 //static int& g_nLocalizerDownsampler = CVarUtils::CreateGetCVar("debug.LocalizerDownsampler",0);
 /////////////////////////////////////////////////////////////////////////////////////////
 LearningGui::LearningGui() :
-    m_sCarObjectName("CAR"),
+    m_sCarObjectName("NinjaCar"),
     m_dT(CreateCVar("learning.TimeInteval", 0.005, "")),
     m_dImuRate(0),
     m_dLocalizerRate(0),
@@ -422,7 +422,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
 
         m_Node.subscribe("herbie/Imu");
         //dT_localizer_ref.block<3,3>(0,0).transposeInPlace();
-        m_Localizer.TrackObject(m_sCarObjectName, "192.168.10.1",Sophus::SE3d(dT_localizer_ref).inverse(),true);
+        m_Localizer.TrackObject(m_sCarObjectName, "posetonode",Sophus::SE3d(dT_localizer_ref).inverse(),true);
         m_Localizer.Start();
 
         m_pImuThread = new boost::thread(boost::bind(&LearningGui::_ImuReadFunc,this));

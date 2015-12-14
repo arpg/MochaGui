@@ -4,7 +4,7 @@
 #include <SimpleGui/Gui.h>
 #include <SimpleGui/GLObject.h>
 #include <SimpleGui/GLMesh.h>
-#include "SE3.h"
+#include <SensorFusion/SE3.h>
 #include "WayPoint.h"
 
 
