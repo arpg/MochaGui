@@ -5,10 +5,10 @@
 #include <boost/lexical_cast.hpp>
 #include <node/Node.h>
 
-#include "Messages.pb.h"
+#include "CarMessages.pb.h"
 #include <CarPlanner/BulletCarModel.h>
 #include <CarPlanner/Localizer.h>
-#include <SensorFusion/SE3.h>
+#include <CarPlanner/SE3.h>
 
 #include "config.h"
 #include "GetPot"

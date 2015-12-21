@@ -11,7 +11,7 @@
 #include <SceneGraph/SceneGraph.h>
 #include <SceneGraph/GLMesh.h>
 #include <CVars/CVar.h>
-#include "Messages.pb.h"
+#include "CarMessages.pb.h"
 #include <CarPlanner/CarPlannerCommon.h>
 #include <CarPlanner/BulletCarModel.h>
 #include <CarPlanner/Localizer.h>
@@ -22,7 +22,7 @@
 #include "JoystickHandler.h"
 #include "PlannerGui.h"
 #include "GLBulletDebugDrawer.h"
-#include "Messages.pb.h"
+#include "CarMessages.pb.h"
 #include "GLLearningPanel.h"
 #include "ProcessModelFusion.h"
 #include "EventLogger.h"

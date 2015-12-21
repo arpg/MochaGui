@@ -13,7 +13,10 @@
 #include <atomic>
 #include <thread>
 
-#include "Messages.pb.h"
+#include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
+
+#include "CarMessages.pb.h"
 
 #include <CarPlanner/CarController.h>
 #include <CarPlanner/LocalPlanner.h>
@@ -42,11 +45,7 @@ extern float g_fSpeed;
 
 
 
-#define DEFAULT_MAP_NAME "room.heightmap"
-#define DEFAULT_MAP_IMAGE_NAME "room.image"
-#define SAVED_MAP_NAME "room2.heightmap"
-
-#define PARAMS_FILE_NAME "gui_params.csv"
+#define PARAMS_FILE_NAME "/Users/crh/data/params.csv"
 
 
 class MochaGui {
@@ -63,7 +62,6 @@ public:
 
 protected:
     MochaGui();
-    void _FixGround();
     bool _SetWaypointVel(std::vector<std::string> *vArgs);
     bool _Refresh(std::vector<std::string> *vArgs);
     void _RefreshWaypoints();
@@ -102,13 +100,6 @@ protected:
     static bool RefreshHandler(std::vector<std::string> *vArgs) { return GetInstance()->_Refresh(vArgs); }
     static bool CommandHandler(MochaCommands command) { return GetInstance()->_CommandFunc(command); }
 
-
-    //heightmap variable
-    //MeshHeightMap m_MeshHeightMap;
-    //PeaksHeightMap m_PeaksHeightMap;
-    //GLHeightMap m_GLHeightMap;
-    //KinectHeightMap m_KHeightMap;
-    //HeightMap &m_ActiveHeightMap;
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;
@@ -178,13 +169,13 @@ protected:
     std::string m_sCarObjectName;
     //std::vector<MochaEntity> m_vEntities;
 
-    std::thread* m_pPlannerThread;
-    std::thread* m_pPhysicsThread;
-    std::thread* m_pControlThread;
-    std::thread* m_pCommandThread;
-    std::thread* m_pLearningThread;
-    std::thread* m_pImuThread;
-    std::thread* m_pLocalizerThread;
+    boost::thread* m_pPlannerThread;
+    boost::thread* m_pPhysicsThread;
+    boost::thread* m_pControlThread;
+    boost::thread* m_pCommandThread;
+    boost::thread* m_pLearningThread;
+    boost::thread* m_pImuThread;
+    boost::thread* m_pLocalizerThread;
 
     ControlCommand m_ControlCommand;
     double m_dTargetVel;
@@ -212,8 +203,8 @@ protected:
     node::node m_Node;   //node for capturing IMU data from the car
     ProcessModelFusion m_Fusion;
 
-    std::mutex m_ControlMutex;
-    std::mutex m_DrawMutex;
+    boost::mutex m_ControlMutex;
+    boost::mutex m_DrawMutex;
 
     PlannerGui m_Gui;
 

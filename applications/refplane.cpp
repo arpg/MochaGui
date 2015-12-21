@@ -6,11 +6,11 @@
 #include <Node/Node.h>
 #include <CarPlanner/RpgUtils.h>
 #include <CarPlanner/Localizer.h>
-#include <SensorFusion/SE3.h>
+#include <CarPlanner/SE3.h>
 
 #include "config.h"
 #include "GetPot"
-#include "Messages.pb.h"
+#include "CarMessages.pb.h"
 
 Localizer g_localizer;
 

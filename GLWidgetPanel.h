@@ -1,9 +1,7 @@
 #ifndef GLWIDGETPANEL_H
 #define GLWIDGETPANEL_H
 
-
 #include <CarPlanner/RigidBody.h>
-#include <SensorFusion/SE3.h>
 
 
 /*

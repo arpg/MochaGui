@@ -5,7 +5,7 @@
 #include "CarPlanner/CarPlannerCommon.h"
 #include "CarPlanner/BulletCarModel.h"
 #include "CarPlanner/CarController.h"
-#include "Messages.pb.h"
+#include "CarMessages.pb.h"
 
 
 class EventLogger

@@ -38,15 +38,11 @@ PlannerGui::~PlannerGui()
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::Render()
 {
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
     m_pView->ActivateScissorAndClear();
 
     if(m_pFollowCar != NULL){
         m_RenderState.Follow(OpenGlMatrix(m_pFollowCar->m_GLCar.GetPose4x4_po()));
     }
-
-    //TODO: remove this and debug the GL problem that's occuring
-    glGetError();
 
     // Swap frames and Process Events
     pangolin::FinishGlutFrame();
@@ -193,7 +189,6 @@ int PlannerGui::AddStatusLine(StatusLineLocation location)
     statusLine->m_Location = location;
     statusLine->m_GLText.SetPosition(pos[0],pos[1]);
 
-    //boost::mutex::scoped_lock lock(m_DrawMutex);
     m_SceneGraph2d.AddChild(&statusLine->m_GLText);
 
     return m_vStatusLines.size()-1;
@@ -239,7 +234,7 @@ int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth)
 void PlannerGui::SetCarState(const int &id, const VehicleState &state, bool bAddToTrajectory /* = false */)
 {
     Car* pCar = m_vCars[id];
-    std::unique_lock<std::mutex> lock(*pCar);
+    boost::mutex::scoped_lock lock(*pCar);
 
     Sophus::SE3d state_aug = state.m_dTwv;
     state_aug.translation() -= GetBasisVector(state_aug,2)*0.05;

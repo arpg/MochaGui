@@ -40,7 +40,6 @@ MochaGui::MochaGui() :
     m_bFuseImu(CreateCVar("planner.FuseImu", true)),
     m_nPathSegments(CreateCVar("planner.PathSegments", 20u, "how many segments to draw")),
     m_dTimeInterval(CreateCVar("planner.TimeInteval", 0.01, "")),
-
     m_pPlannerThread(0),
     m_pPhysicsThread(0),
     m_pControlThread(0),
@@ -48,14 +47,16 @@ MochaGui::MochaGui() :
     m_pImuThread(0),
     m_pLocalizerThread(0),
     m_bLoggerEnabled(CreateUnsavedCVar("logger.Enabled", false, "")),
-    m_sLogFileName(CreateUnsavedCVar("logger.FileName", std::string(), "")),
+
+    m_sLogFileName(CreateUnsavedCVar("logger.FileName", std::string(), "/Users/crh/data/mocha.log")),
     m_bFusionLoggerEnabled(CreateUnsavedCVar("logger.FusionEnabled", false, "")),
     m_bLoggerPlayback(CreateUnsavedCVar("logger.Playback", false, "")),
     m_nNumControlSignals(0),
     m_nNumPoseUpdates(0),
     m_dPlaybackTimer(-1),
     m_Fusion(30,&m_DriveCarModel),
-    m_dPlanTime(Tic())//the size of the fusion sensor
+    m_bLoadWaypoints(CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.")),
+    m_dPlanTime(Tic()) //the size of the fusion sensor
 {
     m_Node.init("MochaGui");
 }
@@ -97,10 +98,10 @@ void MochaGui::Run() {
     while( !pangolin::ShouldQuit() )
     {
 
-        {
-            std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock);
-            m_Gui.Render();
-        }
+      {
+        boost::mutex::scoped_lock lock(m_DrawMutex);
+        m_Gui.Render();
+      }
 
         usleep(1e6/100.0);
 
@@ -243,8 +244,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
 {
     m_sPlaybackLogFile = sLogFile;
 
-    dout ("Initializing MochaGui");
-    m_Node.subscribe("herbie/Imu");
+    //m_Node.subscribe("herbie/Imu");
 
     m_dStartTime = Tic();
     m_bAllClean = false;
@@ -279,7 +279,6 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
     //initialize the car model
 
     const aiScene *pScene = aiImportFile( sMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-    std::cout << aiGetErrorString() << std::endl;
 
     if(bLocalizer){
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
@@ -485,31 +484,31 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
 void MochaGui::_StartThreads()
 {
     //recreate the threads
-    m_pPlannerThread = new std::thread(std::bind(&MochaGui::_PlannerFunc,this));
-    m_pPhysicsThread = new std::thread(std::bind(&MochaGui::_PhysicsFunc,this));
-    m_pControlThread = new std::thread(std::bind(&MochaGui::_ControlFunc,this));
+    m_pPlannerThread = new boost::thread(std::bind(&MochaGui::_PlannerFunc,this));
+    m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
+    m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
     if(m_eControlTarget == eTargetExperiment){
-        m_pCommandThread = new std::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
+        m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
     }
     if(m_eControlTarget == eTargetSimulation){
         if(m_pImuThread != NULL){
-            // m_pImuThread->interrupt(); //don't know what eTargetSim does yet -crh
+            m_pImuThread->interrupt();
             m_pImuThread->join();
         }
 
         if(m_pLocalizerThread) {
-            // m_pLocalizerThread->interrupt(); //same as above -crh
+            m_pLocalizerThread->interrupt();
             m_pLocalizerThread->join();
         }
     }else{
         m_Localizer.Start();
 
         if(m_pImuThread == NULL){
-            m_pImuThread = new std::thread(std::bind(&MochaGui::_ImuReadFunc,this));
+            m_pImuThread = new boost::thread(std::bind(&MochaGui::_ImuReadFunc,this));
         }
 
         if(m_pLocalizerThread == NULL){
-            m_pLocalizerThread = new std::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
+            m_pLocalizerThread = new boost::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
         }
     }
 
@@ -672,7 +671,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
             usleep(1000);
         }
         {
-            //std::unique_lock<std::mutex> lock(m_DrawMutex);
+            //boost::mutex::scoped_lock lock(m_DrawMutex);
             m_pControlLine->Clear();
             for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
                 (*iter)->Clear();
@@ -690,7 +689,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
     case eMochaTogglePlans:
         {
-            //std::unique_lock<std::mutex> lock(m_DrawMutex);
+            //boost::mutex::scoped_lock lock(m_DrawMutex);
             for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
                 (*iter)->SetVisible(!(*iter)->IsVisible());
             }
@@ -699,7 +698,7 @@ bool MochaGui::_CommandFunc(MochaCommands command) {
 
     case eMochaClear:
         {
-            //std::unique_lock<std::mutex> lock(m_DrawMutex);
+            //boost::mutex::scoped_lock lock(m_DrawMutex);
             m_Gui.ClearCarTrajectory(m_nDriveCarId);
             m_pControlLine->Clear();
             for (GLCachedPrimitives*& strip: m_lPlanLineSegments) {
@@ -780,7 +779,7 @@ void MochaGui::_UpdateVisuals()
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 {
-    //std::unique_lock<std::mutex> lock(m_DrawMutex);
+    //boost::mutex::scoped_lock lock(m_DrawMutex);
     //get the current plans and draw them
     Sophus::SE3d dTwv1,dTwv2;
     *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
@@ -892,7 +891,7 @@ void MochaGui::_LocalizerReadFunc()
             if(g_bProcessModelActive){
                 ControlCommand command;
                 {
-                    std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+                    boost::mutex::scoped_lock lock(m_ControlMutex);
                     command = m_ControlCommand;
                 }
                 m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
@@ -961,7 +960,7 @@ void MochaGui::_ControlCommandFunc()
             //get commands from the controller, apply to the car and update the position
             //of the car in the controller
             {
-                std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+                boost::mutex::scoped_lock lock(m_ControlMutex);
                 double dCurrentTime = Tic();
                 m_Controller.GetCurrentCommands(dCurrentTime,
                                                 m_ControlCommand,
@@ -1096,7 +1095,7 @@ void MochaGui::_ControlFunc()
                     _UpdateVehicleStateFromFusion(currentState);
                     //set the command history and current pose on the controller
                     {
-                        std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+                        boost::mutex::scoped_lock lock(m_ControlMutex);
                         m_Controller.SetCurrentPose(currentState,&m_DriveCarModel.GetCommandHistoryRef(0));
                     }
                 }else{
@@ -1276,7 +1275,7 @@ void MochaGui::_PhysicsFunc()
 
                     //get the current commands
                     {
-                        std::unique_lock<std::mutex> lock(m_ControlMutex, std::try_to_lock);
+                        boost::mutex::scoped_lock lock(m_ControlMutex);
 
                         if(m_bPause == false && g_bInfiniteTime == false){
                             m_dPlanTime = Tic();
@@ -1358,7 +1357,7 @@ void MochaGui::_PlannerFunc() {
     // now add line segments
     bool previousOpenLoopSetting = m_bPlannerOn;
     while (1) {
-        //std::this_thread::interruption_point();
+        boost::this_thread::interruption_point();
 
         //if the use has changed the openloop setting, dirty all
         //the waypoints
@@ -1397,7 +1396,7 @@ void MochaGui::_PlannerFunc() {
 
                 {
                     //lock the drawing look as we will be modifying things here
-                    std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock);
+                    boost::mutex::scoped_lock lock(m_DrawMutex);
                     if(a->GetDirty()) {
                         Sophus::SE3d pose(a->GetPose4x4_po());
                         if(m_DriveCarModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
@@ -1475,7 +1474,7 @@ void MochaGui::_PlannerFunc() {
                         numInterations++;
 
                         //lock the mutex as this next bit will modify object
-                        std::unique_lock<std::mutex> lock(m_DrawMutex, std::try_to_lock );
+                        boost::mutex::scoped_lock lock(m_DrawMutex);
 
                         if (m_bCompute3dPath == true ) {
                             success =  res;

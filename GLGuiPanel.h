@@ -134,7 +134,10 @@ public:
                             fileNames[ii] = vFileNames->at(ii).c_str();
                         }
 
-                        m_Ui.doComboBox(comboRect,vFileNames->size(),fileNames,GetVar<int*>("planner:SelectedFileName"));
+                        std::cout << vFileNames->size() << std::endl;
+                        if(vFileNames->size() != 0) {
+                          m_Ui.doComboBox(comboRect,vFileNames->size(),fileNames,GetVar<int*>("planner:SelectedFileName"));
+                        }
                         delete[] fileNames;
                         m_Ui.doButton(buttonRect,"Load",GetVar<bool*>("planner:LoadWaypoints"));
                     m_Ui.endGroup();

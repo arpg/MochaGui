@@ -9,7 +9,7 @@
 // Hermes node
 /*
 #include "../../Hermes1.0/Node.h"
-#include "Messages.pb.h"
+#include "CarMessages.pb.h"
 
 extern float g_fTurnrate;
 extern float g_fSpeed;

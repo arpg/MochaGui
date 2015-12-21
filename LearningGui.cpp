@@ -446,8 +446,8 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
     state.m_dTwv = Sophus::SE3d(fusion::Cart2T(-5,0,-0.05,0,0,0));
     m_DriveCarModel.SetState(0,state);
 
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', boost::bind(&LearningGui::_CommandHandler, this, eMochaRestart) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', boost::bind(&LearningGui::_CommandHandler, this, eMochaClear) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(&LearningGui::_CommandHandler, this, eMochaRestart) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(&LearningGui::_CommandHandler, this, eMochaClear) );
     pangolin::RegisterKeyPressCallback( '\r', [this]() {this->m_bStep = true;} );
     pangolin::RegisterKeyPressCallback( ' ', [this]() {this->m_bPaused = !this->m_bPaused;} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(LEARNING_PARAMS_FILE_NAME),m_mParameters);} );

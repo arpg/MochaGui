@@ -63,7 +63,7 @@ add_subdirectory(Gamepad)
 
 
 include_directories( ${CMAKE_BINARY_DIR} )
-PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS Messages.proto )
+PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS CarMessages.proto )
 
 
 set( _INCLUDE_DIRS
@@ -115,7 +115,7 @@ set( SHARED_SRC PlannerGui.cpp
                 ProcessModelFusion.cpp
                 JoystickHandler.cpp
                 EventLogger.cpp
-                Messages.pb.cc
+                CarMessages.pb.cc
                 #Vicon.cpp
                 )
 
@@ -136,7 +136,7 @@ set( LEARNING_HDRS  config.h.in
 set( LEARNING_SRC
                   LearningGui.cpp )
 
-add_executable(  logger applications/logger.cpp Messages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
+              add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
 target_link_libraries( logger ${LIBRARIES} )
 
 add_executable(  refplane applications/refplane.cpp ${SHARED_HDRS} ${SHARED_SRC} )

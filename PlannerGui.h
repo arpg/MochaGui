@@ -48,7 +48,7 @@ public:
         Eigen::Vector2d m_dPos2D;
     };
 
-    struct Car : std::mutex
+    struct Car : boost::mutex
     {
         SceneGraph::GLLineStrip m_CarLineSegments;
         GLCar m_GLCar;
@@ -140,7 +140,6 @@ private:
     std::vector<GLWidgetPanel*> m_vWidgetPanels;
 
     Car* m_pFollowCar;
-    std::mutex m_DrawMutex;
     PlannerViewType m_eViewType;
     int m_nSelectedWaypoint;
 };

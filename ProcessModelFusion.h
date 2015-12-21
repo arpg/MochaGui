@@ -5,7 +5,7 @@
 #include <CarPlanner/BulletCarModel.h>
 
 #include <SensorFusion/SensorFusionCeres.h>
-#include <SensorFusion/SE3.h>
+#include <CarPlanner/SE3.h>
 
 class ProcessModelFusion : public fusion::SensorFusionCeres
 {
