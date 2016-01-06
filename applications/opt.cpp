@@ -76,7 +76,7 @@ bool CanContinue(const bool bPaused, bool& bStep){
 int main( int argc, char** argv )
 {
     g_dSuccessNorm = 1e-10;
-    bool bPaused = false, bStep = false;
+    bool bPaused = true, bStep = false;
     bool bPlannerOn = true, bControllerOn = true;
     float fLookaheadTime = 1.5, fStartCurvature = 0.0;
     double dNorm = 0, dActualLookahead = fLookaheadTime;
@@ -135,7 +135,7 @@ int main( int argc, char** argv )
 
     CarParameterMap params;
     //load te parameters
-    CarParameters::LoadFromFile("/Users/crh/data/gui_params.csv",params);
+    CarParameters::LoadFromFile("/Users/crh/data/params.csv",params);
     carModel.Init((const struct aiScene *)terrainMesh.GetScene(),params,LocalPlanner::GetNumWorldsRequired(OPT_DIM));
 
 

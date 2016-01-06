@@ -27,7 +27,7 @@
 #include "ProcessModelFusion.h"
 #include "EventLogger.h"
 
-#define LEARNING_PARAMS_FILE_NAME "learning_params.csv"
+#define LEARNING_PARAMS_FILE_NAME "/Users/crh/data/params.csv"
 
 using namespace CVarUtils;
 

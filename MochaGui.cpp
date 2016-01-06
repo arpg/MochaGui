@@ -98,6 +98,12 @@ void MochaGui::Run() {
     while( !pangolin::ShouldQuit() )
     {
 
+//      // Added by crh.
+//      VehicleState currentState;
+//      m_DriveCarModel.GetVehicleState(0,currentState);
+//      m_Gui.SetCarState(m_nDriveCarId,currentState);
+//      // end added
+
       {
         boost::mutex::scoped_lock lock(m_DrawMutex);
         m_Gui.Render();
@@ -244,7 +250,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
 {
     m_sPlaybackLogFile = sLogFile;
 
-    //m_Node.subscribe("herbie/Imu");
+    m_Node.subscribe("herbie/Imu");
 
     m_dStartTime = Tic();
     m_bAllClean = false;
@@ -478,6 +484,8 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
     T_ic << -0.003988648232, 0.003161519861,  0.02271876324, -0.02824564077, -0.04132003806,   -1.463881523;
     m_Fusion.SetCalibrationPose(Sophus::SE3d(fusion::Cart2T(T_ic)));
     m_Fusion.SetCalibrationActive(false);
+    //dout("Sucessfully initialized MochaGui object.");
+    m_pControlLine = new GLCachedPrimitives();
 }
 
 ////////////////////////////////////////////////////////////////
@@ -628,8 +636,8 @@ void MochaGui::_RefreshWaypoints()
     }
 
     m_vSegmentSamples.resize(m_Path.size()-1);
-    //m_vGLLineSegments.resize(m_Path.size()-1);
-    //m_vTerrainLineSegments.resize(m_Path.size()-1);
+    m_vGLLineSegments.resize(m_Path.size()-1);
+    m_vTerrainLineSegments.resize(m_Path.size()-1);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -867,6 +875,7 @@ void MochaGui::_LocalizerReadFunc()
     int numPoses = 0;
     int counter = 1;
     //double localizerTime = 0;
+    m_Localizer.Start();
 
     while(1){
         //this is a blocking call
@@ -919,6 +928,9 @@ void MochaGui::_ImuReadFunc()
     double lastTime = Tic();
     int numPoses = 0;
 
+    std::cout << "ImuReadFunc currently disabled." << std::endl;
+
+    /*
     while(1){
         Imu_Accel_Gyro Msg;
         //this needs to be a blocking call .. not sure it is!!!
@@ -947,6 +959,7 @@ void MochaGui::_ImuReadFunc()
             numPoses++;
         }
     }
+    */
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -994,7 +1007,7 @@ void MochaGui::_ControlCommandFunc()
             Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
             Req.set_phi(m_ControlCommand.m_dPhi);
             double time = Tic();
-            m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
+            //m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
             m_dControlDelay = Toc(time);
         }
 
@@ -1523,32 +1536,31 @@ void MochaGui::_PlannerFunc() {
 
 ////////////////////////////////////////////////////////////////
 void MochaGui::_PopulateSceneGraph() {
-    _RefreshWaypoints();
+  _RefreshWaypoints();
 
-    m_vGLLineSegments.resize(m_Path.size() - 1);
-    for (size_t ii = 0; ii < m_vGLLineSegments.size(); ii++) {
-        m_Gui.AddGLObject(&m_vGLLineSegments[ii],true);
-    }
+  m_vGLLineSegments.resize(m_Path.size() - 1);
+  for (size_t ii = 0; ii < m_vGLLineSegments.size(); ii++) {
+    m_vGLLineSegments[ii].SetColor(GLColor(0.0f,0.0f,0.0f));
+    m_vGLLineSegments[ii].SetIgnoreDepth(true);
+    m_Gui.AddGLObject(&m_vGLLineSegments[ii],true);
+  }
 
-    // also add segments for curve that takes terrain into account
-    m_vTerrainLineSegments.resize(m_Path.size() - 1);
-    for (size_t ii = 0; ii < m_vTerrainLineSegments.size(); ii++) {
-        m_Gui.AddGLObject(&m_vTerrainLineSegments[ii]);
-        m_vTerrainLineSegments[ii].SetColor(GLColor(1.0f, 0.0f, 0.0f));
-    }
+  // also add segments for curve that takes terrain into account
+  m_vTerrainLineSegments.resize(m_Path.size() - 1);
+  for (size_t ii = 0; ii < m_vTerrainLineSegments.size(); ii++) {
+    m_Gui.AddGLObject(&m_vTerrainLineSegments[ii]);
+    m_vTerrainLineSegments[ii].SetColor(GLColor(1.0f, 0.0f, 0.0f));
+  }
 
-    //maximum number of plans
-    m_lPlanLineSegments.resize(25);
-    for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
-        pStrip = new GLCachedPrimitives();
-        m_Gui.AddGLObject(pStrip);
-        pStrip->SetColor(GLColor(0.0f, 1.0f, 0.0f));
-    }
+  //maximum number of plans
+  m_lPlanLineSegments.resize(25);
+  for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
+    pStrip = new GLCachedPrimitives();
+    m_Gui.AddGLObject(pStrip);
+    pStrip->SetColor(GLColor(0.0f, 1.0f, 0.0f));
+  }
 
-
-    m_Gui.AddGLObject(&m_DestAxis);
-    m_Gui.AddGLObject(m_pControlLine);
-    m_Gui.AddPanel(&m_GuiPanel);
+  m_Gui.AddGLObject(&m_DestAxis);
+  //m_Gui.AddGLObject(m_pControlLine);
+  m_Gui.AddPanel(&m_GuiPanel);
 }
-
-
