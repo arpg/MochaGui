@@ -390,9 +390,9 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
     m_TerrainMesh.SetAlpha(1.0);
     m_Gui.Init(&m_TerrainMesh);
 
-    m_pGraphView = &pangolin::Plotter(&m_Log)
-            .SetBounds(0.0, 0.3, 0.6, 1.0);
-    pangolin::DisplayBase().AddDisplay(*m_pGraphView);
+//    m_pGraphView = &pangolin::Plotter(&m_Log)
+//            .SetBounds(0.0, 0.3, 0.6, 1.0);
+//    pangolin::DisplayBase().AddDisplay(*m_pGraphView);
 
     m_nDriveCarId = m_Gui.AddCar(m_mDefaultParameters[CarParameters::WheelBase],m_mDefaultParameters[CarParameters::Width]);
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
