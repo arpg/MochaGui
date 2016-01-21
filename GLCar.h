@@ -43,9 +43,12 @@ public:
         if (m_eCarDrawType != eTriangle) {
             //initialize the body mesh
             const struct aiScene* pBodyMesh;
-            pBodyMesh = aiImportFile("/Users/crh/data/herbie.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
+            pBodyMesh = aiImportFile("/Users/crh/data/herbie.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals
+                                     | aiProcess_JoinIdenticalVertices);
             m_pScene = pBodyMesh;
-            LoadMeshTextures();
+            //LoadMeshTextures();
+
+            GLMesh::Init(m_pScene);
 
             const struct aiScene* pWheelMesh;
             pWheelMesh = aiImportFile("/Users/crh/data/wheel.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);

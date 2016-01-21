@@ -806,6 +806,7 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
         }
         m_lPlanLineSegments.back()->AddVerticesFromTrajectory(vPts);
         m_lPlanLineSegments.back()->SetColor(GLColor::HsvColor(m_dCurrentHue,1.0,0.8));
+        m_lPlanLineSegments.back()->SetIgnoreDepth(true);
         m_dCurrentHue += 0.05;
         if(m_dCurrentHue > 1.0){
             m_dCurrentHue = 0;
@@ -818,6 +819,7 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
         m_pControlLine->AddVertex(pPlan->m_StartState.m_dTwv.translation());
         m_pControlLine->AddVertex(pPlan->m_GoalState.m_dTwv.translation());
         m_pControlLine->SetColor(GLColor(1.0f,1.0f,1.0f));
+        m_pControlLine->SetIgnoreDepth(true);
 
         m_DestAxis.SetPose(pPlan->m_GoalState.m_dTwv.matrix());
         m_DestAxis.SetAxisSize(pPlan->m_GoalState.m_dV.norm());
@@ -1550,6 +1552,7 @@ void MochaGui::_PopulateSceneGraph() {
   for (size_t ii = 0; ii < m_vTerrainLineSegments.size(); ii++) {
     m_Gui.AddGLObject(&m_vTerrainLineSegments[ii]);
     m_vTerrainLineSegments[ii].SetColor(GLColor(1.0f, 0.0f, 0.0f));
+    m_vTerrainLineSegments[ii].SetIgnoreDepth(true);
   }
 
   //maximum number of plans

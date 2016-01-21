@@ -525,9 +525,10 @@ void LearningGui::_PhysicsFunc()
     double dT;
     int playBackSegment = 0, playBackSample = 0;
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
-    m_Gui.SetCarVisibility(m_nPlayBackCarId,true);
+    m_Gui.SetCarVisibility(m_nPlayBackCarId,false);
     while(1){
         if(m_bPlayback){
+            m_Gui.SetCarVisibility(m_nPlayBackCarId,true);
             while(m_bPaused == true){
                 if(m_bStep == true){
                     m_bStep = false;
