@@ -240,9 +240,10 @@ void MochaGui::_UpdateWaypointFiles()
 }
 
 ////////////////////////////////////////////////////////////////
-void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, std::string sMode, std::string sLogFile)
+void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, std::string sMode, std::string sLogFile, std::string sParamsFile)
 {
     m_sPlaybackLogFile = sLogFile;
+    m_sParamsFile = sParamsFile;
 
     m_Node.subscribe("herbie/Imu");
 
@@ -254,8 +255,8 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(CommandHandler, eMochaClear ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + '1', std::bind(CommandHandler, eMochaToggleTrajectory ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + '2', std::bind(CommandHandler, eMochaTogglePlans ) );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters);} );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(std::string(PARAMS_FILE_NAME),m_mDefaultParameters);} );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(m_sParamsFile,m_mDefaultParameters);} );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(m_sParamsFile,m_mDefaultParameters);} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(CommandHandler, eMochaRestart ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 't', std::bind(CommandHandler, eMochaSolve ) );
     //pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'v', std::bind(CommandHandler, eMochaPpmControl ) );
@@ -316,7 +317,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
 
 
     /// Initialize the car parameters.
-    CarParameters::LoadFromFile(PARAMS_FILE_NAME,m_mDefaultParameters);
+    CarParameters::LoadFromFile(m_sParamsFile,m_mDefaultParameters);
 
     /// Generate as many new cars as we need in order to use MPC.
     m_LearningCarModel.Init(pCollisionShape,dMin,dMax, m_mDefaultParameters, REGRESSOR_NUM_WORLDS );
@@ -410,6 +411,7 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
     m_TerrainMesh.SetAlpha(1.0);
     m_Gui.Init(&m_TerrainMesh);
 
+    /// m_pGraphView cannot be resized in old_pangolin and crashes everything.
 //    m_pGraphView = &pangolin::Plotter(&m_Log)
 //            .SetBounds(0.0, 0.3, 0.6, 1.0);
 //    pangolin::DisplayBase().AddDisplay(*m_pGraphView);

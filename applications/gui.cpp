@@ -1,26 +1,52 @@
-
-#include "config.h"
-#include "GetPot"
-#include "MochaGui.h"
 #include <fenv.h>
+#include "config.h"
+#include "MochaGui.h"
+
+DEFINE_string(params, "", "File for car parameters.");		// /Users/crh/data/params.csv
+DEFINE_string(mesh, "", "File for car parameters.");  		// /Users/crh/data/lab.ply
+DEFINE_bool(localizer, false, "Whether or not to instantiate localization system.");
+DEFINE_string(mode, "Simulation", "Mode: Experiment or Simulation (default).");
+DEFINE_string(ref, "", "Reference plane for model if no triangle mesh.");
+DEFINE_string(logfile, "", "Logfile for playing back.");	// /Users/crh/data/mocha_playback.log
 
 /////////////////////////////////////////////////////////////////////////////////////////
-int main( int argc, char** argv ) 
+int main( int argc, char* argv[] )
 {
-    //feenableexcept(FE_DIVBYZERO|/*FE_UNDERFLOW|FE_OVERFLOW|*/FE_INVALID);
-    GetPot cl( argc, argv );
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
 
-    std::string sMesh = "/Users/crh/data/lab.ply";
-    bool localizer = cl.search("-localizer");
-    std::string sRef = cl.follow( "", 1, "-ref" );
-    std::string sMode = "Simulation";
-    std::string logFile = "/Users/crh/data/mocha_playback.log";
+  if(FLAGS_params.empty()) {
+    LOG(FATAL) << "Car parameters file not provided. Use parameter -params";
+    return -1;
+  }
 
-    MochaGui *pGui = MochaGui::GetInstance();
-    pGui->Init(sRef,sMesh,localizer,sMode,logFile);
-    pGui->Run();
+  if(FLAGS_mesh.empty()) {
+    LOG(FATAL) << "Mesh of environment not provided. Use parameter -mesh";
+    return -1;
+  }
 
-    delete pGui;
-    return 0;
+  if(!FLAGS_localizer) {
+    LOG(INFO) << "Localizer not initialized. To initialize, use parameter -localizer";
+  }
+
+  if(FLAGS_mode.empty()) {
+    LOG(INFO) << "Mode not specified; assuming Simulation.";
+  }
+
+  if(FLAGS_ref.empty()) {
+    LOG(INFO) << "Reference plane not specified.";
+  }
+
+  if(FLAGS_logfile.empty()) {
+    LOG(FATAL) << "Missing required path to logfile for output.";
+    return -1;
+  }
+
+  MochaGui *pGui = MochaGui::GetInstance();
+  pGui->Init(FLAGS_ref,FLAGS_mesh,FLAGS_localizer,FLAGS_mode,FLAGS_logfile,FLAGS_params);
+  pGui->Run();
+
+  delete pGui;
+  return 0;
 }
 

@@ -15,6 +15,7 @@
 
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
+#include <glog/logging.h>
 
 #include "CarMessages.pb.h"
 
@@ -45,15 +46,12 @@ extern float g_fSpeed;
 
 
 
-#define PARAMS_FILE_NAME "/Users/crh/data/params.csv"
-
-
 class MochaGui {
 public:
     ////////////////////////////////////////////////////////////////
 
     void Run();
-    void Init(string sRefPlane, std::string sMesh, bool bLocalizer, std::string sMode, string sLogFile);
+    void Init(string sRefPlane, std::string sMesh, bool bLocalizer, std::string sMode, string sLogFile, std::string sParamFile);
 
     static MochaGui *GetInstance();
     ~MochaGui();
@@ -221,6 +219,7 @@ protected:
     char m_pSaveFileName[100];
     int m_nSaveFileNameLen;
     int m_nSelectedFileName;
+    std::string m_sParamsFile;
     std::vector<std::string> m_vFileNames;
 
     std::vector<RegressionParameter> m_vLearningParams;

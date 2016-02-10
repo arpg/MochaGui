@@ -93,6 +93,7 @@ void LearningGui::_UpdateTrajectories()
             boost::mutex::scoped_lock renderMutex(m_RenderkMutex);
             m_lGLLineSegments.push_back(GLLineStrip());
             m_lGLLineSegments.back().SetColor(GLColor(1.0f,0.0f,0.0f,1.0f));
+            m_lGLLineSegments.back().SetIgnoreDepth(true);
             m_Gui.AddGLObject(&m_lGLLineSegments.back());
             iter = m_lGLLineSegments.end();
             iter--;
@@ -331,9 +332,10 @@ bool LearningGui::_LoadData(std::vector<std::string> *vArgs)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode)
+void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode, std::string sLearningParamsFile)
 {
     m_eMode = eMode;
+    m_sLearningParamsFile = sLearningParamsFile;
 
     //initialize the scene
     //const aiScene *pScene = aiImportFile( "jump.blend", aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
@@ -356,7 +358,7 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
     m_Gui.Init(&m_TerrainMesh);
 
     //initialize the car parameters
-    CarParameters::LoadFromFile(LEARNING_PARAMS_FILE_NAME,m_mParameters);
+    CarParameters::LoadFromFile(m_sLearningParamsFile,m_mParameters);
 
     m_FusionCarModel.Init(pScene, m_mParameters,1 );
     m_DriveCarModel.Init( pScene, m_mParameters,1 );
@@ -450,8 +452,8 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(&LearningGui::_CommandHandler, this, eMochaClear) );
     pangolin::RegisterKeyPressCallback( '\r', [this]() {this->m_bStep = true;} );
     pangolin::RegisterKeyPressCallback( ' ', [this]() {this->m_bPaused = !this->m_bPaused;} );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(std::string(LEARNING_PARAMS_FILE_NAME),m_mParameters);} );
-    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(std::string(LEARNING_PARAMS_FILE_NAME),m_mParameters);} );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'l', [this] {CarParameters::LoadFromFile(m_sLearningParamsFile,m_mParameters);} );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(m_sLearningParamsFile,m_mParameters);} );
 
 
     m_pJoystickThread = new boost::thread(boost::bind(&LearningGui::_JoystickReadFunc,this));

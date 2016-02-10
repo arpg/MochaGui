@@ -6,6 +6,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <tuple>
+#include <glog/logging.h>
 
 #include <pangolin/pangolin.h>
 #include <SceneGraph/SceneGraph.h>
@@ -27,8 +28,6 @@
 #include "ProcessModelFusion.h"
 #include "EventLogger.h"
 
-#define LEARNING_PARAMS_FILE_NAME "/Users/crh/data/params.csv"
-
 using namespace CVarUtils;
 
 enum Mode
@@ -42,7 +41,7 @@ class LearningGui
 public:
     LearningGui();
     /// Initializes the GUI
-    void Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode);
+    void Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode, std::string sLearningParamsFile);
 
     /// Runs the GUI
     void Run();
@@ -127,6 +126,7 @@ private:
     ProcessModelFusion m_Fusion;
     Mode m_eMode;
 
+    std::string m_sLearningParamsFile;
     std::vector<RegressionParameter> m_vDriveLearningParams;
     std::vector<RegressionParameter> m_vLearningParams;
     std::list<GLLineStrip> m_lGLLineSegments;
