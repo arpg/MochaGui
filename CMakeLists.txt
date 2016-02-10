@@ -52,6 +52,7 @@ find_package( SensorFusion REQUIRED )
 find_package( LibAO REQUIRED )
 find_package( IOKit REQUIRED )
 find_package( Sophus REQUIRED )
+find_package( assimp REQUIRED )
 find_package( Node REQUIRED )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
@@ -80,6 +81,7 @@ set( _INCLUDE_DIRS
             ${SceneGraph_INCLUDE_DIRS}
             ${BULLET_INCLUDE_DIR}
             ${SensorFusion_INCLUDE_DIRS}
+            ${assimp_INCLUDE_DIRS}
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_BINARY_DIR}
        )
@@ -97,7 +99,10 @@ set( LIBRARIES
                ${CVars_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
                Gamepad # this is also built with the solution
+               ${assimp_LIBRARIES}
         )
+
+    message(STATUS ${assimp_LIBRARIES})
 
 include_directories( ${_INCLUDE_DIRS} )
 
