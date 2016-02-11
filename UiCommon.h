@@ -4,7 +4,7 @@
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"
 #include "GLWidgetPanel.h"
-#include "CVars/CVar.h"
+#include "cvars/CVar.h"
 #include <CarPlanner/CVarHelpers.h>
 
 struct PlannerHandler : public SceneGraph::HandlerSceneGraph
