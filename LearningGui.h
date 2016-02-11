@@ -41,7 +41,10 @@ class LearningGui
 public:
     LearningGui();
     /// Initializes the GUI
-    void Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode, std::string sLearningParamsFile);
+    void Init(const std::string& sRefPlane, const std::string& sMeshName,
+              bool bLocalizerTransform, const Mode eMode,
+              const std::string& sLearningParamsFile,
+              const std::string& sCarMesh, const std::string& sWheelMesh);
 
     /// Runs the GUI
     void Run();
@@ -82,6 +85,8 @@ private:
     node::node m_Node;
     /// name of the car used for localizer tracking
     std::string m_sCarObjectName;
+
+    std::string m_sLearningParamsFile;
 
     //view related variables
     JoystickHandler m_Joystick;
@@ -126,7 +131,6 @@ private:
     ProcessModelFusion m_Fusion;
     Mode m_eMode;
 
-    std::string m_sLearningParamsFile;
     std::vector<RegressionParameter> m_vDriveLearningParams;
     std::vector<RegressionParameter> m_vLearningParams;
     std::list<GLLineStrip> m_lGLLineSegments;

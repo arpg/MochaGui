@@ -34,16 +34,15 @@ public:
         m_bPerceptable = false;
     }
 
-    void Init(GLCarDrawType eCarDrawType, std::string bodyMeshName = "/Users/crh/data/herbie.ply") {
+    void Init(GLCarDrawType eCarDrawType, const std::string& sCarMesh, const std::string& sWheelMesh) {
         m_eCarDrawType = eCarDrawType;
-        m_sBodyMeshName = bodyMeshName;
         m_Color = GLColor();
 
         //only if the body isn't a triangle, load the meshes
         if (m_eCarDrawType != eTriangle) {
             //initialize the body mesh
             const struct aiScene* pBodyMesh;
-            pBodyMesh = aiImportFile("/Users/crh/data/herbie.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals
+            pBodyMesh = aiImportFile(sCarMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals
                                      | aiProcess_JoinIdenticalVertices);
             m_pScene = pBodyMesh;
             //LoadMeshTextures();
@@ -51,7 +50,7 @@ public:
             GLMesh::Init(m_pScene);
 
             const struct aiScene* pWheelMesh;
-            pWheelMesh = aiImportFile("/Users/crh/data/wheel.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals);
+            pWheelMesh = aiImportFile(sWheelMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals);
 
 
             //load the wheels
@@ -108,7 +107,6 @@ protected:
 
     // control scale of car
     GLColor m_Color;
-    std::string m_sBodyMeshName;
     std::vector<GLMesh *> m_vWheels;
     GLCarDrawType m_eCarDrawType;
 

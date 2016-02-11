@@ -8,6 +8,8 @@ DEFINE_bool(localizer, false, "Whether or not to instantiate localization system
 DEFINE_string(mode, "Simulation", "Mode: Experiment or Simulation (default).");
 DEFINE_string(ref, "", "Reference plane for model if no triangle mesh.");
 DEFINE_string(logfile, "", "Logfile for playing back.");	// /Users/crh/data/mocha_playback.log
+DEFINE_string(car, "", "File for car mesh.");
+DEFINE_string(wheel,"", "File for wheel mesh.");
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char* argv[] )
@@ -42,8 +44,19 @@ int main( int argc, char* argv[] )
     return -1;
   }
 
+  if(FLAGS_car.empty()) {
+    LOG(FATAL) << "Mesh of car not provided. Use parameter -car";
+    return -1;
+  }
+
+  if(FLAGS_wheel.empty()) {
+    LOG(FATAL) << "Mesh of wheel not provided. Use parameter -wheel";
+    return -1;
+  }
+
   MochaGui *pGui = MochaGui::GetInstance();
-  pGui->Init(FLAGS_ref,FLAGS_mesh,FLAGS_localizer,FLAGS_mode,FLAGS_logfile,FLAGS_params);
+  pGui->Init(FLAGS_ref,FLAGS_mesh,FLAGS_localizer,FLAGS_mode,FLAGS_logfile,
+             FLAGS_params,FLAGS_car,FLAGS_wheel);
   pGui->Run();
 
   delete pGui;

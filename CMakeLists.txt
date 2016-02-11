@@ -150,8 +150,8 @@ target_link_libraries( refplane ${LIBRARIES} )
 add_executable(  learning applications/learning.cpp ${SHARED_HDRS} ${LEARNING_HDRS} ${SHARED_SRC} ${LEARNING_SRC} )
 target_link_libraries( learning ${LIBRARIES} )
 
-add_executable(  opt applications/opt.cpp ${SHARED_HDRS} ${SHARED_SRC} )
-target_link_libraries( opt ${LIBRARIES} )
+#add_executable(  opt applications/opt.cpp ${SHARED_HDRS} ${SHARED_SRC} )
+#target_link_libraries( opt ${LIBRARIES} )
 
 add_executable(  gui applications/gui.cpp ${SHARED_HDRS} ${GUI_HDRS} ${SHARED_SRC} ${GUI_SRC} )
 target_link_libraries( gui ${LIBRARIES} )

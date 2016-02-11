@@ -240,7 +240,9 @@ void MochaGui::_UpdateWaypointFiles()
 }
 
 ////////////////////////////////////////////////////////////////
-void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, std::string sMode, std::string sLogFile, std::string sParamsFile)
+void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool bLocalizer,
+                    const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
+                    const std::string& sCarMesh, const std::string& sWheelMesh)
 {
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
@@ -416,7 +418,8 @@ void MochaGui::Init(std::string sRefPlane,std::string sMesh, bool bLocalizer, st
 //            .SetBounds(0.0, 0.3, 0.6, 1.0);
 //    pangolin::DisplayBase().AddDisplay(*m_pGraphView);
 
-    m_nDriveCarId = m_Gui.AddCar(m_mDefaultParameters[CarParameters::WheelBase],m_mDefaultParameters[CarParameters::Width]);
+    m_nDriveCarId = m_Gui.AddCar(m_mDefaultParameters[CarParameters::WheelBase],m_mDefaultParameters[CarParameters::Width],
+        sCarMesh, sWheelMesh);
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
     //populate all the objects

@@ -81,7 +81,7 @@ public:
     void SetStatusLineText(int id, std::string text);
 
     /// Add a new car to the scene. Returns the ID of the car
-    int AddCar(const double &nWheelbase, const double &nWidth);
+    int AddCar(const double &nWheelbase, const double &nWidth, const std::string& sCarMesh, const std::string& sWheelMesh);
     /// Sets the position and rotation of the car and the wheels used the vehiclestate structure passed.
     void SetCarState(const int& id, const VehicleState& state,  //< The structure containing the state of the car and wheels
                      bool bAddToTrajectory = false              //< If true, a new point will be added to the linestrip that tracks the car trajectory

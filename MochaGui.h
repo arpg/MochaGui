@@ -51,7 +51,10 @@ public:
     ////////////////////////////////////////////////////////////////
 
     void Run();
-    void Init(string sRefPlane, std::string sMesh, bool bLocalizer, std::string sMode, string sLogFile, std::string sParamFile);
+    void Init(const std::string& sRefPlane, const std::string& sMesh, bool bLocalizer,
+              const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
+              const std::string& sCarMesh, const std::string& sWheelMesh);
+
 
     static MochaGui *GetInstance();
     ~MochaGui();

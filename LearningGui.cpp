@@ -332,7 +332,10 @@ bool LearningGui::_LoadData(std::vector<std::string> *vArgs)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocalizerTransform, Mode eMode, std::string sLearningParamsFile)
+void LearningGui::Init(const std::string& sRefPlane, const std::string& sMeshName,
+                       bool bLocalizerTransform, const Mode eMode,
+                       const std::string& sLearningParamsFile,
+                       const std::string& sCarMesh, const std::string& sWheelMesh)
 {
     m_eMode = eMode;
     m_sLearningParamsFile = sLearningParamsFile;
@@ -362,8 +365,10 @@ void LearningGui::Init(std::string sRefPlane, std::string sMeshName, bool bLocal
 
     m_FusionCarModel.Init(pScene, m_mParameters,1 );
     m_DriveCarModel.Init( pScene, m_mParameters,1 );
-    m_nDriveCarId = m_Gui.AddCar(m_mParameters[CarParameters::WheelBase],m_mParameters[CarParameters::Width]);
-    m_nPlayBackCarId = m_Gui.AddCar(m_mParameters[CarParameters::WheelBase],m_mParameters[CarParameters::Width]);
+    m_nDriveCarId = m_Gui.AddCar(m_mParameters[CarParameters::WheelBase],m_mParameters[CarParameters::Width],
+        sCarMesh, sWheelMesh);
+    m_nPlayBackCarId = m_Gui.AddCar(m_mParameters[CarParameters::WheelBase],m_mParameters[CarParameters::Width],
+        sCarMesh, sWheelMesh);
     m_Gui.SetCarVisibility(m_nDriveCarId,false);
 
 

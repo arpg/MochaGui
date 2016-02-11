@@ -69,26 +69,32 @@ void PlannerGui::Render()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh, const bool bLocalizerCoords /* = false */)
-{
-    const aiScene *pScene = aiImportFile( sTerrainMeshFileName.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-    std::cout << aiGetErrorString() << std::endl;
+// DEPRECATED FUNCTION.
+//void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh,
+//                      const bool bLocalizerCoords /* = false */,
+//                      const std::string& sCarMesh, const std::string& sWheelMesh)
+//{
+//    const aiScene *pScene = aiImportFile( sTerrainMeshFileName.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
+//    std::cout << aiGetErrorString() << std::endl;
 
-    if(bLocalizerCoords){
-      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
-                                                       0,-1,0,0,
-                                                       0,0,-1,0,
-                                                       0,0,0,1);
-    } else {
-      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
-                                                       0,1,0,0,
-                                                       0,0,-1,0,
-                                                       0,0,0,1);
+//    if(bLocalizerCoords){
+//      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+//                                                       0,-1,0,0,
+//                                                       0,0,-1,0,
+//                                                       0,0,0,1);
+//    } else {
+//      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+//                                                       0,1,0,0,
+//                                                       0,0,-1,0,
+//                                                       0,0,0,1);
 
-    }
-    pMesh->Init(pScene);
-    Init(pMesh);
-}
+//    }
+//    pMesh->Init(pScene);
+//    Init(pMesh);
+
+//    m_sCarMesh = sCarMesh;
+//    m_sWheelMesh = sWheelMesh;
+//}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::Init(SceneGraph::GLObject* pTerrain)
@@ -202,12 +208,13 @@ void PlannerGui::SetStatusLineText(int id, std::string text)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth)
+int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth,
+                       const std::string& sCarMesh, const std::string& sWheelMesh)
 {
     m_vCars.push_back(new Car());
     Car* pCar = m_vCars.back();
 
-    pCar->m_GLCar.Init(eMesh);
+    pCar->m_GLCar.Init(eMesh, sCarMesh, sWheelMesh);
     pCar->m_GLCar.SetCarScale(Eigen::Vector3d(nWheelbase,nWidth,nWheelbase));
 
     pCar->m_CarLineSegments.SetColor(GLColor(0.0f,0.0f,1.0f));
