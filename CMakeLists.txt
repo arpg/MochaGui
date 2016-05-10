@@ -48,7 +48,8 @@ find_package( CVars REQUIRED )
 find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
 find_package( Protobuf REQUIRED )
 find_package( Bullet REQUIRED )
-find_package( SensorFusion REQUIRED )
+find_package( CeresSolver REQUIRED )
+#find_package( SensorFusion REQUIRED )
 find_package( LibAO REQUIRED )
 find_package( IOKit REQUIRED )
 find_package( Sophus REQUIRED )
@@ -59,9 +60,8 @@ link_directories( ${Pangolin_LIBRARY_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
 
 set( NV_CMAKE_DIR ${CMAKE_MODULE_PATH} )
-add_subdirectory(NvWidgets)
-add_subdirectory(Gamepad)
-
+add_subdirectory( NvWidgets )
+add_subdirectory( Gamepad )
 
 include_directories( ${CMAKE_BINARY_DIR} )
 PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS CarMessages.proto )
@@ -80,7 +80,8 @@ set( _INCLUDE_DIRS
             ${PROTOBUF_INCLUDE_DIRS}
             ${SceneGraph_INCLUDE_DIRS}
             ${BULLET_INCLUDE_DIR}
-            ${SensorFusion_INCLUDE_DIRS}
+            ${CeresSolver_INCLUDE_DIRS}
+            #${SensorFusion_INCLUDE_DIRS}
             ${assimp_INCLUDE_DIRS}
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_BINARY_DIR}
@@ -89,7 +90,8 @@ set( _INCLUDE_DIRS
 set( LIBRARIES
     ${GLog_LIBRARIES}
                ${Node_LIBRARIES}
-               ${SensorFusion_LIBRARIES}
+               ${CeresSolver_LIBRARIES}
+               #${SensorFusion_LIBRARIES}
                ${Pangolin_LIBRARIES}
                ${LIBAO_LIBRARY}
                ${SceneGraph_LIBRARIES}
@@ -110,10 +112,11 @@ set( SHARED_HDRS PlannerGui.h
                  GLBulletDebugDrawer.h
                  UiCommon.h
                  ProcessModelFusion.h
-                GLCar.h
-                EventLogger.h
-                #Vicon.h
-                )
+                 GLCar.h
+                 EventLogger.h
+                 SensorFusionCeres.h
+                 #Vicon.h
+                 )
 
 set( SHARED_SRC PlannerGui.cpp
                 GLBulletDebugDrawer.cpp
@@ -121,6 +124,7 @@ set( SHARED_SRC PlannerGui.cpp
                 JoystickHandler.cpp
                 EventLogger.cpp
                 CarMessages.pb.cc
+                SensorFusionCeres.cpp
                 #Vicon.cpp
                 )
 
@@ -141,7 +145,7 @@ set( LEARNING_HDRS  config.h.in
 set( LEARNING_SRC
                   LearningGui.cpp )
 
-              add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
+add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
 target_link_libraries( logger ${LIBRARIES} )
 
 add_executable(  refplane applications/refplane.cpp ${SHARED_HDRS} ${SHARED_SRC} )

@@ -31,7 +31,7 @@
 #include "GLBulletDebugDrawer.h"
 
 
-#include "SensorFusion/SensorFusionCeres.h"
+#include "SensorFusionCeres.h"
 #include "GLGuiPanel.h"
 #include "assimp/DefaultLogger.hpp"
 #include "EventLogger.h"
@@ -184,9 +184,6 @@ protected:
     double m_dVelError;
     double m_dControlAccel;
     double m_dControlPhi;
-
-
-
 
     //logging
     EventLogger m_Logger;
