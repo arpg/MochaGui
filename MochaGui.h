@@ -30,7 +30,6 @@
 #include "PlannerGui.h"
 #include "GLBulletDebugDrawer.h"
 
-
 #include "SensorFusionCeres.h"
 #include "GLGuiPanel.h"
 #include "assimp/DefaultLogger.hpp"
@@ -75,7 +74,7 @@ protected:
     void _PhysicsFunc();
     void _ControlCommandFunc();
     void _ControlFunc();
-    void _ImuReadFunc();
+    //void _ImuReadFunc(); Imu not used
     void _LocalizerReadFunc();
     void _PlannerFunc();
     void _LearningFunc(ControlPlan *m_pRegressionPlan);
@@ -139,7 +138,6 @@ protected:
 #define WAYPOINT_VEL_INDEX 6
 #define WAYPOINT_AIR_INDEX 7
 
-
     //flags
     std::atomic<bool> m_StillRun;
     std::atomic<bool> m_StillControl;
@@ -151,7 +149,7 @@ protected:
     bool& m_bControl3dPath;
 
 
-    bool& m_bFuseImu;
+    bool& m_bFuseImu; //Imu not used
     bool m_bPlanning;
     bool m_bControllerRunning;
     bool m_bLearningRunning;
@@ -175,7 +173,7 @@ protected:
     boost::thread* m_pControlThread;
     boost::thread* m_pCommandThread;
     boost::thread* m_pLearningThread;
-    boost::thread* m_pImuThread;
+    boost::thread* m_pImuThread; //Imu not used
     boost::thread* m_pLocalizerThread;
 
     ControlCommand m_ControlCommand;
@@ -198,7 +196,7 @@ protected:
     std::string m_sPlaybackLogFile;
     double m_dPlaybackTimer;
 
-    node::node m_Node;   //node for capturing IMU data from the car
+    node::node m_Node;   //node for capturing PoseData from the car
     ProcessModelFusion m_Fusion;
 
     boost::mutex m_ControlMutex;
@@ -209,7 +207,7 @@ protected:
     //ui widgets
     GLGuiPanel m_GuiPanel;
     double m_dLocalizerFreq;
-    double m_dImuFreq;
+    double m_dImuFreq; //Imu not used
     double m_dVel;
     Eigen::Vector3d m_dPos;
 

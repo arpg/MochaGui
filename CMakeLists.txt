@@ -39,7 +39,7 @@ set(BOOST_LIBS regex thread date_time system timer  )
 #this dependency is required for newer versions of the boost library. unfortunately
 #boost doesn't seem to link to it..
 
-find_package(Pangolin REQUIRED)
+find_package( Pangolin REQUIRED)
 find_package( GLog REQUIRED)
 find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
@@ -88,7 +88,7 @@ set( _INCLUDE_DIRS
        )
 
 set( LIBRARIES
-    ${GLog_LIBRARIES}
+               ${GLog_LIBRARIES}
                ${Node_LIBRARIES}
                ${CeresSolver_LIBRARIES}
                #${SensorFusion_LIBRARIES}

@@ -1,0 +1,16 @@
+package posedata;
+
+message PoseData {
+	required double posX = 1;
+	required double posY = 2;
+	required double posZ = 3;
+	required double roll = 4;
+	required double pitch = 5;
+	required double yaw = 6;
+
+	repeated coList coVar = 7; 
+}
+
+message coList {
+	repeated double item = 1;
+}

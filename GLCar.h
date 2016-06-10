@@ -42,8 +42,7 @@ public:
         if (m_eCarDrawType != eTriangle) {
             //initialize the body mesh
             const struct aiScene* pBodyMesh;
-            pBodyMesh = aiImportFile(sCarMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals
-                                     | aiProcess_JoinIdenticalVertices);
+            pBodyMesh = aiImportFile(sCarMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices);
             m_pScene = pBodyMesh;
             //LoadMeshTextures();
 
