@@ -56,7 +56,7 @@ MochaGui::MochaGui() :
     m_dPlaybackTimer(-1),
     m_Fusion(30,&m_DriveCarModel),
     m_bLoadWaypoints(CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.")),
-    m_dPlanTime(Tic()) //the size of the fusion sensor
+    m_dPlanTime(CarPlanner::Tic()) //the size of the fusion sensor
 {
     m_Node.init("MochaGui");
 }
@@ -90,11 +90,11 @@ void MochaGui::Run() {
                                         "debug.MaxLookaheadTime","debug.InertialControl","debug.StartSegmentIndex","planner.PointCostWeights",
                                         "planner.TrajCostWeights", "planner.Epsilon"};
     int frameCount = 0;
-    double lastTime = Tic();
-    m_dDiagTime = Tic();
+    double lastTime = CarPlanner::Tic();
+    m_dDiagTime = CarPlanner::Tic();
     SetThreadName("Main thread");
     _StartThreads();
-    double lastFrameTime = Tic();
+    double lastFrameTime = CarPlanner::Tic();
     while( !pangolin::ShouldQuit() )
     {
 
@@ -103,25 +103,26 @@ void MochaGui::Run() {
         m_Gui.Render();
       }
 
-        usleep(1e6/100.0);
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
 
         //calcualte Fps
         frameCount++;
-        if(Toc(lastTime) > 0.5){
-            m_dFps = (double)frameCount / (Toc(lastTime));
+        if(CarPlanner::Toc(lastTime) > 0.5){
+            m_dFps = (double)frameCount / (CarPlanner::Toc(lastTime));
             frameCount = 0;
-            lastTime =Tic();
+            lastTime = CarPlanner::Tic();
         }
 
 
 
 
         if(m_bLoggerPlayback){
-            _PlaybackLog(Toc(lastFrameTime));
+            _PlaybackLog(CarPlanner::Toc(lastFrameTime));
         }else{
             _UpdateVisuals();
         }
-        lastFrameTime = Tic();
+        lastFrameTime = CarPlanner::Tic();
+
 
 
         //save/load files if necessary
@@ -249,7 +250,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     m_Node.subscribe("herbie/Imu");
 
-    m_dStartTime = Tic();
+    m_dStartTime = CarPlanner::Tic();
     m_bAllClean = false;
     m_bPause = false;
     m_bStep = false;
@@ -892,7 +893,7 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_LocalizerReadFunc()
 {
-    double lastTime = Tic();
+    double lastTime = CarPlanner::Tic();
     int numPoses = 0;
     int counter = 1;
     //double localizerTime = 0;
@@ -903,19 +904,19 @@ void MochaGui::_LocalizerReadFunc()
         double localizerTime;
         const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
 
-        double sysTime = Tic();
+        double sysTime = CarPlanner::Tic();
 
-        double dt = Tic()-lastTime;
+        double dt = CarPlanner::Tic()-lastTime;
         if(dt > 0.5){
             m_dLocalizerFreq = numPoses/dt;
-            lastTime = Tic();
+            lastTime = CarPlanner::Tic();
             numPoses = 0;
         }
         numPoses++;
 
         if(g_bImuIntegrationOnly == false){
             counter++;
-            //double dTemp = Tic();
+            //double dTemp = CarPlanner::Tic();
             //if(counter > 1){
             //std::cout << "Global pose received at:" << sysTime << "seconds." << std::endl;
             if(g_bProcessModelActive){
@@ -928,13 +929,13 @@ void MochaGui::_LocalizerReadFunc()
             }else{
                 m_Fusion.RegisterGlobalPose(Twb,sysTime,sysTime);
             }
-            //dout("Fusion process took" << Toc(dTemp) << " seconds.");
+            //dout("Fusion process took" << CarPlanner::Toc(dTemp) << " seconds.");
             counter = 0;
 
 
 
             if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-                m_FusionLogger.LogLocalizerData(Tic(),localizerTime,Twb);
+                m_FusionLogger.LogLocalizerData(CarPlanner::Tic(),localizerTime,Twb);
             }
 
         }
@@ -946,7 +947,7 @@ void MochaGui::_LocalizerReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ImuReadFunc()
 {
-    double lastTime = Tic();
+    double lastTime = CarPlanner::Tic();
     int numPoses = 0;
 
     std::cout << "ImuReadFunc currently disabled." << std::endl;
@@ -957,7 +958,7 @@ void MochaGui::_ImuReadFunc()
         //this needs to be a blocking call .. not sure it is!!!
         if(m_Node.receive("herbie/Imu",Msg)){
             double dImuTime = (double)Msg.timer()/62500.0;
-            double sysTime = Tic();
+            double sysTime = CarPlanner::Tic();
             m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
                                      Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
 
@@ -971,10 +972,10 @@ void MochaGui::_ImuReadFunc()
 //                m_Logger.LogPoseUpdate(state,EventLogger::eIMU);
 //            }
 
-            double dt = Tic()-lastTime;
+            double dt = CarPlanner::Tic()-lastTime;
             if(dt > 0.5){
                 m_dImuFreq = numPoses/dt;
-                lastTime = Tic();
+                lastTime = CarPlanner::Tic();
                 numPoses = 0;
             }
             numPoses++;
@@ -986,7 +987,7 @@ void MochaGui::_ImuReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlCommandFunc()
 {
-    double dLastTime = Tic();
+    double dLastTime = CarPlanner::Tic();
     while(1)
     {
         //only go ahead if the controller is running, and we are targeting the real vehicle
@@ -995,7 +996,7 @@ void MochaGui::_ControlCommandFunc()
             //of the car in the controller
             {
                 boost::mutex::scoped_lock lock(m_ControlMutex);
-                double dCurrentTime = Tic();
+                double dCurrentTime = CarPlanner::Tic();
                 m_Controller.GetCurrentCommands(dCurrentTime,
                                                 m_ControlCommand,
                                                 m_vTargetVel,
@@ -1027,9 +1028,9 @@ void MochaGui::_ControlCommandFunc()
 
             Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
             Req.set_phi(m_ControlCommand.m_dPhi);
-            double time = Tic();
+            double time = CarPlanner::Tic();
             //m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
-            m_dControlDelay = Toc(time);
+            m_dControlDelay = CarPlanner::Toc(time);
         }
 
         //about 100 commands/sec
@@ -1043,7 +1044,7 @@ void MochaGui::_ControlFunc()
 {
     int nNumConrolPlans = 0;
     m_dControlPlansPerS = 0;
-    double dLastTime = Tic();
+    double dLastTime = CarPlanner::Tic();
 
     std::vector<std::string> vLabels = {"Lookahead","Accel","Norm", "Vel.", "Z Vel.", "Target Vel."};
     m_Log.SetLabels(vLabels);
@@ -1140,7 +1141,7 @@ void MochaGui::_ControlFunc()
                 //now run the controller to crete a plan
                 ControlPlan* pPlan;
                 if(m_bPause == false && g_bInfiniteTime == false){
-                    m_dPlanTime = Tic();
+                    m_dPlanTime = CarPlanner::Tic();
                 }
                 m_Controller.PlanControl(m_dPlanTime,pPlan);
 
@@ -1163,10 +1164,10 @@ void MochaGui::_ControlFunc()
                     _UpdateControlPathVisuals(pPlan);
                     //update control plan statistics if there is a new control plan available
                     nNumConrolPlans++;
-                    if(Toc(dLastTime) > 0.5){
-                        m_dControlPlansPerS = (double)nNumConrolPlans / (Toc(dLastTime));
+                    if(CarPlanner::Toc(dLastTime) > 0.5){
+                        m_dControlPlansPerS = (double)nNumConrolPlans / (CarPlanner::Toc(dLastTime));
                         nNumConrolPlans = 0;
-                        dLastTime =Tic();
+                        dLastTime = CarPlanner::Tic();
                     }
                 }
 
@@ -1229,12 +1230,12 @@ void MochaGui::_PhysicsFunc()
     while(m_StillRun){
 
         while(m_bSimulate3dPath == false && m_StillRun){
-            dCurrentTic = Tic();
+            dCurrentTic = CarPlanner::Tic();
             usleep(10000);
         }
 
         //this is so pausing doesn't shoot the car in the air
-        double pauseStartTime = Tic();
+        double pauseStartTime = CarPlanner::Tic();
         while(m_bPause == true && m_bSimulate3dPath == true && m_StillRun) {
             usleep(1000);
 
@@ -1263,14 +1264,14 @@ void MochaGui::_PhysicsFunc()
                 break;
             }
         }
-        dCurrentTic += Toc(pauseStartTime); //subtract the pause time
+        dCurrentTic += CarPlanner::Toc(pauseStartTime); //subtract the pause time
 
         if(m_bSimulate3dPath == true) {
             //m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
             //calculate the current dT
             if(dCurrentTic < 0  && m_bControl3dPath == false ) {
-                dCurrentTic = Tic();
+                dCurrentTic = CarPlanner::Tic();
                 VehicleState startState = m_vSegmentSamples[0].m_vStates[0];
                 //startState.m_dV = Eigen::Vector3d::Zero();
                 m_DriveCarModel.SetState(0,startState);
@@ -1283,11 +1284,11 @@ void MochaGui::_PhysicsFunc()
             if(m_bControl3dPath) {
                 if(m_bControllerRunning){
 
-                    while((Toc(dCurrentTic)) < 0.002) {
+                    while((CarPlanner::Toc(dCurrentTic)) < 0.002) {
                         usleep(100);
                     }
-                    currentDt = Toc(dCurrentTic);
-                    dCurrentTic = Tic();
+                    currentDt = CarPlanner::Toc(dCurrentTic);
+                    dCurrentTic = CarPlanner::Tic();
 
                     if(m_bPause == true){
                         currentDt = m_dTimeInterval;
@@ -1312,7 +1313,7 @@ void MochaGui::_PhysicsFunc()
                         boost::mutex::scoped_lock lock(m_ControlMutex);
 
                         if(m_bPause == false && g_bInfiniteTime == false){
-                            m_dPlanTime = Tic();
+                            m_dPlanTime = CarPlanner::Tic();
                         }
 
 
@@ -1352,10 +1353,10 @@ void MochaGui::_PhysicsFunc()
 
                 //wait until we have reached the correct dT to
                 //apply the next set of commands
-                while((Toc(dCurrentTic)) < m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dT) {
+                while((CarPlanner::Toc(dCurrentTic)) < m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dT) {
                     usleep(100);
                 }
-                dCurrentTic = Tic();
+                dCurrentTic = CarPlanner::Tic();
 
                 //progress to the next pose
                 nCurrentSample++;

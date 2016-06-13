@@ -240,7 +240,7 @@ bool EventLogger::ReadMessage(msg_Log &msg)
 void EventLogger::WriteMessage(msg_Log &msg)
 {
     boost::mutex::scoped_lock lock(m_WriteMutex);
-    msg.set_timestamp(Tic());
+    msg.set_timestamp(CarPlanner::Tic());
     int byteSize = msg.ByteSize();
     m_File << byteSize ; //write the size
     char* array = new char[byteSize];

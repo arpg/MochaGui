@@ -16,7 +16,7 @@
 #include "EventLogger.h"
 
 
-double g_dStartTime = Tic();
+double g_dStartTime = CarPlanner::Tic();
 Localizer g_localizer;
 EventLogger logger;
 node::node g_node;
@@ -46,7 +46,7 @@ void JoystickFunc()
         command.m_dPhi = joystickPhi;
         if(g_bLog ){
             logger.LogControlCommand(command);
-            LOG(INFO) << "Joystick commands logged at:" << Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]";
+            LOG(INFO) << "Joystick commands logged at:" << CarPlanner::Tic()-g_dStartTime << "seconds [" << joystickAccel << " " << joystickPhi << "]";
         }
 
         CommandMsg Req;
@@ -70,7 +70,7 @@ void ImuReadFunc()
             if(g_bLog ){
                 std::cout << "IMU pose received at:" << time << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << "]" << std::endl;
                 fflush(stdout);
-                logger.LogImuData(Tic(),time,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
+                logger.LogImuData(CarPlanner::Tic(),time,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
             }
         }
     }
@@ -89,7 +89,7 @@ void LocalizerReadFunc()
         if(g_bLog ){
             std::cout << "Localizer pose received at:" << localizerTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
             fflush(stdout);
-            logger.LogLocalizerData(Tic(),localizerTime,Twb);
+            logger.LogLocalizerData(CarPlanner::Tic(),localizerTime,Twb);
         }
     }
 }
@@ -149,7 +149,7 @@ int main( int argc, char** argv )
     std::cout << "Press enter to start logging." << std::endl;
     getchar();
 
-    g_dStartTime = Tic();
+    g_dStartTime = CarPlanner::Tic();
 
     std::string logFile = logger.OpenNewLogFile("","fusion_");
     std::cout << "Opened log file " << logFile << std::endl;

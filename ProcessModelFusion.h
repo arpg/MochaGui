@@ -6,6 +6,7 @@
 
 #include <SensorFusion/SensorFusionCeres.h>
 #include <CarPlanner/SE3.h>
+#include <boost/thread.hpp>
 
 class ProcessModelFusion : public fusion::SensorFusionCeres
 {

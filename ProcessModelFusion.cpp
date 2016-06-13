@@ -15,9 +15,9 @@ void ProcessModelFusion::RegisterInputCommands(ControlCommand command)
 {
     if(m_bFusionCarModelInitialized == true){
         if(m_dLastCommandTime == -1){
-            m_dLastCommandTime = Tic();
+            m_dLastCommandTime = CarPlanner::Tic();
         }else{
-            double currentTime = Tic();
+            double currentTime = CarPlanner::Tic();
             if((currentTime - m_dLastCommandTime) > 0.01){
                 boost::mutex::scoped_lock lock(m_DriveCarMutex);
                 double dt = currentTime - m_dLastCommandTime;
@@ -35,7 +35,7 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
         VehicleState currentState;
         {
             boost::mutex::scoped_lock lock(m_DriveCarMutex);
-            double currentTime = Tic();
+            double currentTime = CarPlanner::Tic();
             double dt = currentTime - m_dLastCommandTime;
             m_pFusionModel->UpdateState(0,command,dt);
             m_dLastCommandTime = currentTime;
@@ -70,7 +70,7 @@ void ProcessModelFusion::RegisterGlobalPoseWithProcessModel(const Sophus::SE3d& 
 
         if(m_bFusionCarModelInitialized == false){
             m_bFusionCarModelInitialized = true;
-            m_dLastCommandTime = Tic();
+            m_dLastCommandTime = CarPlanner::Tic();
         }
     }
 }

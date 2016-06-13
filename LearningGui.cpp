@@ -175,7 +175,7 @@ void LearningGui::_SetPoseFromFusion()
     }
 
     //update learning
-    double time = Tic();
+    double time = CarPlanner::Tic();
     if(m_dLastPoseTime == -1){
         m_dLastPoseTime = time;
     }else{
@@ -207,7 +207,7 @@ void LearningGui::_ImuReadFunc()
         Imu_Accel_Gyro Msg;
         if(m_Node.receive("herbie/Imu",Msg)){ // TODO we do NOT need the IMU anymore -- Juan will use that on the ninja car.
             //double time = (double)Msg.timer()/62500.0;
-            double sysTime = Tic();
+            double sysTime = CarPlanner::Tic();
             m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
                                      Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
 
@@ -220,7 +220,7 @@ void LearningGui::_ImuReadFunc()
                 lastTime = sysTime;
             }
             nNumImu++;
-            //std::cout << "IMU pose received at:" << Tic()-m_dStartTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
+            //std::cout << "IMU pose received at:" << CarPlanner::Tic()-m_dStartTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
         }
     }
 }
@@ -238,7 +238,7 @@ void LearningGui::_LocalizerReadFunc()
         nLocalizerSkip++;
 
         //offset the localizer measurements
-        double sysTime = Tic();
+        double sysTime = CarPlanner::Tic();
 
         ControlCommand command;
         {
@@ -528,7 +528,7 @@ void LearningGui::_PopulateSceneGraph()
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_PhysicsFunc()
 {
-    double dCurrentTime = Tic();
+    double dCurrentTime = CarPlanner::Tic();
     double dT;
     int playBackSegment = 0, playBackSample = 0;
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
@@ -548,11 +548,11 @@ void LearningGui::_PhysicsFunc()
             //show the playback vehicle
             int dataIndex = m_vSampleIndices[playBackSegment] + playBackSample;
             //wait for the dT
-            while((Toc(dCurrentTime)) < m_PlaybackSample.m_vCommands[dataIndex].m_dT) {
+            while((CarPlanner::Toc(dCurrentTime)) < m_PlaybackSample.m_vCommands[dataIndex].m_dT) {
                 usleep(100);
             }
 
-            dCurrentTime = Tic();
+            dCurrentTime = CarPlanner::Tic();
 
             //now set the position of the two cars
             m_Gui.SetCarState(m_nDriveCarId,m_PlaybackSample.m_vStates[dataIndex]);
@@ -566,13 +566,13 @@ void LearningGui::_PhysicsFunc()
                 boost::this_thread::interruption_point();
                 //update the drive car position based on the car model
                 ControlCommand currentCommand;
-                while((Toc(dCurrentTime)) < m_dT) {
+                while((CarPlanner::Toc(dCurrentTime)) < m_dT) {
                     usleep(100);
                 }
 
-                dT = Toc(dCurrentTime);
+                dT = CarPlanner::Toc(dCurrentTime);
                 //std::cout << "dt = " << dT << std::endl;
-                dCurrentTime = Tic();
+                dCurrentTime = CarPlanner::Tic();
 
                 {
                     boost::mutex::scoped_lock lock(m_JoystickMutex);
@@ -714,7 +714,7 @@ void LearningGui::_LearningFunc(MotionSample* pRegressionPlan)
 
 //    if(m_bLoggerEnabled){
 //        _CreateLogFilesIfNeeded();
-//        //m_fLearningLogFile << Tic() - m_dStartTime << " " << currentParams.transpose() << " " <<  pRegressionPlan->m_vCommands.size() << std::endl;
+//        //m_fLearningLogFile << CarPlanner::Tic() - m_dStartTime << " " << currentParams.transpose() << " " <<  pRegressionPlan->m_vCommands.size() << std::endl;
 //    }
 
     //m_Gui.SetStatusLineText(m_nLearningStatusId,(boost::format("Learning: starting with [%s]") % currentParams.transpose()).str());
@@ -739,7 +739,7 @@ void LearningGui::_LearningFunc(MotionSample* pRegressionPlan)
     //write to the log file
 //    if(m_bLoggerEnabled){
 //        _CreateLogFilesIfNeeded();
-//        //m_fLearningLogFile << Tic() - m_dStartTime << " " << newParams.transpose() << " " <<  pRegressionPlan->m_vCommands.size() << std::endl;
+//        //m_fLearningLogFile << CarPlanner::Tic() - m_dStartTime << " " << newParams.transpose() << " " <<  pRegressionPlan->m_vCommands.size() << std::endl;
 //    }
 
     m_LearningCarModel.UpdateParameters(newParams);

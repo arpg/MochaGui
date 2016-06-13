@@ -84,8 +84,8 @@ int main( int argc, char** argv )
     m_vResults.resize(nTotalNum);
     m_vFailures.resize(nTotalNum);
 
-    double firstTime = Tic();
-    double lastTime = Tic();
+    double firstTime = CarPlanner::Tic();
+    double lastTime = CarPlanner::Tic();
 
 
     int index = 0;
@@ -114,14 +114,14 @@ int main( int argc, char** argv )
 
             //wait for  this batch to finish
             while(threadPool.pending() > 0){
-                if(Toc(lastTime) > 1.0  ){
+                if(CarPlanner::Toc(lastTime) > 1.0  ){
                     boost::mutex::scoped_lock loc(m_resultLock);
 
                     double rate = currentItem/Toc(firstTime);
                     double timeRemaining = (double)(nTotalNum-currentItem)/rate;
                     double percentage = ((double)currentItem/(double)nTotalNum)*100.0;
                     dout("[" << percentage << "%] - (" << currentItem << ") complete. Processing " << rate << " cubics/second - " << timeRemaining << " seconds remaining.");
-                    lastTime = Tic();
+                    lastTime = CarPlanner::Tic();
                 }
                 usleep(1000);
             }
@@ -139,12 +139,12 @@ int main( int argc, char** argv )
                    currentItem++;
                 }
 
-                if(Toc(lastTime) > 1.0  ){
+                if(CarPlanner::Toc(lastTime) > 1.0  ){
                     double rate = currentItem/Toc(firstTime);
                     double timeRemaining = (double)(nTotalNum-currentItem)/rate;
                     double percentage = ((double)currentItem/(double)nTotalNum)*100.0;
                     dout("[" << percentage << "%] - (" << currentItem << ") complete. Processing " << rate << " cubics/second - " << timeRemaining << " seconds remaining.");
-                    lastTime = Tic();
+                    lastTime = CarPlanner::Tic();
                 }
 
                 //go through all items at this level and figure out every failure

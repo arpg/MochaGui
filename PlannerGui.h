@@ -8,9 +8,10 @@
 #define UI_PANEL_HEIGHT WINDOW_HEIGHT
 
 #include <stdio.h>
+#include <mutex>
+#include <boost/thread.hpp>
 #include "CarPlanner/CarPlannerCommon.h"
 #include "CarPlanner/BulletCarModel.h"
-#include <mutex>
 #include "pangolin/pangolin.h"
 #include "SceneGraph/SceneGraph.h"
 #include "GLCar.h"
