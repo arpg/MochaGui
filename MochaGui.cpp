@@ -28,6 +28,7 @@ static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.Iterati
 ////////////////////////////////////////////////////////////////
 MochaGui::MochaGui() :
     //m_ActiveHeightMap(m_KHeightMap),
+    m_bPlanner(false),
     m_Path( CreateCVar("path", vector<int>(), "Path vector.") ),
     m_StillRun( true ),
     m_StillControl( true ),
