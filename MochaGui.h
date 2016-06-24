@@ -74,7 +74,6 @@ protected:
     void _PhysicsFunc();
     void _ControlCommandFunc();
     void _ControlFunc();
-    //void _ImuReadFunc(); Imu not used
     void _LocalizerReadFunc();
     void _PlannerFunc();
     void _LearningFunc(ControlPlan *m_pRegressionPlan);
@@ -149,7 +148,6 @@ protected:
     bool& m_bControl3dPath;
 
 
-    bool& m_bFuseImu; //Imu not used
     bool m_bPlanning;
     bool m_bControllerRunning;
     bool m_bLearningRunning;
@@ -173,7 +171,6 @@ protected:
     boost::thread* m_pControlThread;
     boost::thread* m_pCommandThread;
     boost::thread* m_pLearningThread;
-    boost::thread* m_pImuThread; //Imu not used
     boost::thread* m_pLocalizerThread;
 
     ControlCommand m_ControlCommand;
@@ -207,7 +204,6 @@ protected:
     //ui widgets
     GLGuiPanel m_GuiPanel;
     double m_dLocalizerFreq;
-    double m_dImuFreq; //Imu not used
     double m_dVel;
     Eigen::Vector3d m_dPos;
 
