@@ -29,23 +29,21 @@ static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.Iterati
 MochaGui::MochaGui() :
     //m_ActiveHeightMap(m_KHeightMap),
     m_Path( CreateCVar("path", vector<int>(), "Path vector.") ),
+    m_StillRun( true ),
+    m_StillControl( true ),
     m_bPlannerOn( CreateUnsavedCVar("planner.PlannerOn", false, "if true, the car model will only follow the control law from the 2D path.") ),
     m_bShowProjectedPath( CreateCVar("planner.ShowProjected2dPath", true, "how the 2D path z-projected onto the surface") ),
     m_bCompute3dPath( CreateCVar("planner.Compute3DPath", true, "Compute path using terrain driven simulation") ),
     m_bSimulate3dPath( CreateUnsavedCVar("planner.Simulate3DPath", false, "Drive the car over the path to see the results in real-time") ),
     m_eControlTarget( CreateCVar("controller.ControlTarget", (int)eTargetSimulation, "Drive the car over the path to see the results in real-time") ),
     m_bControl3dPath( CreateUnsavedCVar("planner.Control3DPath", false, "Drive the car over the path to see the results in real-time") ),
-    m_bFuseImu( CreateCVar("planner.FuseImu", true) ),
     m_nPathSegments( CreateCVar("planner.PathSegments", 20u, "how many segments to draw") ),
     m_dTimeInterval( CreateCVar("planner.TimeInterval", 0.01, "") ), /* changed TimeInteval to TimeInterval (also in opt.cpp) */
     m_pPlannerThread( 0 ),
     m_pPhysicsThread( 0 ),
     m_pControlThread( 0 ),
     m_pCommandThread( 0 ),
-    m_pImuThread( 0 ),
     m_pLocalizerThread( 0 ),
-    m_StillControl( true ),
-    m_StillRun( true ),
     m_bLoggerEnabled( CreateUnsavedCVar("logger.Enabled", false, "")),
     m_sLogFileName( CreateUnsavedCVar("logger.FileName", std::string(), "/Users/corinsandford/ARPG/MochaGui/logs/mocha.log")),
     m_bFusionLoggerEnabled( CreateUnsavedCVar("logger.FusionEnabled", false, "")),
@@ -466,7 +464,6 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_GuiPanel.SetVar("fusion:FilterSize",m_Fusion.GetFilterSizePtr())
               .SetVar("fusion:RMSE",m_Fusion.GetRMSEPtr())
               .SetVar("fusion:LocalizerFreq",&m_dLocalizerFreq)
-              .SetVar("fusion:ImuFreq",&m_dImuFreq)
               .SetVar("fusion:Vel",&m_dVel)
               .SetVar("fusion:Pos",&m_dPos);
 
@@ -519,32 +516,15 @@ void MochaGui::_StartThreads()
     m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
 
-    //_CommandFunc(eMochaPpmControl); // Force experiment mode
-    if(m_eControlTarget == eTargetExperiment){
-        m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
-    }
     if(m_eControlTarget == eTargetSimulation){
         LOG(INFO) << "Stopping localizer thread";
-        // m_pImuThread not used
-        /*if(m_pImuThread != NULL){
-            m_pImuThread->interrupt();
-            m_pImuThread->join();
-        }*/
 
         if(m_pLocalizerThread) {
             m_pLocalizerThread->interrupt();
             m_pLocalizerThread->join();
         }
     }else{
-        //m_Localizer.Start();
-
-        //LOG(INFO) << "Starting Localizer";
-
-        // _ImuReadFunc not used
-        /*if(m_pImuThread == NULL){
-            m_pImuThread = new boost::thread(std::bind(&MochaGui::_ImuReadFunc,this));
-        }*/
-
+        m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
         if(m_pLocalizerThread == NULL){
             //LOG(INFO) << "Starting Localizer Thread";
             m_pLocalizerThread = new boost::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
@@ -583,11 +563,6 @@ void MochaGui::_KillThreads()
         m_pLearningThread->join();
     }
 
-    // Imu not used
-    if(m_pImuThread) {
-        m_pImuThread->join();
-    }
-
     if(m_pLocalizerThread) {
         m_pLocalizerThread->join();
     }
@@ -599,14 +574,12 @@ void MochaGui::_KillThreads()
     delete m_pControlThread;
     delete m_pPhysicsThread;
     delete m_pPlannerThread;
-    delete m_pImuThread;
     delete m_pLocalizerThread;
     delete m_pCommandThread;
 
     m_pControlThread = 0;
     m_pPhysicsThread = 0;
     m_pPlannerThread = 0 ;
-    m_pImuThread = 0;
     m_pLocalizerThread = 0;
 
     m_Localizer.Stop();
@@ -865,24 +838,18 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
 {
-    // m_bFuseImu set to true in MochaGui constructor 6/9/16
-    // Imu not used
 
-    /*if(m_bFuseImu == true){*/
-        // g_bProcessModelActive set to false in initial CVars at top of MochaGui 6/9/16
-        if(g_bProcessModelActive == false){
-            fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
-            currentState.m_dTwv = currentPose.m_dPose;
-            currentState.m_dV = currentPose.m_dV;
-            currentState.m_dW = currentPose.m_dW;
-            m_dVel = currentState.m_dV.norm();
-            m_dPos = currentState.m_dTwv.translation();
-        }else{
-            m_Fusion.GetVehicleState(currentState);
-        }
-    /*}else {
-        currentState.m_dTwv = m_Fusion.GetLastGlobalPose().m_dPose;
-    }*/
+    // g_bProcessModelActive set to false in initial CVars at top of MochaGui 6/9/16
+    if(g_bProcessModelActive == false){
+        fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
+        currentState.m_dTwv = currentPose.m_dPose;
+        currentState.m_dV = currentPose.m_dV;
+        currentState.m_dW = currentPose.m_dW;
+        m_dVel = currentState.m_dV.norm();
+        m_dPos = currentState.m_dTwv.translation();
+    }else{
+        m_Fusion.GetVehicleState(currentState);
+    }
 
     currentState.m_dV = GetBasisVector(currentState.m_dTwv,0).normalized()*currentState.m_dV.norm();
     currentState.m_dW[0] = currentState.m_dW[1] = 0;
@@ -959,47 +926,6 @@ void MochaGui::_LocalizerReadFunc()
     }
 }
 
-
-/////////////////////////////////////////////////////////////////////////////////////////
-/*void MochaGui::_ImuReadFunc()
-{
-    //double lastTime = Tic();
-    //int numPoses = 0;
-
-    std::cout << "Imu not used" << std::endl;
-
-
-    while(1){
-        Imu_Accel_Gyro Msg;
-        //this needs to be a blocking call .. not sure it is!!!
-        if(m_Node.receive("herbie/Imu",Msg)){
-            double dImuTime = (double)Msg.timer()/62500.0;
-            double sysTime = Tic();
-            m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
-                                     Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
-
-            if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-                m_FusionLogger.LogImuData(sysTime,dImuTime,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
-            }
-            //std::cout << "IMU pose received at:" << sysTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
-//            if(m_bLoggerEnabled && m_Logger.IsReady()){
-//                VehicleState state;
-//                _UpdateVehicleStateFromFusion(state);
-//                m_Logger.LogPoseUpdate(state,EventLogger::eIMU);
-//            }
-
-            double dt = Tic()-lastTime;
-            if(dt > 0.5){
-                m_dImuFreq = numPoses/dt;
-                lastTime = Tic();
-                numPoses = 0;
-            }
-            numPoses++;
-        }
-    }
-
-}*/
-
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlCommandFunc()
 {
@@ -1047,9 +973,16 @@ void MochaGui::_ControlCommandFunc()
             Req.set_phi(m_ControlCommand.m_dPhi);
             double time = Tic();
 
-            m_Node.publish( "Commands", Req );
 
-            //m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
+            //if we are not currently simulating, send these to the ppm
+            if( m_bSimulate3dPath == false )
+            {
+                m_Node.publish( "Commands", Req );
+                //send the messages to the control-daemon
+                //m_Node.call_rpc("herbie/ProgramControlRpc",Req,Rep); // from LearningGui
+                //m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
+            }
+
             m_dControlDelay = Toc(time);
         }
 
