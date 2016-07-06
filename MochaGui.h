@@ -99,6 +99,18 @@ protected:
     static bool RefreshHandler(std::vector<std::string> *vArgs) { return GetInstance()->_Refresh(vArgs); }
     static bool CommandHandler(MochaCommands command) { return GetInstance()->_CommandFunc(command); }
 
+    // UDP values
+    unsigned m_MochaPort;
+    unsigned m_ComPort;
+    unsigned m_NinjaPort;
+    struct sockaddr_in mochAddr;
+    struct sockaddr_in comAddr;
+    struct sockaddr_in ninjAddr;
+    socklen_t addrLen = sizeof(mochAddr);
+    int recvLen;
+    int sockFD;
+    unsigned char buf[2048];
+    unsigned int msgSize = 0;
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;
@@ -146,7 +158,7 @@ protected:
     bool& m_bSimulate3dPath;
     int& m_eControlTarget;
     bool& m_bControl3dPath;
-
+    bool m_bSIL = false;
 
     bool m_bPlanning;
     bool m_bControllerRunning;

@@ -55,7 +55,29 @@ MochaGui::MochaGui() :
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
     m_dPlanTime( Tic() ) //the size of the fusion sensor
 {
-    m_Node.init( "MochaGui" ); // Node on which to receive information from the car
+    //m_Node.init( "MochaGui" ); // Node on which to receive information from the car
+    m_MochaPort = 1643;
+    m_ComPort = 1642;
+    m_NinjaPort = 1644;
+
+    if ( ( sockFD = socket( AF_INET, SOCK_DGRAM, 0 ) ) < 0 ) LOG(ERROR) << "Could not create socket";
+
+    memset( (char*)&mochAddr, 0, addrLen );
+    mochAddr.sin_family = AF_INET;
+    mochAddr.sin_addr.s_addr = htonl( INADDR_ANY );
+    mochAddr.sin_port = htons( m_MochaPort );
+
+    if ( ::bind( sockFD, (struct sockaddr*)&mochAddr, addrLen ) < 0 ) LOG(ERROR) << "Could not bind socket to port " << m_MochaPort;
+
+    memset( (char*)&comAddr, 0, addrLen );
+    comAddr.sin_family = AF_INET;
+    comAddr.sin_addr.s_addr = htonl( INADDR_ANY );
+    comAddr.sin_port = htons( m_ComPort );
+
+    memset( (char*)&ninjAddr, 0, addrLen );
+    ninjAddr.sin_family = AF_INET;
+    ninjAddr.sin_addr.s_addr = htonl( INADDR_ANY );
+    ninjAddr.sin_port = htons( m_NinjaPort );
 }
 
 ////////////////////////////////////////////////////////////////
@@ -236,6 +258,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 {
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
+    m_bSIL = true;
 
     //m_Node.subscribe("herbie/Imu"); // Should change to match TestNode/CarPoseSim.cpp (NinjaCar/Compass)? This is a separate Imu channel that I think is currently unused. See _ImuReadFunc
 
@@ -328,7 +351,11 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //parameters[CarParameters::SteeringCoef] = -700.0;
 
     /// As well as the car that we're actually driving.
-    m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1 );
+    if ( m_bSIL )
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, true );
+    else
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, false );
+
 
     /// Set the two control commands we have to be the offsets calculated
     /// for the car; this should make it set to drive straight and not move.
@@ -453,9 +480,15 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     // Changed "NinjaCar" to "Compass"
     m_sCarObjectName = "Compass";
-    // Changed "posetonode" to "NinjaCar" to match CarPosSim
-    m_Localizer.TrackObject( m_sCarObjectName, "NinjaCar", Sophus::SE3d(dT_localizer_ref).inverse() );
-    LOG(INFO) << "Localizer initialized to track NinjaCar at " << m_sCarObjectName;
+    if ( m_bSIL ) {
+        // Changed "posetonode" to "BulletCarModel" to match BulletCarModel.cpp
+        m_Localizer.TrackObject( m_sCarObjectName, "BulletCarModel", Sophus::SE3d(dT_localizer_ref).inverse() );
+        LOG(INFO) << "Localizer initialized to track BulletCarModel at " << m_sCarObjectName;
+    } else {
+        // Changed "posetonode" to "NinjaCar" to match CarPosSim.cpp
+        m_Localizer.TrackObject( m_sCarObjectName, "NinjaCar", Sophus::SE3d(dT_localizer_ref).inverse() );
+        LOG(INFO) << "Localizer initialized to track NinjaCar at " << m_sCarObjectName;
+    }
 
     //initialize the panel
     m_GuiPanel.Init();
@@ -871,7 +904,6 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
     //dout("Theta: " << currentState.GetTheta());
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_LocalizerReadFunc()
 {
@@ -930,7 +962,7 @@ void MochaGui::_LocalizerReadFunc()
 void MochaGui::_ControlCommandFunc()
 {
     double dLastTime = Tic();
-    if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
+    //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
     while(1)
     {
         //only go ahead if the controller is running, and we are targeting the real vehicle
@@ -961,11 +993,13 @@ void MochaGui::_ControlCommandFunc()
                 //this update does not actually run the simulation. It only serves to push in
                 //a delayed command and update the steering (so we know where the steering value
                 //is when we pass the state to the controller)
-                m_DriveCarModel.UpdateState( 0, m_ControlCommand, m_ControlCommand.m_dT, false, true );
+                if ( !m_bSIL )
+                    m_DriveCarModel.UpdateState( 0, m_ControlCommand, m_ControlCommand.m_dT, false, true );
             }
 
             //send the commands to the car via node
             m_nNumPoseUpdates++;
+            hal::CommanderMsg* Command = new hal::CommanderMsg();
             CommandMsg Req;
             CommandReply Rep;
 
@@ -977,10 +1011,23 @@ void MochaGui::_ControlCommandFunc()
             //if we are not currently simulating, send these to the ppm
             if( m_bSimulate3dPath == false )
             {
-                m_Node.publish( "Commands", Req );
-                //send the messages to the control-daemon
-                //m_Node.call_rpc("herbie/ProgramControlRpc",Req,Rep); // from LearningGui
-                //m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
+                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true, Command );
+                unsigned char buffer[Command->ByteSize() + 4];
+
+                google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
+                google::protobuf::io::CodedOutputStream coded_output( &aos );
+                coded_output.WriteVarint32( Command->ByteSize() );
+                Command->SerializeToCodedStream( &coded_output );
+                if ( m_bSIL ) {
+                    //send Command to BulletCarModel
+                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
+                }
+                else {
+                    //send Command to NinjaCar
+                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&ninjAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
+
+                }
+
             }
 
             m_dControlDelay = Toc(time);
@@ -1081,7 +1128,7 @@ void MochaGui::_ControlFunc()
                     //get the current position and pass it to the controller
                     m_Controller.SetCurrentPoseFromCarModel(&m_DriveCarModel,0);
                 }else if(m_eControlTarget == eTargetExperiment){
-                    //get current pose from the fusion routine
+                    //get current pose from the Localizer
                     _UpdateVehicleStateFromFusion(currentState);
                     //set the command history and current pose on the controller
                     {
@@ -1303,9 +1350,7 @@ void MochaGui::_PhysicsFunc()
                 //dout("Simulating with force " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dForce <<
                 //     " and accel " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dPhi <<
                 //     " and torque " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dTorques.transpose());
-                m_DriveCarModel.UpdateState(0,m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample],
-                                            m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dT,
-                                            true); //no delay for simulation
+                if ( !m_bSIL ) m_DriveCarModel.UpdateState( 0, m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ], m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ].m_dT, true ); //no delay for simulation
                 currentCommand = m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample];
 
                 //wait until we have reached the correct dT to
