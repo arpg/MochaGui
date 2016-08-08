@@ -74,7 +74,7 @@ private:
     void _SetPoseFromFusion();
 
     void _JoystickReadFunc();
-    void _ImuReadFunc();
+    //void _ImuReadFunc();
     void _LocalizerReadFunc();
 
     void _CommandHandler(const MochaCommands& command);
@@ -82,7 +82,7 @@ private:
     /// localizer reader
     Localizer m_Localizer;
     /// node for capturing IMU data from the car
-    node::node m_Node;
+    //node::node m_Node;
     /// name of the car used for localizer tracking
     std::string m_sCarObjectName;
 
@@ -117,7 +117,7 @@ private:
     boost::thread* m_pPhysicsThread;
     boost::thread* m_pLearningThread;
     boost::thread* m_pLearningCaptureThread;
-    boost::thread* m_pImuThread;
+    //boost::thread* m_pImuThread;
     boost::thread* m_pLocalizerThread;
     boost::thread* m_pJoystickThread;
     boost::mutex m_JoystickMutex;

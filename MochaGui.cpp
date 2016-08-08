@@ -258,7 +258,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 {
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
-    m_bSIL = true;
+    m_bSIL = false;
 
     //m_Node.subscribe("herbie/Imu"); // Should change to match TestNode/CarPoseSim.cpp (NinjaCar/Compass)? This is a separate Imu channel that I think is currently unused. See _ImuReadFunc
 
@@ -310,7 +310,6 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
                                                          0,0,0,1);
     }*/
 
-    // cma currently sets sMode to "Experiment" 6/2/16
     if(sMode == "Simulation"){
         m_eControlTarget = eTargetSimulation;
         pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
@@ -320,8 +319,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     }else{
         m_eControlTarget = eTargetExperiment;
         pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-                                                          0, -1, 0, 0,
-                                                          0, 0, -1, 0,
+                                                          0, 1, 0, 0,
+                                                          0, 0,-1, 0,
                                                           0, 0, 0, 1 );
     }
 
@@ -617,7 +616,6 @@ void MochaGui::_KillThreads()
 
     m_Localizer.Stop();
 }
-
 
 ////////////////////////////////////////////////////////////////
 bool MochaGui::_SetWaypointVel(std::vector<std::string> *vArgs)
@@ -997,7 +995,7 @@ void MochaGui::_ControlCommandFunc()
                     m_DriveCarModel.UpdateState( 0, m_ControlCommand, m_ControlCommand.m_dT, false, true );
             }
 
-            //send the commands to the car via node
+            //send the commands to the car via udp
             m_nNumPoseUpdates++;
             hal::CommanderMsg* Command = new hal::CommanderMsg();
             CommandMsg Req;
@@ -1011,7 +1009,9 @@ void MochaGui::_ControlCommandFunc()
             //if we are not currently simulating, send these to the ppm
             if( m_bSimulate3dPath == false )
             {
-                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true, Command );
+                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true/*true*/, Command );
+
+
                 unsigned char buffer[Command->ByteSize() + 4];
 
                 google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
@@ -1020,7 +1020,9 @@ void MochaGui::_ControlCommandFunc()
                 Command->SerializeToCodedStream( &coded_output );
                 if ( m_bSIL ) {
                     //send Command to BulletCarModel
-                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
+                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) { LOG(ERROR) << "Did not send message"; }
+                    //else { LOG(INFO) << "Sent Command"; }
+
                 }
                 else {
                     //send Command to NinjaCar
@@ -1098,7 +1100,13 @@ void MochaGui::_ControlFunc()
             VehicleState startingState = m_vSegmentSamples[g_nStartSegmentIndex].m_vStates[0];
             startingState.m_dV = Eigen::Vector3d::Zero();
             startingState.m_dW = Eigen::Vector3d::Zero();
-            startingState.m_dTwv.translation() += GetBasisVector(startingState.m_dTwv,1)*0.25;
+            startingState.m_dTwv.translation() += (GetBasisVector(startingState.m_dTwv,1)*0.25);
+            Eigen::Matrix3d rm;
+            int yaw = 90;
+            rm << cos(yaw), -sin(yaw),  0,
+                  sin(yaw), cos(yaw),   0,
+                  0,        0,          1;
+            if ( m_eControlTarget == eTargetExperiment ) startingState.m_dTwv.setRotationMatrix(rm);
             m_DriveCarModel.SetState(0,startingState);
             m_DriveCarModel.ResetCommandHistory(0);
 
@@ -1334,7 +1342,7 @@ void MochaGui::_PhysicsFunc()
                         m_Logger.LogControlCommand(currentCommand);
                     }
 
-                    m_DriveCarModel.UpdateState(0,currentCommand,currentDt);
+                    m_DriveCarModel.UpdateState(0,currentCommand,currentDt, false, false );
 
                     m_dPlanTime = m_dPlanTime + currentDt;
 
@@ -1350,7 +1358,7 @@ void MochaGui::_PhysicsFunc()
                 //dout("Simulating with force " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dForce <<
                 //     " and accel " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dPhi <<
                 //     " and torque " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dTorques.transpose());
-                if ( !m_bSIL ) m_DriveCarModel.UpdateState( 0, m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ], m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ].m_dT, true ); //no delay for simulation
+                m_DriveCarModel.UpdateState( 0, m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ], m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ].m_dT, true ); //no delay for simulation
                 currentCommand = m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample];
 
                 //wait until we have reached the correct dT to

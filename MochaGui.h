@@ -24,7 +24,6 @@
 #include <CarPlanner/CarRegressor.h>
 #include <CarPlanner/Localizer.h>
 #include <CarPlanner/CVarHelpers.h>
-#include <Node/Node.h>
 
 #include "GLCar.h"
 #include "PlannerGui.h"
@@ -42,8 +41,6 @@ using namespace Eigen;
 
 extern float g_fTurnrate;
 extern float g_fSpeed;
-
-
 
 class MochaGui {
 public:
@@ -205,7 +202,6 @@ protected:
     std::string m_sPlaybackLogFile;
     double m_dPlaybackTimer;
 
-    node::node m_Node;   //node for capturing PoseData from the car
     ProcessModelFusion m_Fusion;
 
     boost::mutex m_ControlMutex;
