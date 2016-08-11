@@ -62,6 +62,7 @@ protected:
     bool _SetWaypointVel(std::vector<std::string> *vArgs);
     bool _Refresh(std::vector<std::string> *vArgs);
     void _RefreshWaypoints();
+    void _SetWaypoints( int numWaypoints, std::vector<Eigen::Vector3d*> &axy,  std::vector<Eigen::MatrixXd*> &waypoints, std::vector<int> &path );
     bool _CommandFunc(MochaCommands command);
     bool _IteratePlanner(LocalProblem& problem,
                          MotionSample& sample,
@@ -133,6 +134,7 @@ protected:
     list<std::vector<VehicleState> *> m_lPlanStates;
     GLCachedPrimitives* m_pControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
+    std::vector<Eigen::Vector2d*> m_vPrims;
 
     LocalPlanner m_Planner; // Car planner for trajectory plotting
     CarController m_Controller;
@@ -156,6 +158,7 @@ protected:
     int& m_eControlTarget;
     bool& m_bControl3dPath;
     bool m_bSIL = false;
+    bool m_bGlobalPlanner;
 
     bool m_bPlanning;
     bool m_bControllerRunning;

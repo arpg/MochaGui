@@ -259,6 +259,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
     m_bSIL = false;
+    m_bGlobalPlanner = true;
 
     //m_Node.subscribe("herbie/Imu"); // Should change to match TestNode/CarPoseSim.cpp (NinjaCar/Compass)? This is a separate Imu channel that I think is currently unused. See _ImuReadFunc
 
@@ -411,25 +412,32 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
     /// Establish number of waypoints and where they are; set them to CVars.
-    int numWaypoints = 8;
-    for(int ii = 0; ii < numWaypoints ; ii++){
-        char buf[100];
-        snprintf( buf, 100, "waypnt.%d", ii );
-        m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+    if (m_bGlobalPlanner) {
+        std::vector<Eigen::Vector3d*> axy;
+        axy.push_back( new Eigen::Vector3d(0, 1, 0) ); // Start
+        axy.push_back( new Eigen::Vector3d(2, 2, 0) ); // Goal
+        _SetWaypoints( 2, axy, m_vWayPoints, m_Path );
+    } else {
+        int numWaypoints = 8;
+        for(int ii = 0; ii < numWaypoints ; ii++){
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
 
-        /// Linear waypoints.
-        //    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
+            /// Linear waypoints.
+            //    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
 
-        /// Waypoints in a circle.
-        (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints),
-            cos(ii*2*M_PI/numWaypoints),
-            0, 0, 0, -ii*2*M_PI/numWaypoints, 1,0;
+            /// Waypoints in a circle.
+            (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints),
+                cos(ii*2*M_PI/numWaypoints),
+                0, 0, 0, -ii*2*M_PI/numWaypoints, 1,0;
 
-        /// Load this segment ID into a vector that enumerates the path elements.
-        m_Path.push_back(ii);
+            /// Load this segment ID into a vector that enumerates the path elements.
+            m_Path.push_back(ii);
+        }
+        //close the loop
+        m_Path.push_back(0);
     }
-    //close the loop
-    m_Path.push_back(0);
 
     m_nStateStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
     m_nLearningStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
@@ -538,6 +546,19 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_Fusion.SetCalibrationActive(false);
     //dout("Sucessfully initialized MochaGui object.");
     m_pControlLine = new GLCachedPrimitives();
+}
+
+////////////////////////////////////////////////////////////////
+void MochaGui::_SetWaypoints( int numWaypoints, std::vector<Eigen::Vector3d*> &axy, std::vector<Eigen::MatrixXd*> &waypoints, std::vector<int> &path )
+{
+    for ( int ii = 0; ii < numWaypoints; ii++ )
+    {
+        char buff[100];
+        snprintf( buff, 100, "waypoint.%d", ii );
+        waypoints.push_back( &CreateGetCVar( std::string(buff), MatrixXd(8,1) ) );
+        *waypoints.back() << axy[ii][0], axy[ii][1], 1, 0;
+        path.push_back(ii);
+    }
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1546,6 +1567,16 @@ void MochaGui::_PlannerFunc() {
                     vDirtyIds.push_back(nStartIdx);
                     vDirtyIds.push_back(nEndIdx);
                 }
+            }
+
+        }
+
+        if (m_bGlobalPlanner) {
+
+            for ( int ii = 0; ii < m_vSegmentSamples[0].m_vCommands.size(); ii++ ) {
+                std::cout << "Force " << std::to_string(ii) << ": " << m_vSegmentSamples[0].m_vCommands[ii].m_dForce << std::endl;
+                std::cout << "  Phi " << std::to_string(ii) << ": " << m_vSegmentSamples[0].m_vCommands[ii].m_dPhi << std::endl;
+                m_vPrims.push_back( new Eigen::Vector2d( m_vSegmentSamples[0].m_vCommands[ii].m_dForce, m_vSegmentSamples[0].m_vCommands[ii].m_dPhi ) );
             }
         }
 
