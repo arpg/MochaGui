@@ -421,9 +421,10 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
         //    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
 
         /// Waypoints in a circle.
+        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, ?curvature
         (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints),
             cos(ii*2*M_PI/numWaypoints),
-            0, 0, 0, -ii*2*M_PI/numWaypoints, 1,0;
+            0, 0, 0, -ii*2*M_PI/numWaypoints, 1, 0;
 
         /// Load this segment ID into a vector that enumerates the path elements.
         m_Path.push_back(ii);
