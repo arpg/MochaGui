@@ -27,7 +27,7 @@ LearningGui::LearningGui() :
     m_bRefresh(false),
     m_bRegress(false)
 {
-    m_Node.init("LearningGui");
+    //m_Node.init("LearningGui");
     m_bPlayback = false;
 }
 
@@ -137,7 +137,7 @@ void LearningGui::_JoystickReadFunc()
 
             Req.set_accel(command.m_dForce);
             Req.set_phi(command.m_dPhi);
-            m_Node.call_rpc("herbie/ProgramControlRpc",Req,Rep);
+            //m_Node.call_rpc("herbie/ProgramControlRpc",Req,Rep);
         }
 
         {
@@ -199,7 +199,7 @@ void LearningGui::_SetPoseFromFusion()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void LearningGui::_ImuReadFunc()
+/*void LearningGui::_ImuReadFunc()
 {
     int nNumImu = 0;
     double lastTime = -1;
@@ -223,7 +223,7 @@ void LearningGui::_ImuReadFunc()
             //std::cout << "IMU pose received at:" << CarPlanner::Tic()-m_dStartTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
         }
     }
-}
+}*/
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void LearningGui::_LocalizerReadFunc()
@@ -427,12 +427,12 @@ void LearningGui::Init(const std::string& sRefPlane, const std::string& sMeshNam
         m_Fusion.SetCalibrationPose(Sophus::SE3d(fusion::Cart2T(T_ic)));
         m_Fusion.SetCalibrationActive(false);
 
-        m_Node.subscribe("herbie/Imu");
+        //m_Node.subscribe("herbie/Imu");
         //dT_localizer_ref.block<3,3>(0,0).transposeInPlace();
         m_Localizer.TrackObject(m_sCarObjectName, "posetonode",Sophus::SE3d(dT_localizer_ref).inverse(),true);
         m_Localizer.Start();
 
-        m_pImuThread = new boost::thread(boost::bind(&LearningGui::_ImuReadFunc,this));
+        //m_pImuThread = new boost::thread(boost::bind(&LearningGui::_ImuReadFunc,this));
         m_pLocalizerThread = new boost::thread(boost::bind(&LearningGui::_LocalizerReadFunc,this));
         m_pLearningCaptureThread = new boost::thread(boost::bind(&LearningGui::_LearningCaptureFunc,this));
 

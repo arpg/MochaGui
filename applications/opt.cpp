@@ -8,7 +8,7 @@
 #include "PlannerGui.h"
 
 static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.IterationLimit", 10, "");
-static double& g_dT = CVarUtils::CreateGetUnsavedCVar("planner.TimeInteval", 0.01, "");
+static double& g_dT = CVarUtils::CreateGetUnsavedCVar("planner.TimeInterval", 0.01, ""); // Changed TimeInteval to TimeInterval (also in MochaGui.cpp)
 static bool& g_bInertialControlActive = CVarUtils::CreateGetUnsavedCVar("planner.InertialControlActive", false, "");
 static bool& g_bPointCost(CVarUtils::CreateGetUnsavedCVar("controller.PointCost",false,""));
 static double& g_dSuccessNorm = CVarUtils::CreateGetUnsavedCVar("debug.SuccessNorm",1e-10);

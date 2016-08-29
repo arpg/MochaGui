@@ -2,16 +2,16 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 PlannerGui::PlannerGui():
-    m_RenderState(pangolin::ProjectionMatrix(WINDOW_WIDTH,WINDOW_HEIGHT,420,420,WINDOW_WIDTH/2,WINDOW_HEIGHT/2,0.1,1000), pangolin::ModelViewLookAt(2,2,-3,0,0,0,pangolin::AxisNegZ)),
-    m_RenderState2d(pangolin::ProjectionMatrixOrthographic(0,1,0,1,0.0,100)),
-    m_RenderStateWidget(pangolin::ProjectionMatrixOrthographic(0, (double)UI_PANEL_WIDTH/(double)WINDOW_WIDTH,1.0-(double)UI_PANEL_HEIGHT/(double)WINDOW_HEIGHT,1.0,0.0,100)),
-    m_pFollowCar(0),
-    m_eViewType(eNeutral),
-    m_nSelectedWaypoint(-1)
+    m_RenderState( pangolin::ProjectionMatrix(WINDOW_WIDTH,WINDOW_HEIGHT,420,420,WINDOW_WIDTH/2,WINDOW_HEIGHT/2,0.1,1000), pangolin::ModelViewLookAt(2,2,-3,0,0,0,pangolin::AxisNegZ) ),
+    m_RenderState2d( pangolin::ProjectionMatrixOrthographic(0,1,0,1,0.0,100) ),
+    m_RenderStateWidget( pangolin::ProjectionMatrixOrthographic(0, (double)UI_PANEL_WIDTH/(double)WINDOW_WIDTH,1.0-(double)UI_PANEL_HEIGHT/(double)WINDOW_HEIGHT,1.0,0.0,100) ),
+    m_pFollowCar( NULL ),
+    m_eViewType( eNeutral ),
+    m_nSelectedWaypoint( -1 )
 {
-    int argc = 0;
+    //int argc = 0;
     //glutInit(&argc,0);
-    pangolin::CreateGlutWindowAndBind("Main",WINDOW_WIDTH,WINDOW_HEIGHT);
+    pangolin::CreateGlutWindowAndBind("PlannerGui",WINDOW_WIDTH,WINDOW_HEIGHT);
     glewInit();
 }
 
@@ -40,12 +40,18 @@ void PlannerGui::Render()
 {
     m_pView->ActivateScissorAndClear();
 
+    //LOG(INFO) << "m_pFollowCar: " << m_pFollowCar;
+
     if(m_pFollowCar != NULL){
         m_RenderState.Follow(OpenGlMatrix(m_pFollowCar->m_GLCar.GetPose4x4_po()));
     }
 
+    //LOG(INFO) << "About to finish glut frame";
+
     // Swap frames and Process Events
     pangolin::FinishGlutFrame();
+
+    //LOG(INFO) << "Finished Glut Frame";
 
     //handle waypoints
 
@@ -68,10 +74,10 @@ void PlannerGui::Render()
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+/*////////////////////////////////////////////////////////////////////////////////////////
 // DEPRECATED FUNCTION.
 //void PlannerGui::Init(const std::string sTerrainMeshFileName, GLMesh* pMesh,
-//                      const bool bLocalizerCoords /* = false */,
+//                      const bool bLocalizerCoords / = false *,
 //                      const std::string& sCarMesh, const std::string& sWheelMesh)
 //{
 //    const aiScene *pScene = aiImportFile( sTerrainMeshFileName.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
@@ -94,7 +100,7 @@ void PlannerGui::Render()
 
 //    m_sCarMesh = sCarMesh;
 //    m_sWheelMesh = sWheelMesh;
-//}
+//}*/
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::Init(SceneGraph::GLObject* pTerrain)
@@ -215,6 +221,7 @@ int PlannerGui::AddCar(const double& nWheelbase, const double& nWidth,
     Car* pCar = m_vCars.back();
 
     pCar->m_GLCar.Init(eMesh, sCarMesh, sWheelMesh);
+
     pCar->m_GLCar.SetCarScale(Eigen::Vector3d(nWheelbase,nWidth,nWheelbase));
 
     pCar->m_CarLineSegments.SetColor(GLColor(0.0f,0.0f,1.0f));
@@ -259,6 +266,7 @@ void PlannerGui::SetCarState(const int &id, const VehicleState &state, bool bAdd
 
     //add this pose to the trajectory of the car if required
     if(bAddToTrajectory){
+        //LOG(INFO) << "Adding pose to car trajectory";
         pCar->m_CarLineSegments.SetPoint(state.m_dTwv.translation());
     }
 }
@@ -311,8 +319,6 @@ void PlannerGui::SetWaypointDirtyFlag(bool bFlag)
 /////////////////////////////////////////////////////////////////////////////////////////
 void PlannerGui::_PopulateSceneGraph()
 {
-
-
     //add the terrain
     m_SceneGraph.AddChild(m_pTerrain);
 

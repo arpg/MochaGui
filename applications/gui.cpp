@@ -2,18 +2,19 @@
 #include "config.h"
 #include "MochaGui.h"
 
-DEFINE_string(params, "", "File for car parameters.");		// /Users/crh/data/params.csv
-DEFINE_string(mesh, "", "File for car parameters.");  		// /Users/crh/data/lab.ply
+DEFINE_string(params, "", "File for car parameters.");		// /Users/corinsandford/Documents/ARPG/MochaGui/herbie/params.csv
+DEFINE_string(mesh, "", "File for car parameters.");  		// /Users/corinsandford/Documents/ARPG/MochaGui/herbie/lab.ply
 DEFINE_bool(localizer, false, "Whether or not to instantiate localization system.");
 DEFINE_string(mode, "Simulation", "Mode: Experiment or Simulation (default).");
 DEFINE_string(ref, "", "Reference plane for model if no triangle mesh.");
-DEFINE_string(logfile, "", "Logfile for playing back.");	// /Users/crh/data/mocha_playback.log
-DEFINE_string(car, "", "File for car mesh.");
-DEFINE_string(wheel,"", "File for wheel mesh.");
+DEFINE_string(logfile, "", "Logfile for playing back.");	// /Users/corinsandford/Documents/ARPG/MochaGui/herbie/mocha_playback.log
+DEFINE_string(car, "", "File for car mesh.");               // /Users/corinsandford/Documents/ARPG/MochaGui/herbie/herbie.ply
+DEFINE_string(wheel,"", "File for wheel mesh.");            // /Users/corinsandford/Documents/ARPG/MochaGui/herbie/wheel.ply
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char* argv[] )
 {
+
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
@@ -55,8 +56,7 @@ int main( int argc, char* argv[] )
   }
 
   MochaGui *pGui = MochaGui::GetInstance();
-  pGui->Init(FLAGS_ref,FLAGS_mesh,FLAGS_localizer,FLAGS_mode,FLAGS_logfile,
-             FLAGS_params,FLAGS_car,FLAGS_wheel);
+  pGui->Init( FLAGS_ref, FLAGS_mesh, FLAGS_localizer, FLAGS_mode, FLAGS_logfile, FLAGS_params, FLAGS_car, FLAGS_wheel );
   pGui->Run();
 
   delete pGui;

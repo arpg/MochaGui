@@ -28,37 +28,56 @@ static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.Iterati
 ////////////////////////////////////////////////////////////////
 MochaGui::MochaGui() :
     //m_ActiveHeightMap(m_KHeightMap),
-    m_Path(CreateCVar("path", vector<int>(), "Path vector.")),
-    m_bPlannerOn(CreateUnsavedCVar("planner.PlannerOn", false, "if true, the car model will only follow the control law from the 2D path.")),
-    m_bShowProjectedPath(CreateCVar("planner.ShowProjected2dPath", true, "how the 2D path z-projected onto the surface")),    
-    m_bCompute3dPath(CreateCVar("planner.Compute3DPath", true, "Compute path using terrain driven simulation")),
-    m_bSimulate3dPath(CreateUnsavedCVar("planner.Simulate3DPath", false, "Drive the car over the path to see the results in real-time")),
-    m_eControlTarget(CreateCVar("controller.ControlTarget", (int)eTargetSimulation, "Drive the car over the path to see the results in real-time")),
-    m_bControl3dPath(CreateUnsavedCVar("planner.Control3DPath", false, "Drive the car over the path to see the results in real-time")),
-    m_bFuseImu(CreateCVar("planner.FuseImu", true)),
-    m_nPathSegments(CreateCVar("planner.PathSegments", 20u, "how many segments to draw")),
-    m_dTimeInterval(CreateCVar("planner.TimeInteval", 0.01, "")),
-    m_pPlannerThread(0),
-    m_pPhysicsThread(0),
-    m_pControlThread(0),
-    m_pCommandThread(0),
-    m_pImuThread(0),
-    m_pLocalizerThread(0),
-    m_StillControl(true),
-    m_StillRun(true),
-    m_bLoggerEnabled(CreateUnsavedCVar("logger.Enabled", false, "")),
-
-    m_sLogFileName(CreateUnsavedCVar("logger.FileName", std::string(), "/Users/crh/data/mocha.log")),
-    m_bFusionLoggerEnabled(CreateUnsavedCVar("logger.FusionEnabled", false, "")),
-    m_bLoggerPlayback(CreateUnsavedCVar("logger.Playback", false, "")),
-    m_nNumControlSignals(0),
-    m_nNumPoseUpdates(0),
-    m_dPlaybackTimer(-1),
-    m_Fusion(30,&m_DriveCarModel),
-    m_bLoadWaypoints(CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.")),
-    m_dPlanTime(CarPlanner::Tic()) //the size of the fusion sensor
+    m_Path( CreateCVar("path", vector<int>(), "Path vector.") ),
+    m_StillRun( true ),
+    m_StillControl( true ),
+    m_bPlannerOn( CreateUnsavedCVar("planner.PlannerOn", false, "if true, the car model will only follow the control law from the 2D path.") ),
+    m_bShowProjectedPath( CreateCVar("planner.ShowProjected2dPath", true, "how the 2D path z-projected onto the surface") ),
+    m_bCompute3dPath( CreateCVar("planner.Compute3DPath", true, "Compute path using terrain driven simulation") ),
+    m_bSimulate3dPath( CreateUnsavedCVar("planner.Simulate3DPath", false, "Drive the car over the path to see the results in real-time") ),
+    m_eControlTarget( CreateCVar("controller.ControlTarget", (int)eTargetSimulation, "Drive the car over the path to see the results in real-time") ),
+    m_bControl3dPath( CreateUnsavedCVar("planner.Control3DPath", false, "Drive the car over the path to see the results in real-time") ),
+    m_nPathSegments( CreateCVar("planner.PathSegments", 20u, "how many segments to draw") ),
+    m_dTimeInterval( CreateCVar("planner.TimeInterval", 0.01, "") ), /* changed TimeInteval to TimeInterval (also in opt.cpp) */
+    m_pPlannerThread( 0 ),
+    m_pPhysicsThread( 0 ),
+    m_pControlThread( 0 ),
+    m_pCommandThread( 0 ),
+    m_pLocalizerThread( 0 ),
+    m_bLoggerEnabled( CreateUnsavedCVar("logger.Enabled", false, "")),
+    m_sLogFileName( CreateUnsavedCVar("logger.FileName", std::string(), "/Users/corinsandford/ARPG/MochaGui/logs/mocha.log")),
+    m_bFusionLoggerEnabled( CreateUnsavedCVar("logger.FusionEnabled", false, "")),
+    m_bLoggerPlayback( CreateUnsavedCVar("logger.Playback", false, "")),
+    m_nNumControlSignals( 0 ),
+    m_nNumPoseUpdates( 0 ),
+    m_dPlaybackTimer( -1 ),
+    m_Fusion( 30, &m_DriveCarModel ),
+    m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
+    m_dPlanTime( Tic() ) //the size of the fusion sensor
 {
-    m_Node.init("MochaGui");
+    //m_Node.init( "MochaGui" ); // Node on which to receive information from the car
+    m_MochaPort = 1643;
+    m_ComPort = 1642;
+    m_NinjaPort = 1644;
+
+    if ( ( sockFD = socket( AF_INET, SOCK_DGRAM, 0 ) ) < 0 ) LOG(ERROR) << "Could not create socket";
+
+    memset( (char*)&mochAddr, 0, addrLen );
+    mochAddr.sin_family = AF_INET;
+    mochAddr.sin_addr.s_addr = htonl( INADDR_ANY );
+    mochAddr.sin_port = htons( m_MochaPort );
+
+    if ( ::bind( sockFD, (struct sockaddr*)&mochAddr, addrLen ) < 0 ) LOG(ERROR) << "Could not bind socket to port " << m_MochaPort;
+
+    memset( (char*)&comAddr, 0, addrLen );
+    comAddr.sin_family = AF_INET;
+    comAddr.sin_addr.s_addr = htonl( INADDR_ANY );
+    comAddr.sin_port = htons( m_ComPort );
+
+    memset( (char*)&ninjAddr, 0, addrLen );
+    ninjAddr.sin_family = AF_INET;
+    ninjAddr.sin_addr.s_addr = htonl( INADDR_ANY );
+    ninjAddr.sin_port = htons( m_NinjaPort );
 }
 
 ////////////////////////////////////////////////////////////////
@@ -82,17 +101,14 @@ MochaGui *MochaGui::GetInstance()
 
 ////////////////////////////////////////////////////////////////
 void MochaGui::Run() {
-    //create the list of cvars not tsave
-    std::vector<std::string> filter = { "not", "debug.MinLookaheadTime", "debug.MaxPlanTimeMultiplier", "debug.FreezeControl", "debug.PointCost",
-                                        "debug.Show2DResult","debug.Optimize2DOnly","debug.ForceZeroStartingCurvature","debug.UseCentralDifferences",
-                                        "debug.UseGoalPoseStepping","debug.DisableDamping","debug.MonotonicCost","debug.LocalizerDownsampler",
-                                        "debug.ImuIntegrationOnly","debug.ShowJacobianPaths","debug.SkidCompensationActive","debug.PlaybackControlPaths",
-                                        "debug.MaxLookaheadTime","debug.InertialControl","debug.StartSegmentIndex","planner.PointCostWeights",
-                                        "planner.TrajCostWeights", "planner.Epsilon"};
+    //create the list of cvars not to save
+    std::vector<std::string> filter = { "not", "debug.MinLookaheadTime", "debug.MaxPlanTimeMultiplier", "debug.FreezeControl", "debug.PointCost", "debug.Show2DResult", "debug.Optimize2DOnly", "debug.ForceZeroStartingCurvature", "debug.UseCentralDifferences", "debug.UseGoalPoseStepping", "debug.DisableDamping", "debug.MonotonicCost", "debug.LocalizerDownsampler", /*"debug.ImuIntegrationOnly",*/ "debug.ShowJacobianPaths", "debug.SkidCompensationActive", "debug.PlaybackControlPaths", "debug.MaxLookaheadTime", "debug.InertialControl", "debug.StartSegmentIndex", "planner.PointCostWeights", "planner.TrajCostWeights", "planner.Epsilon"};
+
     int frameCount = 0;
-    double lastTime = CarPlanner::Tic();
-    m_dDiagTime = CarPlanner::Tic();
-    SetThreadName("Main thread");
+    double lastTime = Tic();
+    m_dDiagTime = Tic();
+    SetThreadName("Main Thread");
+    LOG(INFO) << "Starting Threads";
     _StartThreads();
     double lastFrameTime = CarPlanner::Tic();
     while( !pangolin::ShouldQuit() )
@@ -105,7 +121,7 @@ void MochaGui::Run() {
 
         std::this_thread::sleep_for(std::chrono::microseconds(10));
 
-        //calcualte Fps
+        //calculate Fps
         frameCount++;
         if(CarPlanner::Toc(lastTime) > 0.5){
             m_dFps = (double)frameCount / (CarPlanner::Toc(lastTime));
@@ -113,16 +129,12 @@ void MochaGui::Run() {
             lastTime = CarPlanner::Tic();
         }
 
-
-
-
         if(m_bLoggerPlayback){
             _PlaybackLog(CarPlanner::Toc(lastFrameTime));
         }else{
             _UpdateVisuals();
         }
         lastFrameTime = CarPlanner::Tic();
-
 
 
         //save/load files if necessary
@@ -247,8 +259,9 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 {
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
+    m_bSIL = false;
 
-    m_Node.subscribe("herbie/Imu");
+    //m_Node.subscribe("herbie/Imu"); // Should change to match TestNode/CarPoseSim.cpp (NinjaCar/Compass)? This is a separate Imu channel that I think is currently unused. See _ImuReadFunc
 
     m_dStartTime = CarPlanner::Tic();
     m_bAllClean = false;
@@ -262,7 +275,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 's', [this] {CarParameters::SaveToFile(m_sParamsFile,m_mDefaultParameters);} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'r', std::bind(CommandHandler, eMochaRestart ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 't', std::bind(CommandHandler, eMochaSolve ) );
-    //pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'v', std::bind(CommandHandler, eMochaPpmControl ) );
+    pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'e', std::bind(CommandHandler, eMochaPpmControl ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'b', std::bind(CommandHandler, eMochaSimulationControl ) );
     pangolin::RegisterKeyPressCallback( '\r', std::bind(CommandHandler, eMochaStep ) );
     pangolin::RegisterKeyPressCallback( ' ', std::bind(CommandHandler, eMochaPause ) );
@@ -270,11 +283,9 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     pangolin::RegisterKeyPressCallback( 'G', [this] {this->m_pGraphView->Show(!this->m_pGraphView->IsShown());} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'f', [] {g_bFreezeControl = !g_bFreezeControl;} );
 
-
     //create CVars
     CVarUtils::CreateCVar("refresh", RefreshHandler, "Refresh all the waypoints.");
     CVarUtils::CreateCVar("SetWaypointVel", SetWaypointVelHandler, "Set a single velocity on all waypoints.");
-
 
     //initialize the heightmap
     //m_KHeightMap.LoadMap(DEFAULT_MAP_NAME,DEFAULT_MAP_IMAGE_NAME);
@@ -284,22 +295,34 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     const aiScene *pScene = aiImportFile( sMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
 
-    if(bLocalizer){
+    // Moved this code to simulation/experiment since that what it seems to be
+    // i.e. the localizer is running when in Experiment mode
+    /*if(bLocalizer){
+        // Experiment?
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                          0,-1,0,0,
                                                          0,0,-1,0,
                                                          0,0,0,1);
     } else {
-      pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+        // Simulation?
+        pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                          0,1,0,0,
                                                          0,0,-1,0,
                                                          0,0,0,1);
-    }
+    }*/
 
     if(sMode == "Simulation"){
         m_eControlTarget = eTargetSimulation;
+        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+                                                          0, 1, 0, 0,
+                                                          0, 0,-1, 0,
+                                                          0, 0, 0, 1 );
     }else{
         m_eControlTarget = eTargetExperiment;
+        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+                                                          0, 1, 0, 0,
+                                                          0, 0,-1, 0,
+                                                          0, 0, 0, 1 );
     }
 
     btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
@@ -318,7 +341,6 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //m_MeshHeightMap.Init("ramp.blend");
     //m_GLHeightMap.Init(&m_ActiveHeightMap);
 
-
     /// Initialize the car parameters.
     CarParameters::LoadFromFile(m_sParamsFile,m_mDefaultParameters);
 
@@ -329,7 +351,11 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //parameters[CarParameters::SteeringCoef] = -700.0;
 
     /// As well as the car that we're actually driving.
-    m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1 );
+    if ( m_bSIL )
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, true );
+    else
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, false );
+
 
     /// Set the two control commands we have to be the offsets calculated
     /// for the car; this should make it set to drive straight and not move.
@@ -396,9 +422,10 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
         //    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
 
         /// Waypoints in a circle.
+        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, ?curvature
         (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints),
             cos(ii*2*M_PI/numWaypoints),
-            0, 0, 0, -ii*2*M_PI/numWaypoints, 1,0;
+            0, 0, 0, -ii*2*M_PI/numWaypoints, 1, 0;
 
         /// Load this segment ID into a vector that enumerates the path elements.
         m_Path.push_back(ii);
@@ -414,13 +441,13 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_TerrainMesh.SetAlpha(1.0);
     m_Gui.Init(&m_TerrainMesh);
 
-    /// m_pGraphView cannot be resized in old_pangolin and crashes everything.
+  /// m_pGraphView cannot be resized in old_pangolin and crashes everything.
 //    m_pGraphView = &pangolin::Plotter(&m_Log)
 //            .SetBounds(0.0, 0.3, 0.6, 1.0);
 //    pangolin::DisplayBase().AddDisplay(*m_pGraphView);
 
-    m_nDriveCarId = m_Gui.AddCar(m_mDefaultParameters[CarParameters::WheelBase],m_mDefaultParameters[CarParameters::Width],
-        sCarMesh, sWheelMesh);
+    // Add Car to Car Planner
+    m_nDriveCarId = m_Gui.AddCar( m_mDefaultParameters[CarParameters::WheelBase], m_mDefaultParameters[CarParameters::Width], sCarMesh, sWheelMesh );
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
     //populate all the objects
@@ -430,7 +457,6 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     for (std::vector<VehicleState>*& vStates: m_lPlanStates) {
         vStates = new std::vector<VehicleState>();
     }
-
 
     Eigen::Matrix4d dT_localizer_ref = Eigen::Matrix4d::Identity();
     if(sRefPlane.empty() == false){
@@ -453,8 +479,17 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
         }
     }
 
-    m_sCarObjectName = "NinjaCar";
-    m_Localizer.TrackObject(m_sCarObjectName, "posetonode",Sophus::SE3d(dT_localizer_ref).inverse());
+    // Changed "NinjaCar" to "Compass"
+    m_sCarObjectName = "Compass";
+    if ( m_bSIL ) {
+        // Changed "posetonode" to "BulletCarModel" to match BulletCarModel.cpp
+        m_Localizer.TrackObject( m_sCarObjectName, "BulletCarModel", Sophus::SE3d(dT_localizer_ref).inverse() );
+        LOG(INFO) << "Localizer initialized to track BulletCarModel at " << m_sCarObjectName;
+    } else {
+        // Changed "posetonode" to "NinjaCar" to match CarPosSim.cpp
+        m_Localizer.TrackObject( m_sCarObjectName, "NinjaCar", Sophus::SE3d(dT_localizer_ref).inverse() );
+        LOG(INFO) << "Localizer initialized to track NinjaCar at " << m_sCarObjectName;
+    }
 
     //initialize the panel
     m_GuiPanel.Init();
@@ -463,7 +498,6 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_GuiPanel.SetVar("fusion:FilterSize",m_Fusion.GetFilterSizePtr())
               .SetVar("fusion:RMSE",m_Fusion.GetRMSEPtr())
               .SetVar("fusion:LocalizerFreq",&m_dLocalizerFreq)
-              .SetVar("fusion:ImuFreq",&m_dImuFreq)
               .SetVar("fusion:Vel",&m_dVel)
               .SetVar("fusion:Pos",&m_dPos);
 
@@ -515,32 +549,21 @@ void MochaGui::_StartThreads()
     m_pPlannerThread = new boost::thread(std::bind(&MochaGui::_PlannerFunc,this));
     m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
-    if(m_eControlTarget == eTargetExperiment){
-        m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
-    }
+
     if(m_eControlTarget == eTargetSimulation){
-        if(m_pImuThread != NULL){
-            m_pImuThread->interrupt();
-            m_pImuThread->join();
-        }
+        LOG(INFO) << "Stopping localizer thread";
 
         if(m_pLocalizerThread) {
             m_pLocalizerThread->interrupt();
             m_pLocalizerThread->join();
         }
     }else{
-        m_Localizer.Start();
-
-        if(m_pImuThread == NULL){
-            m_pImuThread = new boost::thread(std::bind(&MochaGui::_ImuReadFunc,this));
-        }
-
+        m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
         if(m_pLocalizerThread == NULL){
+            //LOG(INFO) << "Starting Localizer Thread";
             m_pLocalizerThread = new boost::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
         }
     }
-
-
 }
 
 void MochaGui::_KillController()
@@ -574,10 +597,6 @@ void MochaGui::_KillThreads()
         m_pLearningThread->join();
     }
 
-    if(m_pImuThread) {
-        m_pImuThread->join();
-    }
-
     if(m_pLocalizerThread) {
         m_pLocalizerThread->join();
     }
@@ -589,19 +608,16 @@ void MochaGui::_KillThreads()
     delete m_pControlThread;
     delete m_pPhysicsThread;
     delete m_pPlannerThread;
-    delete m_pImuThread;
     delete m_pLocalizerThread;
     delete m_pCommandThread;
 
     m_pControlThread = 0;
     m_pPhysicsThread = 0;
     m_pPlannerThread = 0 ;
-    m_pImuThread = 0;
     m_pLocalizerThread = 0;
 
     m_Localizer.Stop();
 }
-
 
 ////////////////////////////////////////////////////////////////
 bool MochaGui::_SetWaypointVel(std::vector<std::string> *vArgs)
@@ -793,13 +809,15 @@ void MochaGui::_UpdateVisuals()
     if(g_bPlaybackControlPaths == false || m_bPause == false){
         VehicleState state;
         if(m_bSimulate3dPath == true ){
+            //LOG(INFO) << "m_bSimulate3dPath == true";
             m_DriveCarModel.GetVehicleState(0,state);
         }else{
             _UpdateVehicleStateFromFusion(state);
+            //LOG(INFO) << "Updated Vehicle State from Fusion";
         }
 
         //offset the chasis by the height offset (constant)
-        m_Gui.SetCarState(m_nDriveCarId,state,(m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment));
+        m_Gui.SetCarState( m_nDriveCarId, state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
         //Eigen::Vector6d pose = fusion::T2Cart(state.m_dTwv.matrix());
     }
 }
@@ -853,20 +871,17 @@ bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
 {
-    if(m_bFuseImu == true){
-        if(g_bProcessModelActive == false){
-            fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
-            currentState.m_dTwv = currentPose.m_dPose;
-            currentState.m_dV = currentPose.m_dV;
-            currentState.m_dW = currentPose.m_dW;
-            m_dVel = currentState.m_dV.norm();
-            m_dPos = currentState.m_dTwv.translation();
-        }else{
-            m_Fusion.GetVehicleState(currentState);
-        }
 
-    }else {
-        currentState.m_dTwv = m_Fusion.GetLastGlobalPose().m_dPose;
+    // g_bProcessModelActive set to false in initial CVars at top of MochaGui 6/9/16
+    if(g_bProcessModelActive == false){
+        fusion::PoseParameter currentPose = m_Fusion.GetCurrentPose();
+        currentState.m_dTwv = currentPose.m_dPose;
+        currentState.m_dV = currentPose.m_dV;
+        currentState.m_dW = currentPose.m_dW;
+        m_dVel = currentState.m_dV.norm();
+        m_dPos = currentState.m_dTwv.translation();
+    }else{
+        m_Fusion.GetVehicleState(currentState);
     }
 
     currentState.m_dV = GetBasisVector(currentState.m_dTwv,0).normalized()*currentState.m_dV.norm();
@@ -889,7 +904,6 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
     //dout("Theta: " << currentState.GetTheta());
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_LocalizerReadFunc()
 {
@@ -898,6 +912,8 @@ void MochaGui::_LocalizerReadFunc()
     int counter = 1;
     //double localizerTime = 0;
     m_Localizer.Start();
+
+   LOG(INFO) << "Starting Localizer Thread.";
 
     while(1){
         //this is a blocking call
@@ -914,6 +930,7 @@ void MochaGui::_LocalizerReadFunc()
         }
         numPoses++;
 
+
         if(g_bImuIntegrationOnly == false){
             counter++;
             //double dTemp = CarPlanner::Tic();
@@ -928,11 +945,10 @@ void MochaGui::_LocalizerReadFunc()
                 m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
             }else{
                 m_Fusion.RegisterGlobalPose(Twb,sysTime,sysTime);
+                //LOG(INFO) << "Set pose";
             }
             //dout("Fusion process took" << CarPlanner::Toc(dTemp) << " seconds.");
             counter = 0;
-
-
 
             if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
                 m_FusionLogger.LogLocalizerData(CarPlanner::Tic(),localizerTime,Twb);
@@ -943,51 +959,11 @@ void MochaGui::_LocalizerReadFunc()
     }
 }
 
-
-/////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_ImuReadFunc()
-{
-    double lastTime = CarPlanner::Tic();
-    int numPoses = 0;
-
-    std::cout << "ImuReadFunc currently disabled." << std::endl;
-
-    /*
-    while(1){
-        Imu_Accel_Gyro Msg;
-        //this needs to be a blocking call .. not sure it is!!!
-        if(m_Node.receive("herbie/Imu",Msg)){
-            double dImuTime = (double)Msg.timer()/62500.0;
-            double sysTime = CarPlanner::Tic();
-            m_Fusion.RegisterImuPose(Msg.accelx()*G_ACCEL,Msg.accely()*G_ACCEL,Msg.accelz()*G_ACCEL,
-                                     Msg.gyrox(),Msg.gyroy(),Msg.gyroz(),sysTime,sysTime);
-
-            if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-                m_FusionLogger.LogImuData(sysTime,dImuTime,Eigen::Vector3d(Msg.accelx(),Msg.accely(),Msg.accelz()),Eigen::Vector3d(Msg.gyrox(),Msg.gyroy(),Msg.gyroz()));
-            }
-            //std::cout << "IMU pose received at:" << sysTime << "seconds [" << Msg.accely() << " " <<  -Msg.accelx() << " " << Msg.accelz() << std::endl;
-//            if(m_bLoggerEnabled && m_Logger.IsReady()){
-//                VehicleState state;
-//                _UpdateVehicleStateFromFusion(state);
-//                m_Logger.LogPoseUpdate(state,EventLogger::eIMU);
-//            }
-
-            double dt = CarPlanner::Tic()-lastTime;
-            if(dt > 0.5){
-                m_dImuFreq = numPoses/dt;
-                lastTime = CarPlanner::Tic();
-                numPoses = 0;
-            }
-            numPoses++;
-        }
-    }
-    */
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlCommandFunc()
 {
-    double dLastTime = CarPlanner::Tic();
+    double dLastTime = Tic();
+    //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
     while(1)
     {
         //only go ahead if the controller is running, and we are targeting the real vehicle
@@ -1018,19 +994,48 @@ void MochaGui::_ControlCommandFunc()
                 //this update does not actually run the simulation. It only serves to push in
                 //a delayed command and update the steering (so we know where the steering value
                 //is when we pass the state to the controller)
-                m_DriveCarModel.UpdateState(0,m_ControlCommand,m_ControlCommand.m_dT,false,true);
+                if ( !m_bSIL )
+                    m_DriveCarModel.UpdateState( 0, m_ControlCommand, m_ControlCommand.m_dT, false, true );
             }
 
-            //send the commands to the car via node
+            //send the commands to the car via udp
             m_nNumPoseUpdates++;
+            hal::CommanderMsg* Command = new hal::CommanderMsg();
             CommandMsg Req;
             CommandReply Rep;
 
             Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
             Req.set_phi(m_ControlCommand.m_dPhi);
-            double time = CarPlanner::Tic();
-            //m_Node.call_rpc( "ninja_commander/ProgramControlRpc",Req,Rep,100 );
-            m_dControlDelay = CarPlanner::Toc(time);
+            double time = Tic();
+
+
+            //if we are not currently simulating, send these to the ppm
+            if( m_bSimulate3dPath == false )
+            {
+                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true/*true*/, Command );
+
+
+                unsigned char buffer[Command->ByteSize() + 4];
+
+                google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
+                google::protobuf::io::CodedOutputStream coded_output( &aos );
+                coded_output.WriteVarint32( Command->ByteSize() );
+                Command->SerializeToCodedStream( &coded_output );
+                if ( m_bSIL ) {
+                    //send Command to BulletCarModel
+                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) { LOG(ERROR) << "Did not send message"; }
+                    //else { LOG(INFO) << "Sent Command"; }
+
+                }
+                else {
+                    //send Command to NinjaCar
+                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&ninjAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
+
+                }
+
+            }
+
+            m_dControlDelay = Toc(time);
         }
 
         //about 100 commands/sec
@@ -1042,7 +1047,7 @@ void MochaGui::_ControlCommandFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlFunc()
 {
-    int nNumConrolPlans = 0;
+    int nNumControlPlans = 0;
     m_dControlPlansPerS = 0;
     double dLastTime = CarPlanner::Tic();
 
@@ -1050,9 +1055,11 @@ void MochaGui::_ControlFunc()
     m_Log.SetLabels(vLabels);
 
     SetThreadName("Control thread");
+    LOG(INFO) << "Starting Control Thread";
     try
     {
         m_bControllerRunning = false;
+
 
         while(m_StillControl) {
 
@@ -1063,7 +1070,7 @@ void MochaGui::_ControlFunc()
             m_bControllerRunning = false;
 
             //unlock waypoints
-            //lock all the waypoints
+            //lock all the waypoints (? 6/8/16)
             for (size_t ii = 0; ii < m_Path.size() - 1; ii++) {
                 m_Gui.GetWaypoint(ii)->m_Waypoint.SetLocked(false);
             }
@@ -1096,7 +1103,13 @@ void MochaGui::_ControlFunc()
             VehicleState startingState = m_vSegmentSamples[g_nStartSegmentIndex].m_vStates[0];
             startingState.m_dV = Eigen::Vector3d::Zero();
             startingState.m_dW = Eigen::Vector3d::Zero();
-            startingState.m_dTwv.translation() += GetBasisVector(startingState.m_dTwv,1)*0.25;
+            startingState.m_dTwv.translation() += (GetBasisVector(startingState.m_dTwv,1)*0.25);
+            Eigen::Matrix3d rm;
+            int yaw = 90;
+            rm << cos(yaw), -sin(yaw),  0,
+                  sin(yaw), cos(yaw),   0,
+                  0,        0,          1;
+            if ( m_eControlTarget == eTargetExperiment ) startingState.m_dTwv.setRotationMatrix(rm);
             m_DriveCarModel.SetState(0,startingState);
             m_DriveCarModel.ResetCommandHistory(0);
 
@@ -1126,7 +1139,7 @@ void MochaGui::_ControlFunc()
                     //get the current position and pass it to the controller
                     m_Controller.SetCurrentPoseFromCarModel(&m_DriveCarModel,0);
                 }else if(m_eControlTarget == eTargetExperiment){
-                    //get current pose from the fusion routine
+                    //get current pose from the Localizer
                     _UpdateVehicleStateFromFusion(currentState);
                     //set the command history and current pose on the controller
                     {
@@ -1138,7 +1151,7 @@ void MochaGui::_ControlFunc()
                     assert(false);
                 }
 
-                //now run the controller to crete a plan
+                //now run the controller to create a plan
                 ControlPlan* pPlan;
                 if(m_bPause == false && g_bInfiniteTime == false){
                     m_dPlanTime = CarPlanner::Tic();
@@ -1163,11 +1176,12 @@ void MochaGui::_ControlFunc()
                 if(pPlan != NULL) {
                     _UpdateControlPathVisuals(pPlan);
                     //update control plan statistics if there is a new control plan available
-                    nNumConrolPlans++;
-                    if(CarPlanner::Toc(dLastTime) > 0.5){
-                        m_dControlPlansPerS = (double)nNumConrolPlans / (CarPlanner::Toc(dLastTime));
-                        nNumConrolPlans = 0;
-                        dLastTime = CarPlanner::Tic();
+
+                    nNumControlPlans++;
+                    if(Toc(dLastTime) > 0.5){
+                        m_dControlPlansPerS = (double)nNumControlPlans / (Toc(dLastTime));
+                        nNumControlPlans = 0;
+                        dLastTime =Tic();
                     }
                 }
 
@@ -1220,6 +1234,7 @@ void MochaGui::_LoadDefaultParams()
 void MochaGui::_PhysicsFunc()
 {
     SetThreadName("Physics thread");
+    LOG(INFO) << "Starting Physics Thread.";
 
     double currentDt;
     int nCurrentSample = 0;
@@ -1240,6 +1255,7 @@ void MochaGui::_PhysicsFunc()
             usleep(1000);
 
             //This section will play back control paths, if the user has elected to do so
+            // Currently set to default false 6/8/16
             if(g_bPlaybackControlPaths){
                 //then we need to play through the control paths
                 for(std::vector<VehicleState>*& pStates: m_lPlanStates){
@@ -1330,7 +1346,7 @@ void MochaGui::_PhysicsFunc()
                         m_Logger.LogControlCommand(currentCommand);
                     }
 
-                    m_DriveCarModel.UpdateState(0,currentCommand,currentDt);
+                    m_DriveCarModel.UpdateState(0,currentCommand,currentDt, false, false );
 
                     m_dPlanTime = m_dPlanTime + currentDt;
 
@@ -1346,9 +1362,7 @@ void MochaGui::_PhysicsFunc()
                 //dout("Simulating with force " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dForce <<
                 //     " and accel " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dPhi <<
                 //     " and torque " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dTorques.transpose());
-                m_DriveCarModel.UpdateState(0,m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample],
-                                            m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dT,
-                                            true); //no delay for simulation
+                m_DriveCarModel.UpdateState( 0, m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ], m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ].m_dT, true ); //no delay for simulation
                 currentCommand = m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample];
 
                 //wait until we have reached the correct dT to
@@ -1387,6 +1401,7 @@ void MochaGui::_PhysicsFunc()
 ////////////////////////////////////////////////////////////////
 void MochaGui::_PlannerFunc() {
     SetThreadName("Planning thread");
+    LOG(INFO) << "Starting Planner Thread";
     int numInterations = 0;
     m_bPlanning = false;
     // now add line segments
@@ -1394,8 +1409,9 @@ void MochaGui::_PlannerFunc() {
     while (1) {
         boost::this_thread::interruption_point();
 
-        //if the use has changed the openloop setting, dirty all
+        //if the user has changed the openloop setting, dirty all
         //the waypoints
+        // 6/8/16 this will not run because of line above while(1) "bool previousOpenLoopSetting = m_bPlannerOn"
         if( previousOpenLoopSetting != m_bPlannerOn) {
             m_Gui.SetWaypointDirtyFlag(true);
             previousOpenLoopSetting = m_bPlannerOn;
@@ -1430,21 +1446,21 @@ void MochaGui::_PlannerFunc() {
                 Eigen::Vector6d newPose;
 
                 {
-                    //lock the drawing look as we will be modifying things here
-                    boost::mutex::scoped_lock lock(m_DrawMutex);
-                    if(a->GetDirty()) {
-                        Sophus::SE3d pose(a->GetPose4x4_po());
-                        if(m_DriveCarModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
+                    //lock the drawing lock as we will be modifying things here
+                    boost::mutex::scoped_lock lock( m_DrawMutex );
+                    if( a->GetDirty() ) {
+                        Sophus::SE3d pose( a->GetPose4x4_po() );
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
                             pose.translation() = dIntersect;
-                            a->SetPose(pose.matrix());
+                            a->SetPose( pose.matrix() );
                         }
                         *m_vWayPoints[nStartIdx] << a->GetPose(), a->GetVelocity(), a->GetAerial();
                     }
-                    if(b->GetDirty()) {
-                        Sophus::SE3d pose(b->GetPose4x4_po());
-                        if(m_DriveCarModel.RayCast(pose.translation(),GetBasisVector(pose,2)*0.2,dIntersect,true)){
+                    if( b->GetDirty() ) {
+                        Sophus::SE3d pose( b->GetPose4x4_po() );
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
                             pose.translation() = dIntersect;
-                            b->SetPose(pose.matrix());
+                            b->SetPose( pose.matrix() );
                         }
                         *m_vWayPoints[nEndIdx] << b->GetPose(), b->GetVelocity(), a->GetAerial();
                     }

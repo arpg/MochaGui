@@ -1,5 +1,5 @@
 #include <CarPlanner/CarPlannerCommon.h>
-#include <SensorFusion/SensorFusionCeres.h>
+#include <SensorFusionCeres.h>
 #include <fstream>
 #include <fenv.h>
 #include <pangolin/pangolin.h>
