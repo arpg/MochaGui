@@ -1,11 +1,13 @@
-#ifndef JOYSTICKHANDLER_H
-#define JOYSTICKHANDLER_H
+#pragma once
 
 #include <stdio.h>
 #include <iostream>
-#include "Gamepad/EventDispatcher.h"
+
+#include <thread>
+#include <vector>
+
 #include "Gamepad/Gamepad.h"
-#include "boost/thread.hpp"
+#include "Gamepad/EventDispatcher.h"
 
 #define JOYSTICK_AXIS_MAX 1.0
 #define JOYSTICK_AXIS_MIN -1.0
@@ -20,6 +22,8 @@ public:
     double GetAxisValue(int id) { return id < (int)m_vAxes.size() ? m_vAxes[id] : 0; }
     bool IsButtonPressed(int id){ return id < (int)m_vButtonStates.size() ? m_vButtonStates[id] == 1 : false; }
 
+    void JoinThread();
+
 
 private:
     void _ThreadFunc();
@@ -30,9 +34,7 @@ private:
     static bool _OnDeviceRemoved(void *sender, const char *eventID, void *eventData, void *context);
 
     std::vector<double> m_vAxes;
-    std::vector<int> m_vButtonStates;
-    boost::thread* m_pJoystickThread;
+    std::vector<int>    m_vButtonStates;
+    std::thread*      m_pJoystickThread;
 
 };
-
-#endif // JOYSTICKHANDLER_H
