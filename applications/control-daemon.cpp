@@ -58,7 +58,7 @@ int main()
     m_gLastAccel = DEFAULT_ACCEL_OFFSET;
     m_gLastPhi = DEFAULT_STEERING_OFFSET;
     m_nProgramCount = 0;
-    double dUpdateTime = CarPlanner::Tic();
+    double dUpdateTime = Tic();
 
     JoystickHandler joystick;
 
@@ -122,9 +122,9 @@ int main()
         }
 
         //print out the statistics
-        double dDuration = CarPlanner::Toc(dUpdateTime);
+        double dDuration = Toc(dUpdateTime);
         if(dDuration > 1.0 && g_bError == false){
-            dUpdateTime = CarPlanner::Tic();
+            dUpdateTime = Tic();
             printf("Receiving %.2f/s program calls and sending %.2f/s control calls. Current control: %s\n",
                    (double)m_nProgramCount/dDuration, (double)g_nRpcControlCount/dDuration,GetControlTypeString(g_eMaster));
             fflush(stdout);
