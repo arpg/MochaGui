@@ -58,7 +58,7 @@ MochaGui::MochaGui() :
     //m_Node.init( "MochaGui" ); // Node on which to receive information from the car
     m_MochaPort = 1643;
     m_ComPort = 1642;
-    m_NinjaPort = 1644;
+    m_CarPort = 1640;
 
     if ( ( sockFD = socket( AF_INET, SOCK_DGRAM, 0 ) ) < 0 ) LOG(ERROR) << "Could not create socket";
 
@@ -74,10 +74,10 @@ MochaGui::MochaGui() :
     comAddr.sin_addr.s_addr = htonl( INADDR_ANY );
     comAddr.sin_port = htons( m_ComPort );
 
-    memset( (char*)&ninjAddr, 0, addrLen );
-    ninjAddr.sin_family = AF_INET;
-    ninjAddr.sin_addr.s_addr = htonl( INADDR_ANY );
-    ninjAddr.sin_port = htons( m_NinjaPort );
+    memset( (char*)&carAddr, 0, addrLen );
+    carAddr.sin_family = AF_INET;
+    carAddr.sin_addr.s_addr = htonl( INADDR_ANY );
+    carAddr.sin_port = htons( m_CarPort );
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1029,7 +1029,7 @@ void MochaGui::_ControlCommandFunc()
                 }
                 else {
                     //send Command to NinjaCar
-                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&ninjAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
+                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
 
                 }
 
