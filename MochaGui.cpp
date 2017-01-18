@@ -255,11 +255,12 @@ void MochaGui::_UpdateWaypointFiles()
 ////////////////////////////////////////////////////////////////
 void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool bLocalizer,
                     const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
-                    const std::string& sCarMesh, const std::string& sWheelMesh)
+                    const std::string& sCarMesh, const std::string& sWheelMesh, bool bPad)
 {
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
     m_bSIL = false;
+    m_bUsingGamepad = bPad;
 
     //m_Node.subscribe("herbie/Imu"); // Should change to match TestNode/CarPoseSim.cpp (NinjaCar/Compass)? This is a separate Imu channel that I think is currently unused. See _ImuReadFunc
 
@@ -960,14 +961,70 @@ void MochaGui::_LocalizerReadFunc()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+// Message for gamepad pass through
+hal::CarCommandMsg g2cMsg;
+void GamepadCallback( hal::GamepadMsg& _msg ) {
+    // Output joystick inputs
+    std::cout << "-> "
+              << _msg.axes().data(0) << ", "
+              << _msg.axes().data(1) << ", "
+              << _msg.axes().data(2) << ", "
+              << _msg.axes().data(3) << ", "
+              << _msg.axes().data(4) << ", "
+              << _msg.axes().data(5) << ", "
+              << _msg.axes().data(6) << ", "
+              << _msg.axes().data(7) << ", "
+              << _msg.axes().data(8) << ", "
+              << _msg.axes().data(9) << ", "
+              << _msg.axes().data(10) << ", "
+              << _msg.axes().data(11) << ", "
+              << _msg.axes().data(12) << ", "
+              << _msg.axes().data(13) << ", "
+              << _msg.axes().data(14) << " -  "
+              << _msg.buttons().data(0) << ","
+              << _msg.buttons().data(1) << ","
+              << _msg.buttons().data(2) << ","
+              << _msg.buttons().data(3) << ","
+              << _msg.buttons().data(4) << ","
+              << _msg.buttons().data(5) << ","
+              << _msg.buttons().data(6) << ","
+              << _msg.buttons().data(7) << ","
+              << _msg.buttons().data(8) << ","
+              << _msg.buttons().data(9) << ","
+              << _msg.buttons().data(10) << ","
+              << _msg.buttons().data(11) << ","
+              << std::endl;
+
+    // Update d2c command with gamepad data
+    g2cMsg.set_steering_angle(_msg.axes().data(1));
+    g2cMsg.set_throttle_percent(std::abs(_msg.axes().data(2))*20);
+}
+
+
 void MochaGui::_ControlCommandFunc()
 {
     double dLastTime = Tic();
     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
+
+    if( m_bUsingGamepad ) {
+        // Connect to Gamepad
+        hal::Gamepad gamepad( "gamepad:/" );
+        gamepad.RegisterGamepadDataCallback( &GamepadCallback );
+    }
+    hal::Car ninja_car;
+    if( m_eControlTarget == eTargetExperiment) {
+        // Connect to ninja car
+        ninja_car = hal::Car( "ninja_v3:[baud=115200,dev=/dev/cu.usbserial-00002014A]//" );
+    }
+
+    double angle = 0, throttle = 0;
+
     while(1)
     {
         //only go ahead if the controller is running, and we are targeting the real vehicle
         if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false){
+
             //get commands from the controller, apply to the car and update the position
             //of the car in the controller
             {
@@ -1000,48 +1057,53 @@ void MochaGui::_ControlCommandFunc()
 
             //send the commands to the car via udp
             m_nNumPoseUpdates++;
-            hal::CommanderMsg* Command = new hal::CommanderMsg();
-            CommandMsg Req;
-            CommandReply Rep;
+//            hal::CommanderMsg* Command = new hal::CommanderMsg();
+//            CommandMsg Req;
+//            CommandReply Rep;
 
-            Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
-            Req.set_phi(m_ControlCommand.m_dPhi);
+//            Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
+//            Req.set_phi(m_ControlCommand.m_dPhi);
             double time = Tic();
 
 
             //if we are not currently simulating, send these to the ppm
             if( m_bSimulate3dPath == false )
             {
-                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true/*true*/, Command );
+                if( !m_bUsingGamepad ) {
+                    std::cout << "m_dForce: " << m_ControlCommand.m_dForce << std::endl;
+                    std::cout << "m_dCurvature: " << m_ControlCommand.m_dCurvature << std::endl;
+                    std::cout << "m_dTorque: " << m_ControlCommand.m_dTorque(0) << " " << m_ControlCommand.m_dTorque(1) << " " << m_ControlCommand.m_dTorque(2) << std::endl;
+                    std::cout << "m_dT: " << m_ControlCommand.m_dT << std::endl;
+                    std::cout << "m_dPhi: " << m_ControlCommand.m_dPhi << std::endl;
 
+                    angle = m_ControlCommand.m_dPhi;
+                    throttle = m_ControlCommand.m_dForce * m_ControlCommand.m_dTorque(0);
 
-                unsigned char buffer[Command->ByteSize() + 4];
-
-                google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
-                google::protobuf::io::CodedOutputStream coded_output( &aos );
-                coded_output.WriteVarint32( Command->ByteSize() );
-                Command->SerializeToCodedStream( &coded_output );
-                if ( m_bSIL ) {
-                    //send Command to BulletCarModel
-                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) { LOG(ERROR) << "Did not send message"; }
-                    //else { LOG(INFO) << "Sent Command"; }
-
+                    g2cMsg.set_steering_angle(angle);
+                    g2cMsg.set_throttle_percent(throttle);
                 }
-                else {
-                    //send Command to NinjaCar
-                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
 
-                }
+                // Send g2c command to the car
+                ninja_car.UpdateCarCommand( g2cMsg );
+
+//                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true/*true*/, Command );
+//                unsigned char buffer[Command->ByteSize() + 4];
+//                google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
+//                google::protobuf::io::CodedOutputStream coded_output( &aos );
+//                coded_output.WriteVarint32( Command->ByteSize() );
+//                Command->SerializeToCodedStream( &coded_output );
+//                //send Command to NinjaCar
+//                if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
 
             }
 
             m_dControlDelay = Toc(time);
         }
-
-        //about 100 commands/sec
-        usleep(1E6 * 0.008);
-        //usleep(1E6 * 0.016);
     }
+
+    //about 100 commands/sec
+    usleep(1E6 * 0.008);
+    //usleep(1E6 * 0.016);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

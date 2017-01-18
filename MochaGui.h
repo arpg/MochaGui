@@ -18,6 +18,11 @@
 #include <glog/logging.h>
 
 #include "CarMessages.pb.h"
+#include <HAL/Gamepad.pb.h>
+#include <HAL/Gamepad/GamepadDevice.h>
+#include <HAL/Car.pb.h>
+#include <HAL/Car/CarDevice.h>
+#include <HAL/Messages.pb.h>
 
 #include <CarPlanner/CarController.h>
 #include <CarPlanner/LocalPlanner.h>
@@ -49,7 +54,7 @@ public:
     void Run();
     void Init(const std::string& sRefPlane, const std::string& sMesh, bool bLocalizer,
               const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
-              const std::string& sCarMesh, const std::string& sWheelMesh);
+              const std::string& sCarMesh, const std::string& sWheelMesh, bool bPad);
 
 
     static MochaGui *GetInstance();
@@ -108,6 +113,9 @@ protected:
     int sockFD;
     unsigned char buf[2048];
     unsigned int msgSize = 0;
+
+    // Boolean for indicating gamepad passthrough in experiment mode
+    bool m_bUsingGamepad;
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;
