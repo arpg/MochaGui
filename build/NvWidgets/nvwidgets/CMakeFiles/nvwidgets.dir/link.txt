@@ -1,2 +1,0 @@
-/usr/bin/ar qc libnvwidgets.a  CMakeFiles/nvwidgets.dir/nvWidgets.cpp.o CMakeFiles/nvwidgets.dir/nvGLWidgets.cpp.o CMakeFiles/nvwidgets.dir/nvGlutWidgets.cpp.o
-/usr/bin/ranlib libnvwidgets.a
