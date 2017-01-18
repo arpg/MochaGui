@@ -961,44 +961,47 @@ void MochaGui::_LocalizerReadFunc()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
 // Message for gamepad pass through
 hal::CarCommandMsg g2cMsg;
+hal::Car ninja_car;
+hal::Gamepad gamepad;
+
 void GamepadCallback( hal::GamepadMsg& _msg ) {
     // Output joystick inputs
-    std::cout << "-> "
-              << _msg.axes().data(0) << ", "
-              << _msg.axes().data(1) << ", "
-              << _msg.axes().data(2) << ", "
-              << _msg.axes().data(3) << ", "
-              << _msg.axes().data(4) << ", "
-              << _msg.axes().data(5) << ", "
-              << _msg.axes().data(6) << ", "
-              << _msg.axes().data(7) << ", "
-              << _msg.axes().data(8) << ", "
-              << _msg.axes().data(9) << ", "
-              << _msg.axes().data(10) << ", "
-              << _msg.axes().data(11) << ", "
-              << _msg.axes().data(12) << ", "
-              << _msg.axes().data(13) << ", "
-              << _msg.axes().data(14) << " -  "
-              << _msg.buttons().data(0) << ","
-              << _msg.buttons().data(1) << ","
-              << _msg.buttons().data(2) << ","
-              << _msg.buttons().data(3) << ","
-              << _msg.buttons().data(4) << ","
-              << _msg.buttons().data(5) << ","
-              << _msg.buttons().data(6) << ","
-              << _msg.buttons().data(7) << ","
-              << _msg.buttons().data(8) << ","
-              << _msg.buttons().data(9) << ","
-              << _msg.buttons().data(10) << ","
-              << _msg.buttons().data(11) << ","
-              << std::endl;
+//    std::cout << "-> "
+//              << _msg.axes().data(0) << ", "
+//              << _msg.axes().data(1) << ", "
+//              << _msg.axes().data(2) << ", "
+//              << _msg.axes().data(3) << ", "
+//              << _msg.axes().data(4) << ", "
+//              << _msg.axes().data(5) << ", "
+//              << _msg.axes().data(6) << ", "
+//              << _msg.axes().data(7) << ", "
+//              << _msg.axes().data(8) << ", "
+//              << _msg.axes().data(9) << ", "
+//              << _msg.axes().data(10) << ", "
+//              << _msg.axes().data(11) << ", "
+//              << _msg.axes().data(12) << ", "
+//              << _msg.axes().data(13) << ", "
+//              << _msg.axes().data(14) << " -  "
+//              << _msg.buttons().data(0) << ","
+//              << _msg.buttons().data(1) << ","
+//              << _msg.buttons().data(2) << ","
+//              << _msg.buttons().data(3) << ","
+//              << _msg.buttons().data(4) << ","
+//              << _msg.buttons().data(5) << ","
+//              << _msg.buttons().data(6) << ","
+//              << _msg.buttons().data(7) << ","
+//              << _msg.buttons().data(8) << ","
+//              << _msg.buttons().data(9) << ","
+//              << _msg.buttons().data(10) << ","
+//              << _msg.buttons().data(11) << ","
+//              << std::endl;
 
     // Update d2c command with gamepad data
     g2cMsg.set_steering_angle(_msg.axes().data(2));
     g2cMsg.set_throttle_percent(_msg.axes().data(1)*20);
+    ninja_car.UpdateCarCommand( g2cMsg );
 }
 
 
@@ -1007,14 +1010,12 @@ void MochaGui::_ControlCommandFunc()
     double dLastTime = Tic();
     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
 
-    hal::Gamepad gamepad;
     if( m_bUsingGamepad ) {
         // Connect to Gamepad
         gamepad = hal::Gamepad( "gamepad:/" );
         gamepad.RegisterGamepadDataCallback( &GamepadCallback );
     }
 
-    hal::Car ninja_car;
     if( m_eControlTarget == eTargetExperiment) {
         // Connect to ninja car
         ninja_car = hal::Car( "ninja_v3:[baud=115200,dev=/dev/cu.usbserial-00002014A]//" );
@@ -1078,7 +1079,7 @@ void MochaGui::_ControlCommandFunc()
                     std::cout << "m_dPhi: " << m_ControlCommand.m_dPhi << std::endl;
 
                     angle = m_ControlCommand.m_dPhi;
-                    throttle = m_ControlCommand.m_dForce * m_ControlCommand.m_dTorque(0);
+                    throttle = m_ControlCommand.m_dForce;
 
                     g2cMsg.set_steering_angle(angle);
                     g2cMsg.set_throttle_percent(throttle);
