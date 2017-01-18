@@ -997,8 +997,8 @@ void GamepadCallback( hal::GamepadMsg& _msg ) {
               << std::endl;
 
     // Update d2c command with gamepad data
-    g2cMsg.set_steering_angle(_msg.axes().data(1));
-    g2cMsg.set_throttle_percent(std::abs(_msg.axes().data(2))*20);
+    g2cMsg.set_steering_angle(_msg.axes().data(2));
+    g2cMsg.set_throttle_percent(_msg.axes().data(1)*20);
 }
 
 
@@ -1007,11 +1007,13 @@ void MochaGui::_ControlCommandFunc()
     double dLastTime = Tic();
     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
 
+    hal::Gamepad gamepad;
     if( m_bUsingGamepad ) {
         // Connect to Gamepad
-        hal::Gamepad gamepad( "gamepad:/" );
+        gamepad = hal::Gamepad( "gamepad:/" );
         gamepad.RegisterGamepadDataCallback( &GamepadCallback );
     }
+
     hal::Car ninja_car;
     if( m_eControlTarget == eTargetExperiment) {
         // Connect to ninja car
@@ -1019,7 +1021,6 @@ void MochaGui::_ControlCommandFunc()
     }
 
     double angle = 0, throttle = 0;
-
     while(1)
     {
         //only go ahead if the controller is running, and we are targeting the real vehicle
