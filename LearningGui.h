@@ -20,6 +20,12 @@
 #include <node/Node.h>
 #include <SensorFusionCeres.h>
 
+#include <HAL/Gamepad.pb.h>
+#include <HAL/Gamepad/GamepadDevice.h>
+#include <HAL/Car.pb.h>
+#include <HAL/Car/CarDevice.h>
+#include <HAL/Messages.pb.h>
+
 #include "JoystickHandler.h"
 #include "PlannerGui.h"
 #include "GLBulletDebugDrawer.h"

@@ -10,6 +10,7 @@ DEFINE_string(ref, "", "Reference plane for model if no triangle mesh.");
 DEFINE_string(logfile, "", "Logfile for playing back.");	// /Users/corinsandford/Documents/ARPG/MochaGui/herbie/mocha_playback.log
 DEFINE_string(car, "", "File for car mesh.");               // /Users/corinsandford/Documents/ARPG/MochaGui/herbie/herbie.ply
 DEFINE_string(wheel,"", "File for wheel mesh.");            // /Users/corinsandford/Documents/ARPG/MochaGui/herbie/wheel.ply
+DEFINE_bool(gamepad, false,"Boolean for gamepad usage."); // Give true to use a gamepad
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char* argv[] )
@@ -26,6 +27,10 @@ int main( int argc, char* argv[] )
   if(FLAGS_mesh.empty()) {
     LOG(FATAL) << "Mesh of environment not provided. Use parameter -mesh";
     return -1;
+  }
+
+  if(!FLAGS_gamepad) {
+      LOG(INFO) << "Gamepad not initialized. Use parameter -gamepad";
   }
 
   if(!FLAGS_localizer) {
@@ -56,7 +61,7 @@ int main( int argc, char* argv[] )
   }
 
   MochaGui *pGui = MochaGui::GetInstance();
-  pGui->Init( FLAGS_ref, FLAGS_mesh, FLAGS_localizer, FLAGS_mode, FLAGS_logfile, FLAGS_params, FLAGS_car, FLAGS_wheel );
+  pGui->Init( FLAGS_ref, FLAGS_mesh, FLAGS_localizer, FLAGS_mode, FLAGS_logfile, FLAGS_params, FLAGS_car, FLAGS_wheel, FLAGS_gamepad );
   pGui->Run();
 
   delete pGui;
