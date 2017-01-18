@@ -1,0 +1,2 @@
+/usr/bin/ar qc libGamepad.a  CMakeFiles/Gamepad.dir/EventDispatcher.cpp.o CMakeFiles/Gamepad.dir/Gamepad_linux.cpp.o
+/usr/bin/ranlib libGamepad.a
