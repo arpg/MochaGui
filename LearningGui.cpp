@@ -197,6 +197,7 @@ void LearningGui::_JoystickReadFunc()
             ninja_car.UpdateCarCommand( g2cMsg );
         }
 
+        // Simulation Mode -- this is where joystick gives car inputs
         {
             boost::mutex::scoped_lock lock(m_JoystickMutex);
             m_JoystickCommand = command;

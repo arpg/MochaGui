@@ -49,6 +49,7 @@ find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
 find_package( Protobuf REQUIRED )
 find_package( Bullet REQUIRED )
 find_package( CeresSolver REQUIRED )
+find_package( sdtrack REQUIRED )
 #find_package( SensorFusion REQUIRED )
 find_package( LibAO REQUIRED )
 if(_OSX_)
@@ -77,6 +78,7 @@ set( _INCLUDE_DIRS
             ${Pangolin_INCLUDE_DIRS}
             ${BOOST_INCLUDE_DIR}
             ${CarPlanner_INCLUDE_DIRS}
+            #${sdtrack_INCLUDE_DIRS}
             ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
             ${PROTOBUF_INCLUDE_DIRS}
@@ -95,6 +97,7 @@ set( LIBRARIES
                ${CeresSolver_LIBRARIES}
                #${SensorFusion_LIBRARIES}
                ${Pangolin_LIBRARIES}
+               #${sdtrack_LIBRARIES}
                ${LIBAO_LIBRARY}
                ${SceneGraph_LIBRARIES}
                ${CarPlanner_LIBRARIES}

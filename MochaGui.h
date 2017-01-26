@@ -97,6 +97,8 @@ protected:
 
     void _LoadDefaultParams();
 
+    double _GetZatXY( double x, double y ); // Return the z-value of the current mesh at position (x,y)
+
     static bool SetWaypointVelHandler(std::vector<std::string> *vArgs) { return GetInstance()->_SetWaypointVel(vArgs); }
     static bool RefreshHandler(std::vector<std::string> *vArgs) { return GetInstance()->_Refresh(vArgs); }
     static bool CommandHandler(MochaCommands command) { return GetInstance()->_CommandFunc(command); }
@@ -120,6 +122,22 @@ protected:
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;
     GLMesh m_TerrainMesh;
+
+    // Compare function for std::map m_MeshTable
+    // Should return true if the first argument goes *before* the second (default is '<')
+    struct XYHash
+    {
+        std::size_t operator()(const Eigen::Vector2d& v) const {
+            using std::size_t;
+            using std::hash;
+
+            return ( ( hash<double>()(v(0))
+                      ^ (hash<double>()(v(1)) << 1) ) >> 1);
+        }
+    };
+    // Table for x,y->z lookup
+    Eigen::Matrix<double,Eigen::Dynamic,3> meshTable;
+    std::unordered_map<Eigen::Vector2d,double,XYHash> m_MeshTable;
 
     int m_nStateStatusId;
     int m_nLearningStatusId;
