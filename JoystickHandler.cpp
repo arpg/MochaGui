@@ -1,4 +1,5 @@
 #include "JoystickHandler.h"
+#include <functional>
 
 const bool VERBOSE = true;
 
