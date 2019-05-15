@@ -8,6 +8,9 @@
 #ifndef _MOCHAGUI_H
 #define	_MOCHAGUI_H
 
+#include <ros/ros.h>
+#include <car_planner_msgs/Command.h>
+
 #include <sys/types.h>
 #include <dirent.h>
 #include <atomic>
@@ -97,17 +100,23 @@ protected:
     static bool CommandHandler(MochaCommands command) { return GetInstance()->_CommandFunc(command); }
 
     // UDP values
-    unsigned m_MochaPort; // UDP port for this gui
-    unsigned m_ComPort; // UDP port for m_bSIL (unused)
-    unsigned m_CarPort; // UDP port of the ninja car
-    struct sockaddr_in mochAddr; // Address of this gui (for sending commands from)
-    struct sockaddr_in comAddr;  // Address for m_bSIL (currently not running 1/16/17)
-    struct sockaddr_in carAddr;  // Address of the car (for sending commands to)
-    socklen_t addrLen = sizeof(mochAddr);
-    int recvLen;
-    int sockFD;
-    unsigned char buf[2048];
-    unsigned int msgSize = 0;
+//    unsigned m_MochaPort; // UDP port for this gui
+//    unsigned m_ComPort; // UDP port for m_bSIL (unused)
+//    unsigned m_CarPort; // UDP port of the ninja car
+//    struct sockaddr_in mochAddr; // Address of this gui (for sending commands from)
+//    struct sockaddr_in comAddr;  // Address for m_bSIL (currently not running 1/16/17)
+//    struct sockaddr_in carAddr;  // Address of the car (for sending commands to)
+//    socklen_t addrLen = sizeof(mochAddr);
+//    int recvLen;
+//    int sockFD;
+//    unsigned char buf[2048];
+//    unsigned int msgSize = 0;
+
+
+    // ROS
+    ros::NodeHandle m_nh;
+    ros::Publisher m_expCmdPub;
+    ros::Publisher m_simCmdPub;
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;

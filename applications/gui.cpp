@@ -15,51 +15,53 @@ DEFINE_string(wheel,"", "File for wheel mesh.");            // /Users/corinsandf
 int main( int argc, char* argv[] )
 {
 
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+    google::ParseCommandLineFlags(&argc, &argv, true);
+    google::InitGoogleLogging(argv[0]);
 
-  if(FLAGS_params.empty()) {
-    LOG(FATAL) << "Car parameters file not provided. Use parameter -params";
-    return -1;
-  }
+    if(FLAGS_params.empty()) {
+        LOG(FATAL) << "Car parameters file not provided. Use parameter -params";
+        return -1;
+    }
 
-  if(FLAGS_mesh.empty()) {
-    LOG(FATAL) << "Mesh of environment not provided. Use parameter -mesh";
-    return -1;
-  }
+    if(FLAGS_mesh.empty()) {
+        LOG(FATAL) << "Mesh of environment not provided. Use parameter -mesh";
+        return -1;
+    }
 
-  if(!FLAGS_localizer) {
-    LOG(INFO) << "Localizer not initialized. To initialize, use parameter -localizer";
-  }
+    if(!FLAGS_localizer) {
+        LOG(INFO) << "Localizer not initialized. To initialize, use parameter -localizer";
+    }
 
-  if(FLAGS_mode.empty()) {
-    LOG(INFO) << "Mode not specified; assuming Simulation.";
-  }
+    if(FLAGS_mode.empty()) {
+        LOG(INFO) << "Mode not specified; assuming Simulation.";
+    }
 
-  if(FLAGS_ref.empty()) {
-    LOG(INFO) << "Reference plane not specified.";
-  }
+    if(FLAGS_ref.empty()) {
+        LOG(INFO) << "Reference plane not specified.";
+    }
 
-  if(FLAGS_logfile.empty()) {
-    LOG(FATAL) << "Missing required path to logfile for output.";
-    return -1;
-  }
+    if(FLAGS_logfile.empty()) {
+        LOG(FATAL) << "Missing required path to logfile for output.";
+        return -1;
+    }
 
-  if(FLAGS_car.empty()) {
-    LOG(FATAL) << "Mesh of car not provided. Use parameter -car";
-    return -1;
-  }
+    if(FLAGS_car.empty()) {
+        LOG(FATAL) << "Mesh of car not provided. Use parameter -car";
+        return -1;
+    }
 
-  if(FLAGS_wheel.empty()) {
-    LOG(FATAL) << "Mesh of wheel not provided. Use parameter -wheel";
-    return -1;
-  }
+    if(FLAGS_wheel.empty()) {
+        LOG(FATAL) << "Mesh of wheel not provided. Use parameter -wheel";
+        return -1;
+    }
 
-  MochaGui *pGui = MochaGui::GetInstance();
-  pGui->Init( FLAGS_ref, FLAGS_mesh, FLAGS_localizer, FLAGS_mode, FLAGS_logfile, FLAGS_params, FLAGS_car, FLAGS_wheel );
-  pGui->Run();
+    ros::init(argc, argv, "mocha_gui_node");
 
-  delete pGui;
-  return 0;
+    MochaGui *pGui = MochaGui::GetInstance();
+    pGui->Init( FLAGS_ref, FLAGS_mesh, FLAGS_localizer, FLAGS_mode, FLAGS_logfile, FLAGS_params, FLAGS_car, FLAGS_wheel );
+    pGui->Run();
+
+    delete pGui;
+    return 0;
 }
 
