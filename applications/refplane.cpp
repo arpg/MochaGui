@@ -3,7 +3,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_io.hpp>
 #include <boost/lexical_cast.hpp>
-#include <Node/Node.h>
+#include <node/Node.h>
 #include <CarPlanner/RpgUtils.h>
 #include <CarPlanner/Localizer.h>
 #include <CarPlanner/SE3.h>
