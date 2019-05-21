@@ -5,6 +5,7 @@
 
 #include <thread>
 #include <vector>
+#include <functional>
 
 #include "Gamepad/Gamepad.h"
 #include "Gamepad/EventDispatcher.h"
