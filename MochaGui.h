@@ -9,7 +9,7 @@
 #define	_MOCHAGUI_H
 
 #include <ros/ros.h>
-#include <car_planner_msgs/Command.h>
+#include <carplanner/Command.h>
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -251,4 +251,3 @@ protected:
 };
 
 #endif	/* MOCHAGUI_H */
-

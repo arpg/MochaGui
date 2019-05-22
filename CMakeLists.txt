@@ -1,4 +1,4 @@
-project( MochaGui )
+project( mochagui )
 cmake_minimum_required(VERSION 2.8)
 
 set( CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH} )
@@ -41,7 +41,7 @@ set(BOOST_LIBS regex thread date_time system timer  )
 
 find_package( Pangolin REQUIRED)
 find_package( GLog REQUIRED)
-find_package( CarPlanner REQUIRED )
+#find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
 find_package( CVars REQUIRED )
@@ -57,6 +57,20 @@ endif()
 find_package( Sophus REQUIRED )
 find_package( assimp REQUIRED )
 find_package( Node REQUIRED )
+find_package(catkin REQUIRED
+  COMPONENTS
+    roscpp
+    std_msgs
+    tf
+    carplanner
+)
+
+add_definitions(${EIGEN_DEFINITIONS})
+
+catkin_package(
+  INCLUDE_DIRS .
+  CATKIN_DEPENDS roscpp std_msgs carplanner
+  )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
@@ -76,7 +90,7 @@ set( _INCLUDE_DIRS
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
             ${BOOST_INCLUDE_DIR}
-            ${CarPlanner_INCLUDE_DIRS}
+            #${CarPlanner_INCLUDE_DIRS}
             ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
             ${PROTOBUF_INCLUDE_DIRS}
@@ -87,6 +101,7 @@ set( _INCLUDE_DIRS
             ${assimp_INCLUDE_DIRS}
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_BINARY_DIR}
+            ${catkin_INCLUDE_DIRS}
        )
 
 set( LIBRARIES
@@ -97,13 +112,14 @@ set( LIBRARIES
                ${Pangolin_LIBRARIES}
                ${LIBAO_LIBRARY}
                ${SceneGraph_LIBRARIES}
-               ${CarPlanner_LIBRARIES}
+               #${CarPlanner_LIBRARIES}
                ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
                ${CVars_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
                Gamepad # this is also built with the solution
                ${assimp_LIBRARIES}
+               ${catkin_LIBRARIES}
         )
 
     message(STATUS ${assimp_LIBRARIES})
@@ -175,4 +191,3 @@ CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
   "${CMAKE_CURRENT_BINARY_DIR}/config.h"
 )
-

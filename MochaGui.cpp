@@ -79,8 +79,8 @@ MochaGui::MochaGui() :
 //    carAddr.sin_addr.s_addr = htonl( INADDR_ANY );
 //    carAddr.sin_port = htons( m_CarPort );
 
-    m_expCmdPub = m_nh.advertise<car_planner_msgs::Command>("exp_cmd",1);
-    m_simCmdPub = m_nh.advertise<car_planner_msgs::Command>("sim_cmd",1);
+    m_expCmdPub = m_nh.advertise<carplanner::Command>("exp_cmd",1);
+    m_simCmdPub = m_nh.advertise<carplanner::Command>("sim_cmd",1);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -781,7 +781,7 @@ bool MochaGui::_IteratePlanner(
 
     if(only2d == false) {
         if( m_bPlannerOn == true && m_bSimulate3dPath == false ){
-            res = m_Planner.Iterate(problem);            
+            res = m_Planner.Iterate(problem);
             m_Planner.SimulateTrajectory(sample,problem,0,true);
         }else{
             res = true;
@@ -1022,13 +1022,16 @@ void MochaGui::_ControlCommandFunc()
 //                coded_output.WriteVarint32( Command->ByteSize() );
 //                Command->SerializeToCodedStream( &coded_output );
 
-                car_planner_msgs::Command cmd_msg;
+                carplanner::Command cmd_msg;
                 cmd_msg.worldId = 0;
                 cmd_msg.force = m_ControlCommand.m_dForce;
                 cmd_msg.curvature = m_ControlCommand.m_dCurvature;
                 cmd_msg.dt = m_ControlCommand.m_dT;
                 cmd_msg.phi = m_ControlCommand.m_dPhi;
-                cmd_msg.torques = m_ControlCommand.m_dTorque;
+                for( unsigned int i=0; i<m_ControlCommand.m_dTorque.size(); i++ )
+                {
+                  cmd_msg.torques[i] = m_ControlCommand.m_dTorque[i];
+                }
                 cmd_msg.noDelay = 0;
                 cmd_msg.noUpdate = 1;
 
