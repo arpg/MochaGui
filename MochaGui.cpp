@@ -79,8 +79,8 @@ MochaGui::MochaGui() :
 //    carAddr.sin_addr.s_addr = htonl( INADDR_ANY );
 //    carAddr.sin_port = htons( m_CarPort );
 
-    m_expCmdPub = m_nh.advertise<carplanner::Command>("exp_cmd",1);
-    m_simCmdPub = m_nh.advertise<carplanner::Command>("sim_cmd",1);
+    m_expCmdPub = m_nh.advertise<carplanner_msgs::Command>("exp_cmd",1);
+    m_simCmdPub = m_nh.advertise<carplanner_msgs::Command>("sim_cmd",1);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1022,7 +1022,7 @@ void MochaGui::_ControlCommandFunc()
 //                coded_output.WriteVarint32( Command->ByteSize() );
 //                Command->SerializeToCodedStream( &coded_output );
 
-                carplanner::Command cmd_msg;
+                carplanner_msgs::Command cmd_msg;
                 cmd_msg.worldId = 0;
                 cmd_msg.force = m_ControlCommand.m_dForce;
                 cmd_msg.curvature = m_ControlCommand.m_dCurvature;

@@ -1,4 +1,4 @@
-project( mochagui )
+project( MochaGui )
 cmake_minimum_required(VERSION 2.8)
 
 set( CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH} )
@@ -41,7 +41,7 @@ set(BOOST_LIBS regex thread date_time system timer  )
 
 find_package( Pangolin REQUIRED)
 find_package( GLog REQUIRED)
-#find_package( CarPlanner REQUIRED )
+find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
 find_package( CVars REQUIRED )
@@ -62,14 +62,14 @@ find_package(catkin REQUIRED
     roscpp
     std_msgs
     tf
-    carplanner
-)
+    carplanner_msgs
+    )
 
 add_definitions(${EIGEN_DEFINITIONS})
 
 catkin_package(
   INCLUDE_DIRS .
-  CATKIN_DEPENDS roscpp std_msgs carplanner
+  CATKIN_DEPENDS roscpp std_msgs  
   )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
@@ -90,7 +90,7 @@ set( _INCLUDE_DIRS
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
             ${BOOST_INCLUDE_DIR}
-            #${CarPlanner_INCLUDE_DIRS}
+            ${CarPlanner_INCLUDE_DIRS}
             ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
             ${PROTOBUF_INCLUDE_DIRS}
@@ -112,7 +112,7 @@ set( LIBRARIES
                ${Pangolin_LIBRARIES}
                ${LIBAO_LIBRARY}
                ${SceneGraph_LIBRARIES}
-               #${CarPlanner_LIBRARIES}
+               ${CarPlanner_LIBRARIES}
                ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
                ${CVars_LIBRARIES}

@@ -9,7 +9,7 @@
 #define	_MOCHAGUI_H
 
 #include <ros/ros.h>
-#include <carplanner/Command.h>
+#include <carplanner_msgs/Command.h>
 
 #include <sys/types.h>
 #include <dirent.h>
