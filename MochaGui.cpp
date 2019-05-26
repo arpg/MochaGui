@@ -55,30 +55,6 @@ MochaGui::MochaGui() :
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
     m_dPlanTime( Tic() ) //the size of the fusion sensor
 {
-    //m_Node.init( "MochaGui" ); // Node on which to receive information from the car
-//    m_MochaPort = 1643;
-//    m_ComPort = 1642;
-//    m_CarPort = 1640;
-
-//    if ( ( sockFD = socket( AF_INET, SOCK_DGRAM, 0 ) ) < 0 ) LOG(ERROR) << "Could not create socket";
-
-//    memset( (char*)&mochAddr, 0, addrLen );
-//    mochAddr.sin_family = AF_INET;
-//    mochAddr.sin_addr.s_addr = htonl( INADDR_ANY );
-//    mochAddr.sin_port = htons( m_MochaPort );
-
-//    if ( ::bind( sockFD, (struct sockaddr*)&mochAddr, addrLen ) < 0 ) LOG(ERROR) << "Could not bind socket to port " << m_MochaPort;
-
-//    memset( (char*)&comAddr, 0, addrLen );
-//    comAddr.sin_family = AF_INET;
-//    comAddr.sin_addr.s_addr = htonl( INADDR_ANY );
-//    comAddr.sin_port = htons( m_ComPort );
-
-//    memset( (char*)&carAddr, 0, addrLen );
-//    carAddr.sin_family = AF_INET;
-//    carAddr.sin_addr.s_addr = htonl( INADDR_ANY );
-//    carAddr.sin_port = htons( m_CarPort );
-
     m_expCmdPub = m_nh.advertise<carplanner_msgs::Command>("exp_cmd",1);
     m_simCmdPub = m_nh.advertise<carplanner_msgs::Command>("sim_cmd",1);
 }
@@ -110,7 +86,7 @@ void MochaGui::Run() {
     int frameCount = 0;
     double lastTime = Tic();
     m_dDiagTime = Tic();
-    SetThreadName("Main Thread");
+    SetThreadName("MochaGui Main Thread");
     LOG(INFO) << "Starting Threads";
     _StartThreads();
     double lastFrameTime = Tic();
@@ -271,6 +247,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_bPause = false;
     m_bStep = false;
 
+    std::cout << "Registering keypress callbacks" << std::endl;
+
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(CommandHandler, eMochaClear ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + '1', std::bind(CommandHandler, eMochaToggleTrajectory ) );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + '2', std::bind(CommandHandler, eMochaTogglePlans ) );
@@ -286,6 +264,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     pangolin::RegisterKeyPressCallback( 'G', [this] {this->m_pGraphView->Show(!this->m_pGraphView->IsShown());} );
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'f', [] {g_bFreezeControl = !g_bFreezeControl;} );
 
+    std::cout << "Creating CVars" << std::endl;
+
     //create CVars
     CVarUtils::CreateCVar("refresh", RefreshHandler, "Refresh all the waypoints.");
     CVarUtils::CreateCVar("SetWaypointVel", SetWaypointVelHandler, "Set a single velocity on all waypoints.");
@@ -295,6 +275,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //m_KHeightMap.SaveMap("room2.heightmap");
 
     //initialize the car model
+
+    std::cout << "Initing scene" << std::endl;
 
     const aiScene *pScene = aiImportFile( sMesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
 
@@ -314,19 +296,24 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
                                                          0,0,0,1);
     }*/
 
+    std::cout << "Assigning target";
+
     if(sMode == "Simulation"){
+        std::cout << " to Simulation";
         m_eControlTarget = eTargetSimulation;
         pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
                                                           0, 1, 0, 0,
                                                           0, 0,-1, 0,
                                                           0, 0, 0, 1 );
     }else{
+        std::cout << " to Experiment";
         m_eControlTarget = eTargetExperiment;
         pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
                                                           0, 1, 0, 0,
                                                           0, 0,-1, 0,
                                                           0, 0, 0, 1 );
     }
+    std::cout << std::endl;
 
     btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
     btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
@@ -334,12 +321,15 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     btTriangleMesh *pTriangleMesh = new btTriangleMesh();
 
     /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
+    std::cout << "Generating static hull" << std::endl;
     BulletCarModel::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
 
     /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
+    / std::cout << "Initing CollisionShape" << std::endl;
     btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
 
     /// Also initialize a GLObject for the terrain mesh.
+    / std::cout << "Initing TerrainMesh" << std::endl;
     m_TerrainMesh.Init(pScene);
     //m_MeshHeightMap.Init("ramp.blend");
     //m_GLHeightMap.Init(&m_ActiveHeightMap);
@@ -348,6 +338,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     CarParameters::LoadFromFile(m_sParamsFile,m_mDefaultParameters);
 
     /// Generate as many new cars as we need in order to use MPC.
+    std::cout << "Initing car models" << std::endl;
     m_LearningCarModel.Init(pCollisionShape,dMin,dMax, m_mDefaultParameters, REGRESSOR_NUM_WORLDS );
     m_PlanCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,LocalPlanner::GetNumWorldsRequired(OPT_DIM) );
     m_ControlCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters, LocalPlanner::GetNumWorldsRequired(OPT_DIM)  );
@@ -367,6 +358,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     /// Set all of the ControlParams in MochaGui to be RegressionParameters that
     /// we grab from the ControlCarModel's CarParameters.
+    std::cout << "Vectorizing car parameters" << std::endl;
     m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::DynamicFrictionCoef,&m_ControlCarModel));
     m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::ControlDelay,&m_ControlCarModel));
     m_vControlParams.push_back(RegressionParameter(m_ControlCarModel.GetParameters(0),CarParameters::SteeringCoef,&m_ControlCarModel));
@@ -415,6 +407,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
     /// Establish number of waypoints and where they are; set them to CVars.
+    std::cout << "Setting waypoints" << std::endl;
     int numWaypoints = 8;
     for(int ii = 0; ii < numWaypoints ; ii++){
         char buf[100];
@@ -442,6 +435,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_nGravityStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
 
     m_TerrainMesh.SetAlpha(1.0);
+    std::cout << "Initing gui" << std::endl;
     m_Gui.Init(&m_TerrainMesh);
 
   /// m_pGraphView cannot be resized in old_pangolin and crashes everything.
@@ -450,10 +444,12 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 //    pangolin::DisplayBase().AddDisplay(*m_pGraphView);
 
     // Add Car to Car Planner
+    std::cout << "Adding car to gui" << std::endl;
     m_nDriveCarId = m_Gui.AddCar( m_mDefaultParameters[CarParameters::WheelBase], m_mDefaultParameters[CarParameters::Width], sCarMesh, sWheelMesh );
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
     //populate all the objects
+    std::cout << "Populating scenegraph" << std::endl;
     _PopulateSceneGraph();
 
     m_lPlanStates.resize(25);
@@ -483,6 +479,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     }
 
     // Changed "NinjaCar" to "Compass"
+    std::cout << "Initing Localizer" << std::endl;
     m_sCarObjectName = "Compass";
     if ( m_bSIL ) {
         // Changed "posetonode" to "BulletCarModel" to match BulletCarModel.cpp
@@ -495,6 +492,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     }
 
     //initialize the panel
+    std::cout << "Initing GuiPanel" << std::endl;
     m_GuiPanel.Init();
 
     //fusion parameters
@@ -549,6 +547,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 void MochaGui::_StartThreads()
 {
     //recreate the threads
+    std::cout << "Starting threads" << std::endl;
     m_pPlannerThread = new boost::thread(std::bind(&MochaGui::_PlannerFunc,this));
     m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
@@ -1071,7 +1070,7 @@ void MochaGui::_ControlFunc()
     std::vector<std::string> vLabels = {"Lookahead","Accel","Norm", "Vel.", "Z Vel.", "Target Vel."};
     m_Log.SetLabels(vLabels);
 
-    SetThreadName("Control thread");
+    SetThreadName("MochaGui/Control thread");
     LOG(INFO) << "Starting Control Thread";
     try
     {
@@ -1250,7 +1249,7 @@ void MochaGui::_LoadDefaultParams()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_PhysicsFunc()
 {
-    SetThreadName("Physics thread");
+    SetThreadName("MochaGui/Physics thread");
     LOG(INFO) << "Starting Physics Thread.";
 
     double currentDt;
@@ -1417,7 +1416,7 @@ void MochaGui::_PhysicsFunc()
 
 ////////////////////////////////////////////////////////////////
 void MochaGui::_PlannerFunc() {
-    SetThreadName("Planning thread");
+    SetThreadName("MochaGui/Planner thread");
     LOG(INFO) << "Starting Planner Thread";
     int numInterations = 0;
     m_bPlanning = false;
