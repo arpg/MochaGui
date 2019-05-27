@@ -247,6 +247,12 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_bPause = false;
     m_bStep = false;
 
+    std::cout << "Registering ROS stuff" << std::endl;
+
+    m_nh = new ros::NodeHandle("~");
+    m_commandPub = m_nh->advertise<carplanner_msgs::Command>("command",1);
+//    m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
+
     std::cout << "Registering keypress callbacks" << std::endl;
 
     pangolin::RegisterKeyPressCallback( PANGO_CTRL + 'c', std::bind(CommandHandler, eMochaClear ) );
@@ -339,16 +345,16 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     /// Generate as many new cars as we need in order to use MPC.
     std::cout << "Initing car models" << std::endl;
-    m_LearningCarModel.Init(pCollisionShape,dMin,dMax, m_mDefaultParameters, REGRESSOR_NUM_WORLDS );
-    m_PlanCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,LocalPlanner::GetNumWorldsRequired(OPT_DIM) );
-    m_ControlCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters, LocalPlanner::GetNumWorldsRequired(OPT_DIM)  );
+    m_LearningCarModel.Init(pCollisionShape,dMin,dMax, m_mDefaultParameters, REGRESSOR_NUM_WORLDS , false, false);
+    m_PlanCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,LocalPlanner::GetNumWorldsRequired(OPT_DIM) , false, false);
+    m_ControlCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters, LocalPlanner::GetNumWorldsRequired(OPT_DIM)  , false, false);
     //parameters[CarParameters::SteeringCoef] = -700.0;
 
     /// As well as the car that we're actually driving.
     if ( m_bSIL )
-        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, true );
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, true , true);
     else
-        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, false );
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, false , true);
 
 
     /// Set the two control commands we have to be the offsets calculated
@@ -449,7 +455,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
     //populate all the objects
-    std::cout << "Populating scenegraph" << std::endl;
+    std::cout << "Populating scene" << std::endl;
     _PopulateSceneGraph();
 
     m_lPlanStates.resize(25);
@@ -1021,18 +1027,15 @@ void MochaGui::_ControlCommandFunc()
 //                coded_output.WriteVarint32( Command->ByteSize() );
 //                Command->SerializeToCodedStream( &coded_output );
 
-                carplanner_msgs::Command cmd_msg;
-                cmd_msg.worldId = 0;
-                cmd_msg.force = m_ControlCommand.m_dForce;
-                cmd_msg.curvature = m_ControlCommand.m_dCurvature;
-                cmd_msg.dt = m_ControlCommand.m_dT;
-                cmd_msg.phi = m_ControlCommand.m_dPhi;
-                for( unsigned int i=0; i<m_ControlCommand.m_dTorque.size(); i++ )
-                {
-                  cmd_msg.torques[i] = m_ControlCommand.m_dTorque[i];
-                }
-                cmd_msg.noDelay = 0;
-                cmd_msg.noUpdate = 1;
+//                carplanner_msgs::Command cmd_msg;
+//                cmd_msg.force = m_ControlCommand.m_dForce;
+//                cmd_msg.curvature = m_ControlCommand.m_dCurvature;
+//                cmd_msg.dt = m_ControlCommand.m_dTime;
+//                cmd_msg.phi = m_ControlCommand.m_dPhi;
+//                for( unsigned int i=0; i<m_ControlCommand.m_dTorque.size(); i++ )
+//                {
+//                  cmd_msg.torques[i] = m_ControlCommand.m_dTorque[i];
+//                }
 
                 if ( m_bSIL ) {
                     //send Command to BulletCarModel
@@ -1047,7 +1050,7 @@ void MochaGui::_ControlCommandFunc()
 //                    m_simCmdPub.publish(cmd_msg);
 
                 }
-                ros::spinOnce();
+//                ros::spinOnce();
 
             }
 
@@ -1059,6 +1062,31 @@ void MochaGui::_ControlCommandFunc()
         //usleep(1E6 * 0.016);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubCommand()
+{
+    carplanner_msgs::Command cmd_msg;
+    cmd_msg.force       = m_ControlCommand.m_dForce;
+    cmd_msg.curvature   = m_ControlCommand.m_dCurvature;
+    cmd_msg.dt          = m_ControlCommand.m_dTime;
+    cmd_msg.phi         = m_ControlCommand.m_dPhi;
+    for(unsigned int i=0; i<3; i++)
+    {
+        cmd_msg.torques.push_back(m_ControlCommand.m_dTorque[i]);
+    }
+    m_commandPub.publish(cmd_msg);
+    ros::spinOnce();
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+//void MochaGui::_pubState(VehicleState& state)
+//{
+//    carplanner_msgs::VehicleState state_msg;
+
+//    m_statePub.publish(state_msg);
+//    ros::spinOnce();
+//}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlFunc()
@@ -1147,8 +1175,6 @@ void MochaGui::_ControlFunc()
                        && m_StillControl )){
                     usleep(1000);
                 }
-
-
 
                 if(m_bSimulate3dPath ){
                     m_DriveCarModel.GetVehicleState(0,currentState);
@@ -1313,8 +1339,8 @@ void MochaGui::_PhysicsFunc()
             //update the drive car position based on the car model
             ControlCommand currentCommand;
             if(m_bControl3dPath) {
+                // m_bControl3dPath = True , m_bSimulate3dPath = True
                 if(m_bControllerRunning){
-
                     while((Toc(dCurrentTic)) < 0.002) {
                         usleep(100);
                     }
@@ -1355,6 +1381,9 @@ void MochaGui::_PhysicsFunc()
 
                         currentCommand = m_ControlCommand;
                     }
+
+                    _pubCommand();
+
                     //dout("Sending accel: "<< currentCommand.m_dForce << " and steering: " << currentCommand.m_dPhi);
 
                     if(m_bLoggerEnabled && m_Logger.IsReady()){
@@ -1368,12 +1397,16 @@ void MochaGui::_PhysicsFunc()
                     currentCommand.m_dT = currentDt;
                     VehicleState currentState;
                     m_DriveCarModel.GetVehicleState(0,currentState);
+//                    _pubState(currentState);
 
                     if(m_bLoggerEnabled && m_Logger.IsReady()){
                         m_Logger.LogPoseUpdate(currentState,EventLogger::eSimulation);
                     }
                 }
-            }else{
+            }
+            else{
+                // m_bControl3dPath = False , m_bSimulate3dPath = True
+
                 //dout("Simulating with force " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dForce <<
                 //     " and accel " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dPhi <<
                 //     " and torque " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dTorques.transpose());

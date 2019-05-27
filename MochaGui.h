@@ -114,8 +114,12 @@ protected:
 
 
     // ROS
-    ros::NodeHandle m_nh;
-    ros::Publisher m_stateFromMochaPub;
+    ros::NodeHandle* m_nh;
+    ros::Publisher m_commandPub;
+//    ros::Publisher m_statePub;
+
+    void _pubCommand();
+//    void _pubState(VehicleState& );
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;
