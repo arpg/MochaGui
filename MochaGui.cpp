@@ -86,7 +86,7 @@ void MochaGui::Run() {
     int frameCount = 0;
     double lastTime = Tic();
     m_dDiagTime = Tic();
-    SetThreadName("MochaGui Main Thread");
+    SetThreadName("mochagui-main");
     LOG(INFO) << "Starting Threads";
     _StartThreads();
     double lastFrameTime = Tic();
@@ -325,11 +325,11 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     BulletCarModel::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
 
     /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
-    / std::cout << "Initing CollisionShape" << std::endl;
+    std::cout << "Initing CollisionShape" << std::endl;
     btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
 
     /// Also initialize a GLObject for the terrain mesh.
-    / std::cout << "Initing TerrainMesh" << std::endl;
+    std::cout << "Initing TerrainMesh" << std::endl;
     m_TerrainMesh.Init(pScene);
     //m_MeshHeightMap.Init("ramp.blend");
     //m_GLHeightMap.Init(&m_ActiveHeightMap);
@@ -1070,7 +1070,7 @@ void MochaGui::_ControlFunc()
     std::vector<std::string> vLabels = {"Lookahead","Accel","Norm", "Vel.", "Z Vel.", "Target Vel."};
     m_Log.SetLabels(vLabels);
 
-    SetThreadName("MochaGui/Control thread");
+    SetThreadName("mochagui-control");
     LOG(INFO) << "Starting Control Thread";
     try
     {
@@ -1249,7 +1249,7 @@ void MochaGui::_LoadDefaultParams()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_PhysicsFunc()
 {
-    SetThreadName("MochaGui/Physics thread");
+    SetThreadName("mochagui-physics");
     LOG(INFO) << "Starting Physics Thread.";
 
     double currentDt;
@@ -1309,7 +1309,6 @@ void MochaGui::_PhysicsFunc()
                 m_DriveCarModel.SetState(0,startState);
 
             }
-
 
             //update the drive car position based on the car model
             ControlCommand currentCommand;
@@ -1416,7 +1415,7 @@ void MochaGui::_PhysicsFunc()
 
 ////////////////////////////////////////////////////////////////
 void MochaGui::_PlannerFunc() {
-    SetThreadName("MochaGui/Planner thread");
+    SetThreadName("mochagui-planner");
     LOG(INFO) << "Starting Planner Thread";
     int numInterations = 0;
     m_bPlanning = false;
