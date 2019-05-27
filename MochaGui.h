@@ -115,8 +115,7 @@ protected:
 
     // ROS
     ros::NodeHandle m_nh;
-    ros::Publisher m_expCmdPub;
-    ros::Publisher m_simCmdPub;
+    ros::Publisher m_stateFromMochaPub;
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;

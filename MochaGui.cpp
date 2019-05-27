@@ -55,8 +55,8 @@ MochaGui::MochaGui() :
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
     m_dPlanTime( Tic() ) //the size of the fusion sensor
 {
-    m_expCmdPub = m_nh.advertise<carplanner_msgs::Command>("exp_cmd",1);
-    m_simCmdPub = m_nh.advertise<carplanner_msgs::Command>("sim_cmd",1);
+//    m_expCmdPub = m_nh.advertise<carplanner_msgs::Command>("exp_cmd",1);
+//    m_simCmdPub = m_nh.advertise<carplanner_msgs::Command>("sim_cmd",1);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1037,14 +1037,14 @@ void MochaGui::_ControlCommandFunc()
                 if ( m_bSIL ) {
                     //send Command to BulletCarModel
 //                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) { LOG(ERROR) << "Did not send message"; }
-                    m_expCmdPub.publish(cmd_msg);
+//                    m_expCmdPub.publish(cmd_msg);
                     //else { LOG(INFO) << "Sent Command"; }
 
                 }
                 else {
                     //send Command to NinjaCar
 //                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
-                    m_simCmdPub.publish(cmd_msg);
+//                    m_simCmdPub.publish(cmd_msg);
 
                 }
                 ros::spinOnce();
