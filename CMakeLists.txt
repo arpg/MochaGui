@@ -57,19 +57,22 @@ endif()
 find_package( Sophus REQUIRED )
 find_package( assimp REQUIRED )
 find_package( Node REQUIRED )
+#find_package( pcl REQUIRED )
 find_package(catkin REQUIRED
   COMPONENTS
     roscpp
     std_msgs
     tf
     carplanner_msgs
+    pcl_ros
+    pcl_conversions
     )
 
 add_definitions(${EIGEN_DEFINITIONS})
 
 catkin_package(
   INCLUDE_DIRS .
-  CATKIN_DEPENDS roscpp std_msgs
+  CATKIN_DEPENDS roscpp std_msgs tf carplanner_msgs
   )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )

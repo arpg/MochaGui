@@ -9,7 +9,19 @@
 #define	_MOCHAGUI_H
 
 #include <ros/ros.h>
+#include <std_msgs/Bool.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <geometry_msgs/PolygonStamped.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <carplanner_msgs/Command.h>
+#include <carplanner_msgs/VehicleState.h>
+#include <tf/transform_broadcaster.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/search/kdtree.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl_ros/transforms.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -52,7 +64,7 @@ public:
     void Run();
     void Init(const std::string& sRefPlane, const std::string& sMesh, bool bLocalizer,
               const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
-              const std::string& sCarMesh, const std::string& sWheelMesh);
+              const std::string& sCarMesh, const std::string& sWheelMesh, bool enableROS=false);
 
 
     static MochaGui *GetInstance();
@@ -114,12 +126,22 @@ protected:
 
 
     // ROS
+    bool m_bEnableROS;
     ros::NodeHandle* m_nh;
     ros::Publisher m_commandPub;
-//    ros::Publisher m_statePub;
-
+    ros::Publisher m_statePub;
+    ros::Publisher m_meshPub;
+    ros::Subscriber m_meshSub;
+    boost::thread* m_pPublisherThread;
+    tf::TransformBroadcaster m_tfbr;
+    void _PublisherFunc();
+    void _meshCB(const sensor_msgs::PointCloud2::Ptr);
     void _pubCommand();
-//    void _pubState(VehicleState& );
+    void _pubCommand(ControlCommand& );
+    void _pubState();
+    void _pubState(VehicleState& );
+    void _pubMesh();
+    void _pubMesh(aiMesh& );
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;
