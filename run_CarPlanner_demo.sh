@@ -1,1 +1,1 @@
-~/code/MochaGui/build/devel/lib/mochagui/gui -params ~/code/MochaGui/learning_params.csv -mesh ~/code/MochaGui/labLoop.ply -logfile 1.log -car ~/code/MochaGui/herbie/herbie.blend -wheel ~/code/MochaGui/herbie/wheel.blend
+./build/devel/lib/mochagui/gui -params ./learning_params.csv -mesh ./labLoop.ply -logfile 1.log -car ./herbie/herbie.blend -wheel ./herbie/wheel.blend

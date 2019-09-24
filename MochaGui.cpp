@@ -79,7 +79,8 @@ MochaGui *MochaGui::GetInstance()
 }
 
 ////////////////////////////////////////////////////////////////
-void MochaGui::Run() {
+void MochaGui::Run()
+{
     //create the list of cvars not to save
     std::vector<std::string> filter = { "not", "debug.MinLookaheadTime", "debug.MaxPlanTimeMultiplier", "debug.FreezeControl", "debug.PointCost", "debug.Show2DResult", "debug.Optimize2DOnly", "debug.ForceZeroStartingCurvature", "debug.UseCentralDifferences", "debug.UseGoalPoseStepping", "debug.DisableDamping", "debug.MonotonicCost", "debug.LocalizerDownsampler", /*"debug.ImuIntegrationOnly",*/ "debug.ShowJacobianPaths", "debug.SkidCompensationActive", "debug.PlaybackControlPaths", "debug.MaxLookaheadTime", "debug.InertialControl", "debug.StartSegmentIndex", "planner.PointCostWeights", "planner.TrajCostWeights", "planner.Epsilon"};
 
@@ -231,6 +232,18 @@ void MochaGui::_UpdateWaypointFiles()
      closedir(d);
 }
 
+///////////////////////////////////////////////////////////////////////
+void MochaGui::InitROS()
+{
+  m_nh = new ros::NodeHandle("~");
+
+  m_commandPub = m_nh->advertise<carplanner_msgs::Command>("command",1);
+  // m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
+  m_meshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("scene_mesh",1);
+
+  // m_meshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("infinitam/mesh", 1, boost::bind(&MochaGui::_meshCB, this, _1));
+}
+
 ////////////////////////////////////////////////////////////////
 void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool bLocalizer,
                     const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
@@ -253,13 +266,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_bEnableROS = enableROS;
     if( m_bEnableROS )
     {
-        m_nh = new ros::NodeHandle("~");
-
-        m_commandPub = m_nh->advertise<carplanner_msgs::Command>("command",1);
-        m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
-        m_meshPub = m_nh->advertise<sensor_msgs::PointCloud2>("map",1);
-
-        m_meshSub = m_nh->subscribe<sensor_msgs::PointCloud2>("map",1,meshCB);
+        InitROS();
     }
 
     std::cout << "Registering keypress callbacks" << std::endl;
@@ -346,6 +353,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     /// Also initialize a GLObject for the terrain mesh.
     std::cout << "Initing TerrainMesh" << std::endl;
     m_TerrainMesh.Init(pScene);
+    // scene = pScene;
     //m_MeshHeightMap.Init("ramp.blend");
     //m_GLHeightMap.Init(&m_ActiveHeightMap);
 
@@ -427,7 +435,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     std::cout << "Setting waypoints" << std::endl;
     int numWaypoints = 8;
     double radius = 1;
-    std::vector<double> offset{2, 2, 0};
+    std::vector<double> offset{2, 2, 0}; // x y z in NED
     for(int ii = 0; ii < numWaypoints ; ii++){
         char buf[100];
         snprintf( buf, 100, "waypnt.%d", ii );
@@ -572,7 +580,6 @@ void MochaGui::_StartThreads()
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
     if( m_bEnableROS )
     {
-        m_nh = new ros::NodeHandle("~");
         m_pPublisherThread = new boost::thread(std::bind(&MochaGui::_PublisherFunc,this));
     }
 
@@ -631,11 +638,16 @@ void MochaGui::_KillThreads()
         m_pCommandThread->join();
     }
 
+    if(m_pPublisherThread) {
+        m_pPublisherThread->join();
+    }
+
     delete m_pControlThread;
     delete m_pPhysicsThread;
     delete m_pPlannerThread;
     delete m_pLocalizerThread;
     delete m_pCommandThread;
+    delete m_pPublisherThread;
 
     m_pControlThread = 0;
     m_pPhysicsThread = 0;
@@ -703,7 +715,8 @@ void MochaGui::_RefreshWaypoints()
 }
 
 ////////////////////////////////////////////////////////////////
-bool MochaGui::_CommandFunc(MochaCommands command) {
+bool MochaGui::_CommandFunc(MochaCommands command)
+{
 
     switch (command){
     case eMochaSolve:
@@ -1084,24 +1097,76 @@ void MochaGui::_ControlCommandFunc()
 ///////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_PublisherFunc()
 {
-    while( m_bEnableROS )
+    while( ros::ok() && m_StillRun )
     {
-        std::cout << "Starting PublisherFunc" << std::endl;
+        _pubCommand();
+        // _pubState();
+        _pubMesh();
 
-        while( ros::ok() && m_StillRun )
-        {
-            _pubCommand();
-            _pubState();
-            // _pubMesh();
-            ros::Rate(100).sleep();
-        }
+        // const aiMesh* pMesh = new aiMesh;
+        // for( uint ii=0; ii< ; ii++)
+        // {
+        //   // aiVector3D pt =
+        //   pMesh->mVertices.push_back(pt);
+        // }
+        //
+        // const aiScene *pScene = aiImportFile( "./labLoop.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
+        // BulletCarModel::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+        // m_TerrainMesh.Init(pScene);
+        // m_TerrainMesh = m_DriveCarModel.m_pTerrainShape;
+
+
+        ros::Rate(100).sleep();
     }
+
     usleep(1E6 * 0.005);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_meshCB(const sensor_msgs::PointCloud2::Ptr msg)
+void MochaGui::_meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
+  // ROS_INFO("mochagui got a mesh!");
+
+  // btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+  // mochagui::convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape);
+  //
+
+  // convert mesh from mesh_tools to assimp format
+  // aiMesh* tmpMesh = new aiMesh();
+  // mesh_msgs::TriangleMeshStamped tmpmesh_msg = *mesh_msg;
+  // mesh_msgs::TriangleMesh* tmpmesh_msgptr = &(tmpmesh_msg.mesh);
+  // mochagui::convertMeshMsgToAssimpMesh(tmpmesh_msgptr, tmpMesh);
+
+  // ROS_INFO("mochagui got mesh with %d faces",tmpMesh->mNumFaces);
+
+  // now that we have populated the mesh, we can use it to build a new aiScene, which we'll use to generate a new m_TerrainMesh for visualization
+  // aiScene* tmpScene = new aiScene();
+  // tmpScene->mMeshes = new aiMesh*[ 1 ];
+  // tmpScene->mMeshes[0] = nullptr;
+  // tmpScene->mNumMeshes = 1;
+  // tmpScene->mMeshes[0] = tmpMesh;
+  //
+  // tmpScene->mRootNode = new aiNode();
+  // tmpScene->mRootNode->mMeshes = new unsigned int[ 1 ];
+  // tmpScene->mRootNode->mMeshes[0] = 0;
+  // tmpScene->mRootNode->mNumMeshes = 1;
+  // tmpScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
+  //                                                    0,1,0,0,
+  //                                                    0,0,-1,0,
+  //                                                    0,0,0,1);
+
+  // const aiScene* tmpScenePtr(tmpScene);
+  // GLMesh tmpTerrainMesh;
+  // tmpTerrainMesh.Init(tmpScenePtr);
+
+  // m_TerrainMesh = tmpTerrainMesh;
+
+  // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
+  // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
+  // btTriangleMesh* pTriangleMesh = new btTriangleMesh();
+  // BulletCarModel::GenerateStaticHull(scene,scene->mRootNode,scene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+  // m_TerrainMesh.Init(pScene);
+
 
 }
 
@@ -1128,148 +1193,205 @@ void MochaGui::_pubCommand(ControlCommand& cmd)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubState()
-{
-    VehicleState state;
-    m_DriveCarModel.GetVehicleState(0,state);
-    _pubState(state);
-}
+// void MochaGui::_pubState()
+// {
+//     VehicleState state;
+//     m_DriveCarModel.GetVehicleState(0,state);
+//     _pubState(state);
+// }
 
 //////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubState(VehicleState& state)
-{
-    Sophus::SE3d T_NWD_NWU(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
-    Sophus::SE3d rot_180_z(Eigen::Quaterniond(0,0,0,1),Eigen::Vector3d(0,0,0));
-
-    carplanner_msgs::VehicleState state_msg;
-    state_msg.m_dTwv.header.stamp = ros::Time::now();
-    state_msg.m_dTwv.header.frame_id = "map";
-    state_msg.m_dTwv.child_frame_id = "vehicle";
-
-    Sophus::SE3d Twv = rot_180_z*T_NWD_NWU*state.m_dTwv;
-    state_msg.m_dTwv.transform.translation.x = Twv.translation()[0];
-    state_msg.m_dTwv.transform.translation.y = Twv.translation()[1];
-    state_msg.m_dTwv.transform.translation.z = Twv.translation()[2];
-    state_msg.m_dTwv.transform.rotation.w = Twv.unit_quaternion().w();
-    state_msg.m_dTwv.transform.rotation.x = Twv.unit_quaternion().x();
-    state_msg.m_dTwv.transform.rotation.y = Twv.unit_quaternion().y();
-    state_msg.m_dTwv.transform.rotation.z = Twv.unit_quaternion().z();
-
-    m_tfbr.sendTransform(state_msg.m_dTwv);
-
-    for( unsigned int i=0; i<state.m_vWheelStates.size(); i++ )
-    {
-        geometry_msgs::TransformStamped tf;
-        tf.header.stamp = ros::Time::now();
-        tf.header.frame_id = "vehicle";
-        tf.child_frame_id = "wheel" + std::to_string(i);
-
-        Sophus::SE3d Twv = state.m_vWheelStates[i];
-        tf.transform.translation.x = Twv.translation()[0];
-        tf.transform.translation.y = Twv.translation()[1];
-        tf.transform.translation.z = Twv.translation()[2];
-        tf.transform.rotation.w = Twv.unit_quaternion().w();
-        tf.transform.rotation.x = Twv.unit_quaternion().x();
-        tf.transform.rotation.y = Twv.unit_quaternion().y();
-        tf.transform.rotation.z = Twv.unit_quaternion().z();
-
-        m_tfbr.sendTransform(tf);
-        state_msg.m_vWheelStates.push_back( tf );
-    }
-
-    for( unsigned int i=0; i<state.m_vWheelContacts.size(); i++ )
-    {
-        std_msgs::Bool contact;
-        contact.data = state.m_vWheelContacts[i];
-        state_msg.m_vWheelContacts.push_back( contact );
-    }
-
-    state_msg.m_dV.x = state.m_dV[0];
-    state_msg.m_dV.y = state.m_dV[1];
-    state_msg.m_dV.z = state.m_dV[2];
-
-    state_msg.m_dW.x = state.m_dW[0];
-    state_msg.m_dW.y = state.m_dW[1];
-    state_msg.m_dW.z = state.m_dW[2];
-
-    state_msg.m_dCurvature      = state.m_dCurvature;
-    state_msg.m_dSteering       = state.m_dSteering;
-    state_msg.m_dTime           = state.m_dTime;
-
-    m_statePub.publish(state_msg);
-    ros::spinOnce();
-}
+// void MochaGui::_pubState(VehicleState& state)
+// {
+    // Sophus::SE3d T_NWD_NWU(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+    // Sophus::SE3d rot_180_z(Eigen::Quaterniond(0,0,0,1),Eigen::Vector3d(0,0,0));
+    //
+    // carplanner_msgs::VehicleState state_msg;
+    // state_msg.m_dTwv.header.stamp = ros::Time::now();
+    // state_msg.m_dTwv.header.frame_id = "map";
+    // state_msg.m_dTwv.child_frame_id = "vehicle";
+    //
+    // Sophus::SE3d Twv = rot_180_z*T_NWD_NWU*state.m_dTwv;
+    // state_msg.m_dTwv.transform.translation.x = Twv.translation()[0];
+    // state_msg.m_dTwv.transform.translation.y = Twv.translation()[1];
+    // state_msg.m_dTwv.transform.translation.z = Twv.translation()[2];
+    // state_msg.m_dTwv.transform.rotation.w = Twv.unit_quaternion().w();
+    // state_msg.m_dTwv.transform.rotation.x = Twv.unit_quaternion().x();
+    // state_msg.m_dTwv.transform.rotation.y = Twv.unit_quaternion().y();
+    // state_msg.m_dTwv.transform.rotation.z = Twv.unit_quaternion().z();
+    //
+    // m_tfbr.sendTransform(state_msg.m_dTwv);
+    //
+    // for( unsigned int i=0; i<state.m_vWheelStates.size(); i++ )
+    // {
+    //     geometry_msgs::TransformStamped tf;
+    //     tf.header.stamp = ros::Time::now();
+    //     tf.header.frame_id = "vehicle";
+    //     tf.child_frame_id = "wheel" + std::to_string(i);
+    //
+    //     Sophus::SE3d Twv = state.m_vWheelStates[i];
+    //     tf.transform.translation.x = Twv.translation()[0];
+    //     tf.transform.translation.y = Twv.translation()[1];
+    //     tf.transform.translation.z = Twv.translation()[2];
+    //     tf.transform.rotation.w = Twv.unit_quaternion().w();
+    //     tf.transform.rotation.x = Twv.unit_quaternion().x();
+    //     tf.transform.rotation.y = Twv.unit_quaternion().y();
+    //     tf.transform.rotation.z = Twv.unit_quaternion().z();
+    //
+    //     m_tfbr.sendTransform(tf);
+    //     state_msg.m_vWheelStates.push_back( tf );
+    // }
+    //
+    // for( unsigned int i=0; i<state.m_vWheelContacts.size(); i++ )
+    // {
+    //     std_msgs::Bool contact;
+    //     contact.data = state.m_vWheelContacts[i];
+    //     state_msg.m_vWheelContacts.push_back( contact );
+    // }
+    //
+    // state_msg.m_dV.x = state.m_dV[0];
+    // state_msg.m_dV.y = state.m_dV[1];
+    // state_msg.m_dV.z = state.m_dV[2];
+    //
+    // state_msg.m_dW.x = state.m_dW[0];
+    // state_msg.m_dW.y = state.m_dW[1];
+    // state_msg.m_dW.z = state.m_dW[2];
+    //
+    // state_msg.m_dCurvature      = state.m_dCurvature;
+    // state_msg.m_dSteering       = state.m_dSteering;
+    // state_msg.m_dTime           = state.m_dTime;
+    //
+    // m_statePub.publish(state_msg);
+    // ros::spinOnce();
+// }
 ////////////////////////////////////////////////////////////////////////////////////
+
 void MochaGui::_pubMesh()
 {
     const aiScene* scene = m_TerrainMesh.GetScene();
     if( !scene )
     {
-        std::cout << "Invalid scene" << std::endl;
+        std::cout << "Scene is invalid." << std::endl;
         return;
     }
     if( !scene->HasMeshes() )
     {
+        std::cout << "Scene has no meshes." << std::endl;
         return;
     }
-    aiMesh* mesh = scene->mMeshes[0];
+    aiMesh* mesh = scene->mMeshes[scene->mRootNode->mMeshes[0]];
     if( !mesh )
     {
+        std::cout << "Scene mesh is invalid." << std::endl;
         return;
     }
 
-    _pubMesh(*mesh);
+    _pubMesh(mesh);
 
 }
+/////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////////////
-//void MochaGui::_pubMesh(aiMesh& mesh)
-//{
-//    geometry_msgs::PolygonStamped mesh_msg;
-//    mesh_msg.header.frame_id = "map";
-//    mesh_msg.header.stamp = ros::Time::now();
-//    for(unsigned int i=0; i<mesh.mNumVertices; i++)
-//    {
-//        geometry_msgs::Point32 pt;
-//        pt.x = -mesh.mVertices[i].x;
-//        pt.y = mesh.mVertices[i].y;
-//        pt.z = mesh.mVertices[i].z;
-//        mesh_msg.polygon.points.push_back(pt);
-//    }
-//    m_meshPub.publish(mesh_msg);
-
-//    m_tfbr.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(0,0,0,1),tf::Vector3(0,0,0)),
-//                                              mesh_msg.header.stamp,
-//                                              "world","map"));
-
-//    ros::spinOnce();
-//}
-
-void MochaGui::_pubMesh(aiMesh& mesh)
+void MochaGui::_pubMesh(aiMesh*& mesh)
 {
-    sensor_msgs::PointCloud2 mesh_msg;
+    // sensor_msgs::PointCloud2 mesh_msg;
+    //
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    //
+    // for(unsigned int i=0; i<mesh.mNumVertices; i++)
+    // {
+    //     pcl::PointXYZ pt;
+    //     pt.x = -mesh.mVertices[i].x;
+    //     pt.y = mesh.mVertices[i].y;
+    //     pt.z = mesh.mVertices[i].z;
+    //     cloud_ptr->push_back(pt);
+    // }
+    //
+    // pcl::toROSMsg(*cloud_ptr, mesh_msg);
+    // mesh_msg.header.frame_id = "map";
+    // mesh_msg.header.stamp = ros::Time::now();
+    // m_meshPub.publish(mesh_msg);
+    //
+    // m_tfbr.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(0,0,0,1),tf::Vector3(0,0,0)),
+    //                                           mesh_msg.header.stamp,
+    //                                           "world","map"));
+    //
+    // ros::spinOnce();
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    // ITMMesh::Triangle* triangles;
+    // uint* num_triangles = new unsigned int;
+    // uint last_num_triangles = 0;
+    //
+    // ITMMesh *mesh = new ITMMesh(settings->GetMemoryType());
+    // ORUtils::MemoryBlock<ITMMesh::Triangle>* cpu_triangles;
+    //
+    // // assign triangles and num_triangles pointers to internal variables
+    // if (mesh->memoryType == MEMORYDEVICE_CUDA)
+    // {
+    //     cpu_triangles = new ORUtils::MemoryBlock<ITMMesh::Triangle>(mesh->noMaxTriangles, MEMORYDEVICE_CPU);
+    //     cpu_triangles->SetFrom(mesh->triangles, ORUtils::MemoryBlock<ITMMesh::Triangle>::CUDA_TO_CPU);
+    //     // shouldDelete = true;
+    // }
+    // else
+    // {
+    //     cpu_triangles = mesh->triangles;
+    // }
+    //
+    // triangles = cpu_triangles->GetData(MEMORYDEVICE_CPU);
+    // num_triangles = &(mesh->noTotalTriangles);
+    //
+    // while( ros::ok() )
+    // {
+    //     if (meshingEngine != NULL)
+    //     {
+    //       meshingEngine->MeshScene(mesh, scene);
+    //
+    //       bool hasNewMesh = (last_num_triangles != *num_triangles);
+    //       if(hasNewMesh)
+    //       {
+    //         mesh_msgs::TriangleMeshStamped* mesh_msg = new mesh_msgs::TriangleMeshStamped;
+    //         mesh_msg->header.stamp = ros::Time::now();
+    //         mesh_msg->header.frame_id = "infinitam";
+    //         mesh_msgs::TriangleMesh* triangle_mesh_msg = &(mesh_msg->mesh);
+    //         ConvertTrianglesToROS(triangles, *num_triangles, triangle_mesh_msg);
+    //         ROS_INFO("infinitam publishing mesh with %d triangles",*num_triangles);
+    //         meshPub.publish(*mesh_msg);
+    //       }
+    //       last_num_triangles = *num_triangles;
+    //     }
+    //
+    //     // try
+    //     // {
+    //     //   tfListener.waitForTransform("map", "base_link", ros::Time(0), ros::Duration(1));
+    //     //   tfListener.lookupTransform("map", "base_link", ros::Time(0), T_map_base);
+    //     //   this->trackingState->pose_d = new ORUtils::SE3Pose(
+    //     //     T_map_base.getOrigin().getX(),
+    //     //     T_map_base.getOrigin().getY(),
+    //     //     T_map_base.getOrigin().getZ(),
+    //     //     T_map_base.getRotation().getX(),
+    //     //     T_map_base.getRotation().getY(),
+    //     //     T_map_base.getRotation().getZ()
+    //     //   );
+    //     // }
+    //     // catch (const tf::TransformException& exception)
+    //     // {
+    //     //   // ROS_INFO_THROTTLE(1,"[ITMRosEngine] tfListener exception occurred");
+    //     // }
+    //
+    //     ros::spinOnce();
+    //     ros::Rate(100).sleep();
+    // }
+    //
+    // delete triangles;
+    // delete cpu_triangles;
+    // delete mesh;
 
-    for(unsigned int i=0; i<mesh.mNumVertices; i++)
-    {
-        pcl::PointXYZ pt;
-        pt.x = -mesh.mVertices[i].x;
-        pt.y = mesh.mVertices[i].y;
-        pt.z = mesh.mVertices[i].z;
-        cloud_ptr->push_back(pt);
-    }
-
-    pcl::toROSMsg(*cloud_ptr, mesh_msg);
-    mesh_msg.header.frame_id = "map";
-    mesh_msg.header.stamp = ros::Time::now();
-    m_meshPub.publish(mesh_msg);
-
-    m_tfbr.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(0,0,0,1),tf::Vector3(0,0,0)),
-                                              mesh_msg.header.stamp,
-                                              "world","map"));
-
+    mesh_msgs::TriangleMeshStamped* mesh_msg = new mesh_msgs::TriangleMeshStamped();
+    mesh_msg->header.stamp = ros::Time::now();
+    mesh_msg->header.frame_id = "map";
+    convertAssimpMeshToMeshMsg(mesh, mesh_msg);
+    m_meshPub.publish(*mesh_msg);
     ros::spinOnce();
+    ros::Rate(10).sleep();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1634,9 +1756,11 @@ void MochaGui::_PhysicsFunc()
 }
 
 ////////////////////////////////////////////////////////////////
-void MochaGui::_PlannerFunc() {
+void MochaGui::_PlannerFunc()
+{
     SetThreadName("mochagui-planner");
-    LOG(INFO) << "Starting Planner Thread";
+    // LOG(INFO) << "Starting Planner Thread";
+    std::cout << "Starting Planner Thread" << std::endl;
     int numInterations = 0;
     m_bPlanning = false;
     // now add line segments
@@ -1810,7 +1934,8 @@ void MochaGui::_PlannerFunc() {
 }
 
 ////////////////////////////////////////////////////////////////
-void MochaGui::_PopulateSceneGraph() {
+void MochaGui::_PopulateSceneGraph()
+{
   _RefreshWaypoints();
 
   m_vGLLineSegments.resize(m_Path.size() - 1);

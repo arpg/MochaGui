@@ -26,7 +26,7 @@ ENDIF()
 
 # TODO fix all these warnings instead of suppressing them!!
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
 add_definitions(-DBT_USE_DOUBLE_PRECISION)
 add_definitions(-DBT_NO_PROFILE)
 
@@ -66,6 +66,7 @@ find_package(catkin REQUIRED
     carplanner_msgs
     pcl_ros
     pcl_conversions
+    hdf5_map_io
     )
 
 add_definitions(${EIGEN_DEFINITIONS})
@@ -165,6 +166,9 @@ set( LEARNING_HDRS  config.h.in
                     LearningGui.h )
 set( LEARNING_SRC
                   LearningGui.cpp )
+
+	  add_executable( fake_mesh_publisher fake_mesh_publisher.cpp ${SHARED_HDRS} ${SHARED_SRC} ${catkin_INCLUDE_DIRS} )
+	  target_link_libraries( fake_mesh_publisher ${LIBRARIES} ${catkin_LIBRARIES} )
 
 add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
 target_link_libraries( logger ${LIBRARIES} )

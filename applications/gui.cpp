@@ -55,13 +55,13 @@ int main( int argc, char* argv[] )
         return -1;
     }
 
-    ros::init(argc, argv, "mochagui_node");
+    ros::init(argc, argv, "mochagui");
 
     MochaGui *pGui = MochaGui::GetInstance();
-    pGui->Init( FLAGS_ref, FLAGS_mesh, FLAGS_localizer, FLAGS_mode, FLAGS_logfile, FLAGS_params, FLAGS_car, FLAGS_wheel , true);
+    bool enableROS = true;
+    pGui->Init( FLAGS_ref, FLAGS_mesh, FLAGS_localizer, FLAGS_mode, FLAGS_logfile, FLAGS_params, FLAGS_car, FLAGS_wheel, enableROS);
     pGui->Run();
 
     delete pGui;
     return 0;
 }
-

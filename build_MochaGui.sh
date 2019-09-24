@@ -1,4 +1,3 @@
-cd ~/code/MochaGui
 mkdir -p build
 cd build
 cmake .. 
