@@ -256,7 +256,7 @@ inline void convertCollisionShape2MeshMsg(btCollisionShape* collisionShape, cons
     geometry_msgs::Point sVertex;
     sVertex.x = vertexPosition[0];
     sVertex.y = vertexPosition[1];
-    sVertex.z = -vertexPosition[2];
+    sVertex.z = vertexPosition[2];
     (*meshMsg)->vertices[iv] = sVertex;
   }
 
@@ -319,9 +319,11 @@ inline void convertMeshMsg2CollisionShape(mesh_msgs::TriangleMeshStamped* meshMs
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-inline void convertAssimpMeshToMeshMsg(aiMesh*& sMesh, mesh_msgs::TriangleMesh*& mesh)
+inline void convertAssimpMeshToMeshMsg(aiMesh* sMesh, mesh_msgs::TriangleMesh** mesh)
 {
   mesh_msgs::TriangleMesh* dMesh = new mesh_msgs::TriangleMesh();
+
+  // printf("converting aiMesh w %d faces ",sMesh->mNumFaces);
 
   // copy vertices
   dMesh->vertices = std::vector<geometry_msgs::Point>(sMesh->mNumVertices);
@@ -347,14 +349,15 @@ inline void convertAssimpMeshToMeshMsg(aiMesh*& sMesh, mesh_msgs::TriangleMesh*&
     }
   }
 
-  mesh = dMesh;
+  (*mesh) = dMesh;
+  // printf("to mesh_msg w %d faces\n",(*mesh)->triangles.size());
 }
 
-inline void convertAssimpMeshToMeshMsg(aiMesh*& sMesh, mesh_msgs::TriangleMeshStamped*& mesh)
+inline void convertAssimpMeshToMeshMsg(aiMesh* sMesh, mesh_msgs::TriangleMeshStamped** mesh)
 {
-  mesh_msgs::TriangleMesh* tmpmesh;
-  convertAssimpMeshToMeshMsg(sMesh, tmpmesh);
-  mesh->mesh = *tmpmesh;
+  mesh_msgs::TriangleMesh* tmpmesh = &((*mesh)->mesh);
+  convertAssimpMeshToMeshMsg(sMesh, &tmpmesh);
+  // printf("convert to mesh_stamped w %d faces",(*mesh)->mesh.triangles.size());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -393,4 +396,4 @@ inline void convertMeshMsgToAssimpMesh(mesh_msgs::TriangleMeshStamped*& sMesh, a
   convertMeshMsgToAssimpMesh(tmpmesh, mesh);
 }
 
-#endif 
+#endif

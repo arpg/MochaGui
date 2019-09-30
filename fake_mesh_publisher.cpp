@@ -23,7 +23,7 @@ int main( int argc, char* argv[] )
     ros::init(argc, argv, "fake_mesh_publisher");
 
     ros::NodeHandle nh;
-    ros::Publisher mesh_pub = nh.advertise<mesh_msgs::TriangleMeshStamped>("/mesh",1);
+    ros::Publisher mesh_pub = nh.advertise<mesh_msgs::TriangleMeshStamped>("/infinitam/mesh",1);
 
     const aiScene *pScene = aiImportFile( FLAGS_mesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
     if( !pScene )
@@ -38,17 +38,22 @@ int main( int argc, char* argv[] )
 
     while(ros::ok())
     {
-      mesh_msgs::TriangleMeshStamped* mesh = new mesh_msgs::TriangleMeshStamped();
-      mesh_msgs::TriangleMesh* meshmesh = &(mesh->mesh);
-      mesh->header.stamp = ros::Time::now();
-      mesh->header.frame_id = "map";
-      convertAssimpMeshToMeshMsg(aMesh, meshmesh);
-      // mesh->mesh = *meshmesh;
+      mesh_msgs::TriangleMeshStamped* mesh_stamped = new mesh_msgs::TriangleMeshStamped();
+      mesh_msgs::TriangleMesh* mesh = new mesh_msgs::TriangleMesh();
+      // mesh_msgs::TriangleMesh* mesh = &((*mesh_stamped).mesh);
+      // mesh = &(mesh_stamped->mesh);
+      mesh_stamped->header.stamp = ros::Time::now();
+      mesh_stamped->header.frame_id = "map";
+      convertAssimpMeshToMeshMsg(aMesh, &mesh);
+      // mesh_stamped->mesh);
+      mesh_stamped->mesh = *mesh;
 
-      // printf("%sPublishing mesh with %d faces.\n","[fake_mesh_publisher] ",mesh->mesh.triangles.size());
-      mesh_pub.publish(*mesh);
+      printf("%sPublishing mesh with %d faces.\n","[fake_mesh_publisher] ",mesh_stamped->mesh.triangles.size());
+      // printf("%sPublishing mesh with %d faces.\n","[fake_mesh_publisher] ",mesh->triangles.size());
+      // printf("%sPublishing mesh with %d faces.\n","[fake_mesh_publisher] ",aMesh->mNumFaces);
+      mesh_pub.publish(*mesh_stamped);
 
       ros::spinOnce();
-      ros::Rate(10).sleep();
+      ros::Rate(100).sleep();
     }
 }

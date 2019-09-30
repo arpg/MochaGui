@@ -150,7 +150,7 @@ protected:
 
     ros::Publisher m_meshPub;
     void _pubMesh();
-    void _pubMesh(aiMesh*& );
+    void _pubMesh(aiMesh* );
 
     ros::Subscriber m_meshSub;
     void _meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& );

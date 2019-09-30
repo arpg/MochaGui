@@ -1291,7 +1291,7 @@ void MochaGui::_pubMesh()
 }
 /////////////////////////////////////////////////////////////////
 
-void MochaGui::_pubMesh(aiMesh*& mesh)
+void MochaGui::_pubMesh(aiMesh* mesh)
 {
     // sensor_msgs::PointCloud2 mesh_msg;
     //
@@ -1388,7 +1388,7 @@ void MochaGui::_pubMesh(aiMesh*& mesh)
     mesh_msgs::TriangleMeshStamped* mesh_msg = new mesh_msgs::TriangleMeshStamped();
     mesh_msg->header.stamp = ros::Time::now();
     mesh_msg->header.frame_id = "map";
-    convertAssimpMeshToMeshMsg(mesh, mesh_msg);
+    convertAssimpMeshToMeshMsg(mesh, &mesh_msg);
     m_meshPub.publish(*mesh_msg);
     ros::spinOnce();
     ros::Rate(10).sleep();
