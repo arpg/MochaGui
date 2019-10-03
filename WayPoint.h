@@ -50,9 +50,9 @@ struct WayPoint {
 
     bool m_bDirty;
     unsigned int m_nId;
-    Eigen::Vector5d& m_dWayPoint;
+    Eigen::Vector5d& m_dWayPoint; // x y yaw curvature velocity
     Eigen::Vector5d m_dSolvedWayPoint;
-    Eigen::Vector6d m_dPose;
+    Eigen::Vector6d m_dPose; // x y z roll pitch yaw
     double m_dVelocity;
 };
 
