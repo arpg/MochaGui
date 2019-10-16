@@ -106,6 +106,7 @@ protected:
 
     void _PopulateSceneGraph();
     void _UpdateVehicleStateFromFusion(VehicleState& currentState);
+    void _UpdateVehicleStateFromROS(VehicleState& currentState);
 
     void _UpdateVisuals();
     void _PlaybackLog(double dt);
@@ -137,6 +138,8 @@ protected:
     bool m_bEnableROS;
     ros::NodeHandle* m_nh;
     tf::TransformBroadcaster m_tfbr;
+    tf::TransformListener m_tfls;
+    tf::StampedTransform m_Twv;
 
     void InitROS();
 
@@ -151,15 +154,15 @@ protected:
     void _pubState();
     void _pubState(VehicleState& );
 
-    ros::Publisher m_meshPub;
-    void _pubMesh();
-    void _pubMesh(aiMesh* );
+    // ros::Publisher m_meshPub;
+    // void _pubMesh();
+    // void _pubMesh(aiMesh* );
 
     ros::Subscriber m_waypointSub;
     void _waypointCB(const geometry_msgs::PoseStamped::ConstPtr& );
 
-    ros::Subscriber m_meshSub;
-    void _meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& );
+    // ros::Subscriber m_meshSub;
+    // void _meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& );
 
     void _convertMeshMsgToAssimpMesh(mesh_msgs::TriangleMeshStamped*&, aiMesh*& );
     // void _convertMeshMsgToGLMesh(mesh_msgs::TriangleMeshStamped*&, GLMesh*& );

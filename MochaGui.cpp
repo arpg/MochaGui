@@ -239,7 +239,7 @@ void MochaGui::InitROS()
 
   m_commandPub = m_nh->advertise<carplanner_msgs::Command>("command",1);
   m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
-  m_meshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("scene_mesh",1);
+  // m_meshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("scene_mesh",1);
 
   m_waypointSub = m_nh->subscribe<geometry_msgs::PoseStamped>("waypoint", 1, boost::bind(&MochaGui::_waypointCB, this, _1));
   // m_meshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("infinitam/mesh", 1, boost::bind(&MochaGui::_meshCB, this, _1));
@@ -252,7 +252,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 {
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
-    m_bSIL = false;
+    m_bSIL = ( strcmp(sMode.c_str(),"Simulation")==0 ? false : true ); // if in sim mode, don't enable Software In the Loop (ie Experiment)
+
 
     //m_Node.subscribe("herbie/Imu"); // Should change to match TestNode/CarPoseSim.cpp (NinjaCar/Compass)? This is a separate Imu channel that I think is currently unused. See _ImuReadFunc
 
@@ -442,20 +443,20 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     std::cout << "Setting waypoints" << std::endl;
     int numWaypoints = 2;
     double radius = 1;
-    std::vector<double> offset{2, 2, 0}; // x y z in NED
+    std::vector<double> offset{2, 0, 0}; // x y z in NED
     for(int ii = 0; ii < numWaypoints ; ii++){
         char buf[100];
         snprintf( buf, 100, "waypnt.%d", ii );
         m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
 
         /// Linear waypoints.
-           // (*m_vWayPoints.back()) << ii*1+offset[0], ii*0+offset[1], 0+offset[2], 0, 0, 0, 1, 0;
+           (*m_vWayPoints.back()) << ii*1+offset[0], ii*0+offset[1], ii*0+offset[2], 0, 0, 0, 1, 0;
 
         /// Waypoints in a circle.
         /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, ?curvature
-        (*m_vWayPoints.back()) << radius*sin(ii*2*M_PI/numWaypoints)+offset[0],
-            radius*cos(ii*2*M_PI/numWaypoints)+offset[1],
-            offset[2], 0, 0, -ii*2*M_PI/numWaypoints, 1, 0;
+        // (*m_vWayPoints.back()) << radius*sin(ii*2*M_PI/numWaypoints)+offset[0],
+        //     radius*cos(ii*2*M_PI/numWaypoints)+offset[1],
+        //     offset[2], 0, 0, -ii*2*M_PI/numWaypoints, 1, 0;
 
         /// Load this segment ID into a vector that enumerates the path elements.
         m_Path.push_back(ii);
@@ -866,12 +867,19 @@ void MochaGui::_UpdateVisuals()
             //LOG(INFO) << "m_bSimulate3dPath == true";
             m_DriveCarModel.GetVehicleState(0,state);
         }else{
-            _UpdateVehicleStateFromFusion(state);
+            // _UpdateVehicleStateFromFusion(state);
+            _UpdateVehicleStateFromROS(state);
             //LOG(INFO) << "Updated Vehicle State from Fusion";
         }
 
+
+        Sophus::SE3d state_pose = state.ToSE3d();
+        Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+        state_pose = rot_180_x*state_pose*rot_180_x;
+        VehicleState new_state(state_pose, state.GetNormalVelocity(), state.GetCurvature());
+
         //offset the chasis by the height offset (constant)
-        m_Gui.SetCarState( m_nDriveCarId, state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
+        m_Gui.SetCarState( m_nDriveCarId, new_state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
         //Eigen::Vector6d pose = fusion::T2Cart(state.m_dTwv.matrix());
     }
 }
@@ -958,58 +966,120 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
     //dout("Theta: " << currentState.GetTheta());
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_UpdateVehicleStateFromROS(VehicleState& currentState)
+{
+    ROS_INFO_THROTTLE(.1,"\nSetting VehicleState from m_Twv:\n\tx %02.2f y %02.2f z %02.2f\n\tqx %02.2f qy %02.2f qz %02.2f qw %02.2f \n",
+      m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ(),
+      m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ(), m_Twv.getRotation().getW() );
+
+    currentState.m_dTwv = Sophus::SE3d(
+      Eigen::Quaterniond(m_Twv.getRotation().getW(), m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ()),
+      Eigen::Vector3d(m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ()));
+    currentState.m_dV = GetBasisVector(currentState.m_dTwv,0).normalized()*currentState.m_dV.norm();
+    currentState.m_dW[0] = currentState.m_dW[1] = 0;
+
+    Eigen::Vector3d dIntersect;
+    if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*0.2,dIntersect,true)){
+       currentState.m_dTwv.translation() = dIntersect;
+    }
+
+    currentState.UpdateWheels(m_DriveCarModel.GetWheelTransforms(0));
+
+    m_dVel = currentState.m_dV.norm();
+    m_dPos = currentState.m_dTwv.translation();
+
+
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
+// void MochaGui::_LocalizerReadFunc()
+// {
+//     double lastTime = Tic();
+//     int numPoses = 0;
+//     int counter = 1;
+//     //double localizerTime = 0;
+//     m_Localizer.Start();
+//
+//    LOG(INFO) << "Starting Localizer Thread.";
+//
+//     while(1){
+//         //this is a blocking call
+//         double localizerTime;
+//         const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
+//
+//         double sysTime = Tic();
+//
+//         double dt = Tic()-lastTime;
+//         if(dt > 0.5){
+//             m_dLocalizerFreq = numPoses/dt;
+//             lastTime = Tic();
+//             numPoses = 0;
+//         }
+//         numPoses++;
+//
+//
+//         if(g_bImuIntegrationOnly == false){
+//             counter++;
+//             //double dTemp = Tic();
+//             //if(counter > 1){
+//             //std::cout << "Global pose received at:" << sysTime << "seconds." << std::endl;
+//             if(g_bProcessModelActive){
+//                 ControlCommand command;
+//                 {
+//                     boost::mutex::scoped_lock lock(m_ControlMutex);
+//                     command = m_ControlCommand;
+//                 }
+//                 m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
+//             }else{
+//                 m_Fusion.RegisterGlobalPose(Twb,sysTime,sysTime);
+//                 //LOG(INFO) << "Set pose";
+//             }
+//             //dout("Fusion process took" << Toc(dTemp) << " seconds.");
+//             counter = 0;
+//
+//             if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
+//                 m_FusionLogger.LogLocalizerData(Tic(),localizerTime,Twb);
+//             }
+//
+//         }
+//         //}
+//     }
+// }
 void MochaGui::_LocalizerReadFunc()
 {
     double lastTime = Tic();
-    int numPoses = 0;
-    int counter = 1;
-    //double localizerTime = 0;
-    m_Localizer.Start();
+    double dt = 0;
+    tf::StampedTransform Twv;
+    tf::StampedTransform offset;
+    offset.setData(tf::Transform(tf::Quaternion(0,0,0,1),tf::Vector3(0,0,-0.6))); // qx qy qz qw x y z
 
-   LOG(INFO) << "Starting Localizer Thread.";
+    LOG(INFO) << "Starting Localizer Thread.";
 
-    while(1){
-        //this is a blocking call
-        double localizerTime;
-        const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
-
-        double sysTime = Tic();
-
-        double dt = Tic()-lastTime;
-        if(dt > 0.5){
-            m_dLocalizerFreq = numPoses/dt;
-            lastTime = Tic();
-            numPoses = 0;
+    while(1)
+    {
+        try
+        {
+          m_tfls.waitForTransform("world", "base_link", ros::Time::now(), ros::Duration(1.0));
+          m_tfls.lookupTransform("world", "base_link", ros::Time(0), Twv);
         }
-        numPoses++;
-
-
-        if(g_bImuIntegrationOnly == false){
-            counter++;
-            //double dTemp = Tic();
-            //if(counter > 1){
-            //std::cout << "Global pose received at:" << sysTime << "seconds." << std::endl;
-            if(g_bProcessModelActive){
-                ControlCommand command;
-                {
-                    boost::mutex::scoped_lock lock(m_ControlMutex);
-                    command = m_ControlCommand;
-                }
-                m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
-            }else{
-                m_Fusion.RegisterGlobalPose(Twb,sysTime,sysTime);
-                //LOG(INFO) << "Set pose";
-            }
-            //dout("Fusion process took" << Toc(dTemp) << " seconds.");
-            counter = 0;
-
-            if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-                m_FusionLogger.LogLocalizerData(Tic(),localizerTime,Twb);
-            }
-
+        catch (tf::TransformException ex)
+        {
+          ROS_ERROR("%s",ex.what());
+          continue;
         }
-        //}
+
+        m_Twv = Twv;
+        m_Twv.setData(Twv*offset);
+
+        ROS_INFO_THROTTLE(.1,"\nSetting m_Twv in LocalizerReadFunc:\n\tx %02.2f y %02.2f z %02.2f\n\tqx %02.2f qy %02.2f qz %02.2f qw %02.2f \n",
+          m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ(),
+          m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ(), m_Twv.getRotation().getW() );
+
+
+        dt = Tic()-lastTime;
+        m_dLocalizerFreq = 1/dt;
+        lastTime = Tic();
     }
 }
 
@@ -1021,7 +1091,8 @@ void MochaGui::_ControlCommandFunc()
     while(1)
     {
         //only go ahead if the controller is running, and we are targeting the real vehicle
-        if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false){
+        if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false)
+        {
             //get commands from the controller, apply to the car and update the position
             //of the car in the controller
             {
@@ -1118,19 +1189,6 @@ void MochaGui::_PublisherFunc()
         _pubState();
         // _pubMesh();
 
-        // const aiMesh* pMesh = new aiMesh;
-        // for( uint ii=0; ii< ; ii++)
-        // {
-        //   // aiVector3D pt =
-        //   pMesh->mVertices.push_back(pt);
-        // }
-        //
-        // const aiScene *pScene = aiImportFile( "./labLoop.ply", aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-        // BulletCarModel::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
-        // m_TerrainMesh.Init(pScene);
-        // m_TerrainMesh = m_DriveCarModel.m_pTerrainShape;
-
-
         ros::Rate(100).sleep();
     }
 
@@ -1140,6 +1198,8 @@ void MochaGui::_PublisherFunc()
 //////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_ptr)
 {
+  printf("[mochagui] Got waypoint");
+
   geometry_msgs::PoseStamped waypoint = *waypoint_ptr;
 
   // printf("got waypoint %.2f %.2f %.2f\n",waypoint.pose.position.x,waypoint.pose.position.y,waypoint.pose.position.z);
@@ -1165,15 +1225,18 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
 
   VehicleState state;
   m_DriveCarModel.GetVehicleState(0, state);
-  Eigen::Vector7d state_vec = state.ToXYZQuat();
+  // Eigen::Vector7d state_vec = state.ToXYZQuat();
 
   {
     // boost::mutex::scoped_lock lock( m_DrawMutex );
     GLWayPoint* a = &m_Gui.GetWaypoint(0)->m_Waypoint;
     {
-      Sophus::SE3d pose( a->GetPose4x4_po() );
-      pose.translation() = *(new Eigen::Vector3d(state_vec[0], state_vec[1], state_vec[2]));
-      pose.setQuaternion(Eigen::Quaterniond(state_vec[6], state_vec[3], state_vec[4], state_vec[5]));
+      // Sophus::SE3d pose( a->GetPose4x4_po() );
+      // pose.translation() = *(new Eigen::Vector3d(state_vec[0], state_vec[1], state_vec[2]));
+      // pose.setQuaternion(Eigen::Quaterniond(state_vec[6], state_vec[3], state_vec[4], state_vec[5]));
+
+      Sophus::SE3d pose = state.ToSE3d();
+
       a->SetPose( pose.matrix() );
     }
     *m_vWayPoints[0] << a->GetPose(), a->GetVelocity(), a->GetAerial();
@@ -1181,10 +1244,11 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
     GLWayPoint* b = &m_Gui.GetWaypoint(1)->m_Waypoint;
     {
       Sophus::SE3d pose( b->GetPose4x4_po() );
-      m_DriveCarModel.GetVehicleState(0, state);
-      state_vec = state.ToXYZQuat();
       pose.translation() = *(new Eigen::Vector3d(waypoint.pose.position.x, waypoint.pose.position.y, waypoint.pose.position.z));
       pose.setQuaternion(Eigen::Quaterniond(waypoint.pose.orientation.w, waypoint.pose.orientation.x, waypoint.pose.orientation.y, waypoint.pose.orientation.z));
+
+      // Sophus::SE3d pose = waypoint.pose.ToSE3d();
+
       pose = rot_180_x*pose*rot_180_x;
       b->SetPose( pose.matrix() );
       waypointPose = pose;
@@ -1199,16 +1263,22 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
   m_Controller.Reset();
   _RefreshWaypoints();
 
-  m_bPlannerOn = true;
+  printf("[mochagui] Starting Planner.\n");
+
   m_bSimulate3dPath = true;
-  usleep(1000000);
+  m_bPlannerOn = true;
+  // usleep(1000000);
+  while( m_bPlanning ){ usleep(10000); }
+  printf("[mochagui] Planner finished. Starting Controller.\n");
   m_bControl3dPath = true;
 
   bool movingTowardGoal = true;
   double eps_dist = 0.5;
   double eps_timeout = 20.0;
   double timeoutStart = Tic();
-  while( movingTowardGoal )
+  printf("[mochagui] Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.\n", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
+  Eigen::Vector7d state_vec;
+  while( movingTowardGoal && m_bControllerRunning && m_bControl3dPath )
   {
     // printf("goal not reached\n");
 
@@ -1223,7 +1293,10 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
     movingTowardGoal &= ( dist_to_goal > eps_dist );
     movingTowardGoal &= ( Toc(timeoutStart) < eps_timeout );
 
-    usleep(100000);
+    usleep(10000);
+
+
+    printf("[mochagui] Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.\n", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
   }
 
   // printf("goal reached\n");
@@ -1237,8 +1310,8 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
-{
+// void MochaGui::_meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
+// {
   // ROS_INFO("mochagui got a mesh!");
 
   // btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
@@ -1282,7 +1355,7 @@ void MochaGui::_meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
   // m_TerrainMesh.Init(pScene);
 
 
-}
+// }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_pubCommand()
@@ -1319,138 +1392,46 @@ void MochaGui::_pubState(VehicleState& state)
 {
   carplanner_msgs::VehicleState state_msg = state.toROS();
   m_statePub.publish(state_msg);
-  m_tfbr.sendTransform(state_msg.pose);
+  // m_tfbr.sendTransform(state_msg.pose);
   ros::spinOnce();
 }
 ///////////////////////////////////////////////////////////////////////////////////
 
-void MochaGui::_pubMesh()
-{
-    const aiScene* scene = m_TerrainMesh.GetScene();
-    if( !scene )
-    {
-        std::cout << "Scene is invalid." << std::endl;
-        return;
-    }
-    if( !scene->HasMeshes() )
-    {
-        std::cout << "Scene has no meshes." << std::endl;
-        return;
-    }
-    aiMesh* mesh = scene->mMeshes[scene->mRootNode->mMeshes[0]];
-    if( !mesh )
-    {
-        std::cout << "Scene mesh is invalid." << std::endl;
-        return;
-    }
-
-    _pubMesh(mesh);
-
-}
+// void MochaGui::_pubMesh()
+// {
+//     const aiScene* scene = m_TerrainMesh.GetScene();
+//     if( !scene )
+//     {
+//         std::cout << "Scene is invalid." << std::endl;
+//         return;
+//     }
+//     if( !scene->HasMeshes() )
+//     {
+//         std::cout << "Scene has no meshes." << std::endl;
+//         return;
+//     }
+//     aiMesh* mesh = scene->mMeshes[scene->mRootNode->mMeshes[0]];
+//     if( !mesh )
+//     {
+//         std::cout << "Scene mesh is invalid." << std::endl;
+//         return;
+//     }
+//
+//     _pubMesh(mesh);
+//
+// }
 /////////////////////////////////////////////////////////////////
 
-void MochaGui::_pubMesh(aiMesh* mesh)
-{
-    // sensor_msgs::PointCloud2 mesh_msg;
-    //
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
-    //
-    // for(unsigned int i=0; i<mesh.mNumVertices; i++)
-    // {
-    //     pcl::PointXYZ pt;
-    //     pt.x = -mesh.mVertices[i].x;
-    //     pt.y = mesh.mVertices[i].y;
-    //     pt.z = mesh.mVertices[i].z;
-    //     cloud_ptr->push_back(pt);
-    // }
-    //
-    // pcl::toROSMsg(*cloud_ptr, mesh_msg);
-    // mesh_msg.header.frame_id = "map";
-    // mesh_msg.header.stamp = ros::Time::now();
-    // m_meshPub.publish(mesh_msg);
-    //
-    // m_tfbr.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(0,0,0,1),tf::Vector3(0,0,0)),
-    //                                           mesh_msg.header.stamp,
-    //                                           "world","map"));
-    //
-    // ros::spinOnce();
-
-    // ITMMesh::Triangle* triangles;
-    // uint* num_triangles = new unsigned int;
-    // uint last_num_triangles = 0;
-    //
-    // ITMMesh *mesh = new ITMMesh(settings->GetMemoryType());
-    // ORUtils::MemoryBlock<ITMMesh::Triangle>* cpu_triangles;
-    //
-    // // assign triangles and num_triangles pointers to internal variables
-    // if (mesh->memoryType == MEMORYDEVICE_CUDA)
-    // {
-    //     cpu_triangles = new ORUtils::MemoryBlock<ITMMesh::Triangle>(mesh->noMaxTriangles, MEMORYDEVICE_CPU);
-    //     cpu_triangles->SetFrom(mesh->triangles, ORUtils::MemoryBlock<ITMMesh::Triangle>::CUDA_TO_CPU);
-    //     // shouldDelete = true;
-    // }
-    // else
-    // {
-    //     cpu_triangles = mesh->triangles;
-    // }
-    //
-    // triangles = cpu_triangles->GetData(MEMORYDEVICE_CPU);
-    // num_triangles = &(mesh->noTotalTriangles);
-    //
-    // while( ros::ok() )
-    // {
-    //     if (meshingEngine != NULL)
-    //     {
-    //       meshingEngine->MeshScene(mesh, scene);
-    //
-    //       bool hasNewMesh = (last_num_triangles != *num_triangles);
-    //       if(hasNewMesh)
-    //       {
-    //         mesh_msgs::TriangleMeshStamped* mesh_msg = new mesh_msgs::TriangleMeshStamped;
-    //         mesh_msg->header.stamp = ros::Time::now();
-    //         mesh_msg->header.frame_id = "infinitam";
-    //         mesh_msgs::TriangleMesh* triangle_mesh_msg = &(mesh_msg->mesh);
-    //         ConvertTrianglesToROS(triangles, *num_triangles, triangle_mesh_msg);
-    //         ROS_INFO("infinitam publishing mesh with %d triangles",*num_triangles);
-    //         meshPub.publish(*mesh_msg);
-    //       }
-    //       last_num_triangles = *num_triangles;
-    //     }
-    //
-    //     // try
-    //     // {
-    //     //   tfListener.waitForTransform("map", "base_link", ros::Time(0), ros::Duration(1));
-    //     //   tfListener.lookupTransform("map", "base_link", ros::Time(0), T_map_base);
-    //     //   this->trackingState->pose_d = new ORUtils::SE3Pose(
-    //     //     T_map_base.getOrigin().getX(),
-    //     //     T_map_base.getOrigin().getY(),
-    //     //     T_map_base.getOrigin().getZ(),
-    //     //     T_map_base.getRotation().getX(),
-    //     //     T_map_base.getRotation().getY(),
-    //     //     T_map_base.getRotation().getZ()
-    //     //   );
-    //     // }
-    //     // catch (const tf::TransformException& exception)
-    //     // {
-    //     //   // ROS_INFO_THROTTLE(1,"[ITMRosEngine] tfListener exception occurred");
-    //     // }
-    //
-    //     ros::spinOnce();
-    //     ros::Rate(100).sleep();
-    // }
-    //
-    // delete triangles;
-    // delete cpu_triangles;
-    // delete mesh;
-
-    mesh_msgs::TriangleMeshStamped* mesh_msg = new mesh_msgs::TriangleMeshStamped();
-    mesh_msg->header.stamp = ros::Time::now();
-    mesh_msg->header.frame_id = "map";
-    convertAssimpMeshToMeshMsg(mesh, &mesh_msg);
-    m_meshPub.publish(*mesh_msg);
-    ros::spinOnce();
-    ros::Rate(10).sleep();
-}
+// void MochaGui::_pubMesh(aiMesh* mesh)
+// {
+//     mesh_msgs::TriangleMeshStamped* mesh_msg = new mesh_msgs::TriangleMeshStamped();
+//     mesh_msg->header.stamp = ros::Time::now();
+//     mesh_msg->header.frame_id = "map";
+//     convertAssimpMeshToMeshMsg(mesh, &mesh_msg);
+//     m_meshPub.publish(*mesh_msg);
+//     ros::spinOnce();
+//     ros::Rate(10).sleep();
+// }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlFunc()
@@ -1552,11 +1533,18 @@ void MochaGui::_ControlFunc()
                 else if(m_eControlTarget == eTargetExperiment)
                 {
                     //get current pose from the Localizer
-                    _UpdateVehicleStateFromFusion(currentState);
+                    // _UpdateVehicleStateFromFusion(currentState);
+                    _UpdateVehicleStateFromROS(currentState);
+
+                    Sophus::SE3d state_pose = currentState.ToSE3d();
+                    Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+                    state_pose = rot_180_x*state_pose*rot_180_x;
+                    VehicleState new_state(state_pose, currentState.GetNormalVelocity(), currentState.GetCurvature());
+
                     //set the command history and current pose on the controller
                     {
                         boost::mutex::scoped_lock lock(m_ControlMutex);
-                        m_Controller.SetCurrentPose(currentState,&m_DriveCarModel.GetCommandHistoryRef(0));
+                        m_Controller.SetCurrentPose(new_state,&m_DriveCarModel.GetCommandHistoryRef(0));
                     }
                 }
                 else

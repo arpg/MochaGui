@@ -1,5 +1,6 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <cstdio>
 
 #include "/home/mike/code/MochaGui_ros/conversion_tools.h"
 #include <tf/transform_listener.h>
@@ -22,8 +23,9 @@ int main( int argc, char* argv[] )
 
     ros::init(argc, argv, "fake_mesh_publisher");
 
+    std::string mesh_topic = "fake_mesh";
     ros::NodeHandle nh;
-    ros::Publisher mesh_pub = nh.advertise<mesh_msgs::TriangleMeshStamped>("/infinitam/mesh",1);
+    ros::Publisher mesh_pub = nh.advertise<mesh_msgs::TriangleMeshStamped>(mesh_topic,1);
 
     const aiScene *pScene = aiImportFile( FLAGS_mesh.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
     if( !pScene )
@@ -43,14 +45,16 @@ int main( int argc, char* argv[] )
       // mesh_msgs::TriangleMesh* mesh = &((*mesh_stamped).mesh);
       // mesh = &(mesh_stamped->mesh);
       mesh_stamped->header.stamp = ros::Time::now();
-      mesh_stamped->header.frame_id = "map";
+      mesh_stamped->header.frame_id = "mesh";
       convertAssimpMeshToMeshMsg(aMesh, &mesh);
       // mesh_stamped->mesh);
       mesh_stamped->mesh = *mesh;
 
-      printf("%sPublishing mesh with %d faces.\n","[fake_mesh_publisher] ",mesh_stamped->mesh.triangles.size());
-      // printf("%sPublishing mesh with %d faces.\n","[fake_mesh_publisher] ",mesh->triangles.size());
-      // printf("%sPublishing mesh with %d faces.\n","[fake_mesh_publisher] ",aMesh->mNumFaces);
+      printf("%sPublishing mesh with %d faces on %s.\n",
+        "[fake_mesh_publisher] ",
+        mesh_stamped->mesh.triangles.size(),
+        mesh_topic.c_str());
+
       mesh_pub.publish(*mesh_stamped);
 
       ros::spinOnce();
