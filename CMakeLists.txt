@@ -66,7 +66,6 @@ find_package(catkin REQUIRED
     carplanner_msgs
     pcl_ros
     pcl_conversions
-    hdf5_map_io
     )
 
 add_definitions(${EIGEN_DEFINITIONS})
@@ -138,6 +137,7 @@ set( SHARED_HDRS PlannerGui.h
                  EventLogger.h
                  SensorFusionCeres.h
                  #Vicon.h
+		 conversion_tools.h
                  )
 
 set( SHARED_SRC PlannerGui.cpp

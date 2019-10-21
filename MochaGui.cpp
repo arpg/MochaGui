@@ -585,6 +585,7 @@ void MochaGui::_StartThreads()
 {
     //recreate the threads
     std::cout << "Starting threads" << std::endl;
+    m_pDebugPrinterThread = new boost::thread(std::bind(&MochaGui::DebugPrinterFunc,this));
     m_pPlannerThread = new boost::thread(std::bind(&MochaGui::_PlannerFunc,this));
     m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
@@ -652,17 +653,24 @@ void MochaGui::_KillThreads()
         m_pPublisherThread->join();
     }
 
+    if(m_pDebugPrinterThread) {
+        m_pDebugPrinterThread->join();
+    }
+
     delete m_pControlThread;
     delete m_pPhysicsThread;
     delete m_pPlannerThread;
     delete m_pLocalizerThread;
     delete m_pCommandThread;
     delete m_pPublisherThread;
+    delete m_pDebugPrinterThread;
 
     m_pControlThread = 0;
     m_pPhysicsThread = 0;
     m_pPlannerThread = 0 ;
     m_pLocalizerThread = 0;
+    m_pPublisherThread = 0;
+    m_pDebugPrinterThread = 0;
 
     m_Localizer.Stop();
 }
@@ -731,6 +739,7 @@ bool MochaGui::_CommandFunc(MochaCommands command)
     switch (command){
 
       case eMochaSolve:
+          printf("command: %s", "eMochaSolve");
           m_Controller.Reset();
           CVarUtils::Load("cvars.xml");
           _RefreshWaypoints();
@@ -741,25 +750,30 @@ bool MochaGui::_CommandFunc(MochaCommands command)
           break;
 
       case eMochaSimulationControl:
+          printf("command: %s", "eMochaSimulationControl");
           m_eControlTarget = eTargetSimulation;
           m_bControl3dPath = true;
           m_bSimulate3dPath = true;
           break;
 
       case eMochaPpmControl:
+          printf("command: %s", "eMochaPpmControl");
           m_eControlTarget = eTargetExperiment;
           m_bControl3dPath = true;
           break;
 
       case eMochaPause:
+          printf("command: %s", "eMochaPause");
           m_bPause = !m_bPause;
           break;
 
       case eMochaStep:
+          printf("command: %s", "eMochaStep");
           m_bStep = true;
           break;
 
       case eMochaRestart:
+          printf("command: %s", "eMochaRestart");
           m_bControl3dPath = false;
           while(m_bControllerRunning == true) {
               usleep(1000);
@@ -778,10 +792,12 @@ bool MochaGui::_CommandFunc(MochaCommands command)
           break;
 
       case eMochaToggleTrajectory:
+          printf("command: %s", "eMochaToggleTrajectory");
           //m_CarLineSegments.SetVisible(!m_CarLineSegments.IsVisible());
           break;
 
       case eMochaTogglePlans:
+          printf("command: %s", "eMochaTogglePlans");
           {
               //boost::mutex::scoped_lock lock(m_DrawMutex);
               for (list<GLCachedPrimitives*>::iterator iter = m_lPlanLineSegments.begin() ; iter != m_lPlanLineSegments.end() ; iter++) {
@@ -791,6 +807,7 @@ bool MochaGui::_CommandFunc(MochaCommands command)
           break;
 
       case eMochaClear:
+          printf("command: %s", "eMochaClear");
           {
               //boost::mutex::scoped_lock lock(m_DrawMutex);
               m_Gui.ClearCarTrajectory(m_nDriveCarId);
@@ -2036,4 +2053,57 @@ void MochaGui::_PopulateSceneGraph()
   m_Gui.AddGLObject(&m_DestAxis);
   //m_Gui.AddGLObject(m_pControlLine);
   m_Gui.AddPanel(&m_GuiPanel);
+}
+
+/////////////////////////////////////////////////////////////////////
+void MochaGui::DebugPrinterFunc()
+{
+  // printf("\n");
+  //
+  // m_PlanCarModel;
+  // BulletCarModel m_LearningCarModel;
+  // BulletCarModel m_DriveCarModel;
+  // BulletCarModel m_ControlCarModel;
+
+  while(1)
+  {
+
+    printf("Simulate: %s\n", m_bSimulate3dPath ? "ON" : "OFF" );
+
+    printf("Control: %s\n", m_bControl3dPath ? "ON" : "OFF" );
+
+    for(uint ii=0; ii<m_PlanCarModel.GetWorldCount(); ii++)
+    {
+      BulletWorldInstance* pWorld = m_PlanCarModel.GetWorldInstance(ii);
+      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+      printf("Model %s World %d has %d collision objects.\n", "m_PlanCarModel", ii, objarr.size());
+    }
+
+    for(uint ii=0; ii<m_LearningCarModel.GetWorldCount(); ii++)
+    {
+      BulletWorldInstance* pWorld = m_LearningCarModel.GetWorldInstance(ii);
+      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+      printf("Model %s World %d has %d collision objects.\n", "m_LearningCarModel", ii, objarr.size());
+    }
+
+    for(uint ii=0; ii<m_ControlCarModel.GetWorldCount(); ii++)
+    {
+      BulletWorldInstance* pWorld = m_ControlCarModel.GetWorldInstance(ii);
+      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+      printf("Model %s World %d has %d collision objects.\n", "m_ControlCarModel", ii, objarr.size());
+    }
+
+    for(uint ii=0; ii<m_DriveCarModel.GetWorldCount(); ii++)
+    {
+      BulletWorldInstance* pWorld = m_DriveCarModel.GetWorldInstance(ii);
+      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+      printf("Model %s World %d has %d collision objects.\n", "m_DriveCarModel", ii, objarr.size());
+    }
+
+    printf("--------------------------------------------\n");
+
+    usleep(1000000);
+
+  }
+
 }

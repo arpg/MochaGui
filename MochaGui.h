@@ -24,7 +24,7 @@
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include "/home/mike/code/MochaGui_ros/conversion_tools.h"
+#include "conversion_tools.h"
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -161,12 +161,15 @@ protected:
     ros::Subscriber m_waypointSub;
     void _waypointCB(const geometry_msgs::PoseStamped::ConstPtr& );
 
+    boost::thread* m_pDebugPrinterThread;
+    void DebugPrinterFunc();
+
     // ros::Subscriber m_meshSub;
     // void _meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& );
 
-    void _convertMeshMsgToAssimpMesh(mesh_msgs::TriangleMeshStamped*&, aiMesh*& );
+    // void _convertMeshMsgToAssimpMesh(mesh_msgs::TriangleMeshStamped*&, aiMesh*& );
     // void _convertMeshMsgToGLMesh(mesh_msgs::TriangleMeshStamped*&, GLMesh*& );
-    void _convertAssimpMeshToMeshMsg(aiMesh*&, mesh_msgs::TriangleMeshStamped*& );
+    // void _convertAssimpMeshToMeshMsg(aiMesh*&, mesh_msgs::TriangleMeshStamped*& );
 
     // GUIHelperInterface* m_guiHelper;
 
