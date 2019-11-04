@@ -240,6 +240,7 @@ void MochaGui::InitROS()
   m_commandPub = m_nh->advertise<carplanner_msgs::Command>("command",1);
   m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
   // m_meshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("scene_mesh",1);
+  m_waypointPub = m_nh->advertise<geometry_msgs::PoseArray>("waypoints",1);
 
   m_waypointSub = m_nh->subscribe<geometry_msgs::PoseStamped>("waypoint", 1, boost::bind(&MochaGui::_waypointCB, this, _1));
   // m_meshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("infinitam/mesh", 1, boost::bind(&MochaGui::_meshCB, this, _1));
@@ -377,11 +378,11 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     else
         m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, false , true);
 
-    Sophus::SE3d startPose(Eigen::Quaterniond(1,0,0,0),Eigen::Vector3d(1,1,0));
-    Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
-    startPose = rot_180_x*startPose*rot_180_x;
-    VehicleState startState(startPose, 0);
-    m_DriveCarModel.SetState(0,startState);
+    // Sophus::SE3d startPose(Eigen::Quaterniond(1,0,0,0),Eigen::Vector3d(1,1,0));
+    // Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+    // startPose = rot_180_x*startPose*rot_180_x;
+    // VehicleState startState(startPose, 0);
+    // m_DriveCarModel.SetState(0,startState);
     // m_Gui.SetCarState(m_nDriveCarId,startState);
 
     /// Set the two control commands we have to be the offsets calculated
@@ -585,7 +586,7 @@ void MochaGui::_StartThreads()
 {
     //recreate the threads
     std::cout << "Starting threads" << std::endl;
-    m_pDebugPrinterThread = new boost::thread(std::bind(&MochaGui::DebugPrinterFunc,this));
+    // m_pDebugPrinterThread = new boost::thread(std::bind(&MochaGui::DebugPrinterFunc,this));
     m_pPlannerThread = new boost::thread(std::bind(&MochaGui::_PlannerFunc,this));
     m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
@@ -839,6 +840,9 @@ bool MochaGui::_IteratePlanner(
         Eigen::Vector3dAlignedVec& vControlTrajectory,
         bool only2d /*= false*/)
 {
+
+
+
     bool res = false;
 
     //m_Planner.StressTest(problem);
@@ -883,21 +887,26 @@ void MochaGui::_UpdateVisuals()
         {
             //LOG(INFO) << "m_bSimulate3dPath == true";
             m_DriveCarModel.GetVehicleState(0,state);
+
+            m_Gui.SetCarState( m_nDriveCarId, state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
+
         }else{
             // _UpdateVehicleStateFromFusion(state);
-            _UpdateVehicleStateFromROS(state);
+            _GetVehicleStateFromROS(state);
             //LOG(INFO) << "Updated Vehicle State from Fusion";
+
+            Sophus::SE3d state_pose = state.ToSE3d();
+            Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+            state_pose = rot_180_x*state_pose*rot_180_x;
+            VehicleState new_state(state_pose, state.GetNormalVelocity(), state.GetCurvature());
+
+            m_Gui.SetCarState( m_nDriveCarId, new_state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
         }
 
 
-        Sophus::SE3d state_pose = state.ToSE3d();
-        Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
-        state_pose = rot_180_x*state_pose*rot_180_x;
-        VehicleState new_state(state_pose, state.GetNormalVelocity(), state.GetCurvature());
 
         //offset the chasis by the height offset (constant)
-        m_Gui.SetCarState( m_nDriveCarId, new_state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
-        //Eigen::Vector6d pose = fusion::T2Cart(state.m_dTwv.matrix());
+          //Eigen::Vector6d pose = fusion::T2Cart(state.m_dTwv.matrix());
     }
 }
 
@@ -984,11 +993,11 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_UpdateVehicleStateFromROS(VehicleState& currentState)
+void MochaGui::_GetVehicleStateFromROS(VehicleState& currentState)
 {
-    ROS_INFO_THROTTLE(.1,"\nSetting VehicleState from m_Twv:\n\tx %02.2f y %02.2f z %02.2f\n\tqx %02.2f qy %02.2f qz %02.2f qw %02.2f \n",
-      m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ(),
-      m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ(), m_Twv.getRotation().getW() );
+    // ROS_INFO_THROTTLE(.1,"\nSetting VehicleState from m_Twv:\n\tx %02.2f y %02.2f z %02.2f\n\tqx %02.2f qy %02.2f qz %02.2f qw %02.2f \n",
+    //   m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ(),
+    //   m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ(), m_Twv.getRotation().getW() );
 
     currentState.m_dTwv = Sophus::SE3d(
       Eigen::Quaterniond(m_Twv.getRotation().getW(), m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ()),
@@ -1007,6 +1016,18 @@ void MochaGui::_UpdateVehicleStateFromROS(VehicleState& currentState)
     m_dPos = currentState.m_dTwv.translation();
 
 
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_UpdateVehicleStateFromROS()
+{
+    VehicleState state;
+    _GetVehicleStateFromROS(state);
+    Sophus::SE3d state_pose = state.ToSE3d();
+    Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+    state_pose = rot_180_x*state_pose*rot_180_x;
+    state = *(new VehicleState(state_pose, state.GetNormalVelocity(), state.GetCurvature()));
+    m_DriveCarModel.SetState(0, state);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1077,8 +1098,8 @@ void MochaGui::_LocalizerReadFunc()
     {
         try
         {
-          m_tfls.waitForTransform("world", "base_link", ros::Time::now(), ros::Duration(1.0));
-          m_tfls.lookupTransform("world", "base_link", ros::Time(0), Twv);
+          m_tflistener.waitForTransform("world", "base_link", ros::Time::now(), ros::Duration(1.0));
+          m_tflistener.lookupTransform("world", "base_link", ros::Time(0), Twv);
         }
         catch (tf::TransformException ex)
         {
@@ -1087,12 +1108,16 @@ void MochaGui::_LocalizerReadFunc()
         }
 
         m_Twv = Twv;
-        m_Twv.setData(Twv*offset);
+        m_Twv.setData(Twv*offset); // NWU
 
-        ROS_INFO_THROTTLE(.1,"\nSetting m_Twv in LocalizerReadFunc:\n\tx %02.2f y %02.2f z %02.2f\n\tqx %02.2f qy %02.2f qz %02.2f qw %02.2f \n",
-          m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ(),
-          m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ(), m_Twv.getRotation().getW() );
+        // ROS_INFO_THROTTLE(.1,"\nSetting m_Twv in LocalizerReadFunc:\n\tx %02.2f y %02.2f z %02.2f\n\tqx %02.2f qy %02.2f qz %02.2f qw %02.2f \n",
+        //   m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ(),
+        //   m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ(), m_Twv.getRotation().getW() );
 
+        if(m_eControlTarget == eTargetExperiment)
+        {
+          _UpdateVehicleStateFromROS();
+        }
 
         dt = Tic()-lastTime;
         m_dLocalizerFreq = 1/dt;
@@ -1204,6 +1229,7 @@ void MochaGui::_PublisherFunc()
     {
         _pubCommand();
         _pubState();
+        _pubWaypoints();
         // _pubMesh();
 
         ros::Rate(100).sleep();
@@ -1215,7 +1241,7 @@ void MochaGui::_PublisherFunc()
 //////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_ptr)
 {
-  printf("[mochagui] Got waypoint");
+  // ROS_INFO("Got waypoint");
 
   geometry_msgs::PoseStamped waypoint = *waypoint_ptr;
 
@@ -1241,6 +1267,12 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
   Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
 
   VehicleState state;
+
+  // _GetVehicleStateFromROS(state);
+  // Sophus::SE3d state_pose = currentState.ToSE3d();
+  // Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+  // state_pose = rot_180_x*state_pose*rot_180_x;
+
   m_DriveCarModel.GetVehicleState(0, state);
   // Eigen::Vector7d state_vec = state.ToXYZQuat();
 
@@ -1253,11 +1285,12 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
       // pose.setQuaternion(Eigen::Quaterniond(state_vec[6], state_vec[3], state_vec[4], state_vec[5]));
 
       Sophus::SE3d pose = state.ToSE3d();
-
+      // pose = rot_180_x*pose*rot_180_x;
       a->SetPose( pose.matrix() );
     }
     *m_vWayPoints[0] << a->GetPose(), a->GetVelocity(), a->GetAerial();
     a->SetDirty(true);
+
     GLWayPoint* b = &m_Gui.GetWaypoint(1)->m_Waypoint;
     {
       Sophus::SE3d pose( b->GetPose4x4_po() );
@@ -1266,12 +1299,15 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
 
       // Sophus::SE3d pose = waypoint.pose.ToSE3d();
 
+      waypointPose = pose;
+
       pose = rot_180_x*pose*rot_180_x;
       b->SetPose( pose.matrix() );
-      waypointPose = pose;
       // printf("setting waypoint %.2f %.2f %.2f\n",posetmp.translation()[0],posetmp.translation()[1],posetmp.translation()[2]);
     }
-    *m_vWayPoints[1] << b->GetPose(), b->GetVelocity(), b->GetAerial();
+    *m_vWayPoints[1] << b->GetPose() /* Return pose as (x,y,z,roll,pitch,yaw) vector */,
+                        b->GetVelocity(),
+                        b->GetAerial();
     b->SetDirty(true);
   }
 
@@ -1280,25 +1316,35 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
   m_Controller.Reset();
   _RefreshWaypoints();
 
-  printf("[mochagui] Starting Planner.\n");
+  return;
+
+  ROS_INFO("Starting Planner.");
 
   m_bSimulate3dPath = true;
   m_bPlannerOn = true;
   // usleep(1000000);
   while( m_bPlanning ){ usleep(10000); }
-  printf("[mochagui] Planner finished. Starting Controller.\n");
+  ROS_INFO("Planner finished. Starting Controller.");
   m_bControl3dPath = true;
 
   bool movingTowardGoal = true;
   double eps_dist = 0.5;
   double eps_timeout = 20.0;
   double timeoutStart = Tic();
-  printf("[mochagui] Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.\n", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
+  ROS_INFO("Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
   Eigen::Vector7d state_vec;
+
+  while(!m_bControllerRunning)
+  {
+    ROS_INFO("Waiting for controller to start.");
+    usleep(10000);
+  }
+
   while( movingTowardGoal && m_bControllerRunning && m_bControl3dPath )
   {
     // printf("goal not reached\n");
 
+    // _GetVehicleStateFromROS(state);
     m_DriveCarModel.GetVehicleState(0, state);
     state_vec = state.ToXYZQuat();
 
@@ -1313,7 +1359,7 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
     usleep(10000);
 
 
-    printf("[mochagui] Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.\n", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
+    ROS_INFO("Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
   }
 
   // printf("goal reached\n");
@@ -1392,6 +1438,7 @@ void MochaGui::_pubCommand(ControlCommand& cmd)
     {
         cmd_msg.torques.push_back(cmd.m_dTorque[i]);
     }
+
     m_commandPub.publish(cmd_msg);
     ros::spinOnce();
 }
@@ -1408,10 +1455,57 @@ void MochaGui::_pubState()
 void MochaGui::_pubState(VehicleState& state)
 {
   carplanner_msgs::VehicleState state_msg = state.toROS();
+
   m_statePub.publish(state_msg);
-  // m_tfbr.sendTransform(state_msg.pose);
+  // m_tfcaster.sendTransform(state_msg.pose);
   ros::spinOnce();
 }
+
+////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubWaypoints()
+{
+    _pubWaypoints(m_vWayPoints);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubWaypoints(std::vector<Eigen::MatrixXd*> pts)
+{
+  tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+
+  geometry_msgs::PoseArray pts_msg;
+  pts_msg.header.frame_id = "world";
+  pts_msg.header.stamp = ros::Time::now();
+
+  for( uint ii=0; ii<pts.size(); ii++ )
+  {
+    Eigen::MatrixXd* pt = pts[ii];
+    double roll =   (*pt)(3);
+    double pitch =  (*pt)(4);
+    double yaw =    (*pt)(5);
+    Eigen::Quaterniond quat;
+    convertRPY2Quat(Eigen::Vector3d(roll, pitch, yaw), &quat);
+
+    tf::Transform pt_tf(tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()),
+                        tf::Vector3((*pt)(0),(*pt)(1),(*pt)(2)));
+    pt_tf = rot_180_x*pt_tf*rot_180_x;
+
+    geometry_msgs::Pose pt_msg;
+    pt_msg.position.x = pt_tf.getOrigin().x();
+    pt_msg.position.y = pt_tf.getOrigin().y();
+    pt_msg.position.z = pt_tf.getOrigin().z();
+    pt_msg.orientation.x = pt_tf.getRotation().x();
+    pt_msg.orientation.y = pt_tf.getRotation().y();
+    pt_msg.orientation.z = pt_tf.getRotation().z();
+    pt_msg.orientation.w = pt_tf.getRotation().w();
+
+    pts_msg.poses.push_back(pt_msg);
+  }
+
+  m_waypointPub.publish(pts_msg);
+  // m_tfcaster.sendTransform(state_msg.pose);
+  ros::spinOnce();
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 // void MochaGui::_pubMesh()
@@ -1551,7 +1645,7 @@ void MochaGui::_ControlFunc()
                 {
                     //get current pose from the Localizer
                     // _UpdateVehicleStateFromFusion(currentState);
-                    _UpdateVehicleStateFromROS(currentState);
+                    _GetVehicleStateFromROS(currentState);
 
                     Sophus::SE3d state_pose = currentState.ToSE3d();
                     Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
@@ -1842,7 +1936,8 @@ void MochaGui::_PlannerFunc()
     m_bPlanning = false;
     // now add line segments
     bool previousOpenLoopSetting = m_bPlannerOn;
-    while (m_StillRun/*1*/) {
+    // while (m_StillRun) {
+    while (1) {
         boost::this_thread::interruption_point();
 
         //if the user has changed the openloop setting, dirty all
@@ -1864,6 +1959,7 @@ void MochaGui::_PlannerFunc()
             //make sure both waypoints have well defined poses (no nans)
             if(std::isfinite(a->GetPose5d().norm()) == false || std::isfinite(b->GetPose5d().norm()) == false )
             {
+                ROS_ERROR("Poorly defined waypoint in MochaGui::_PlannerFunc");
                 continue;
             }
 

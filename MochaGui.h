@@ -12,6 +12,7 @@
 #include <std_msgs/Bool.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <geometry_msgs/PolygonStamped.h>
+#include <geometry_msgs/PoseArray.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <carplanner_msgs/Command.h>
@@ -106,7 +107,8 @@ protected:
 
     void _PopulateSceneGraph();
     void _UpdateVehicleStateFromFusion(VehicleState& currentState);
-    void _UpdateVehicleStateFromROS(VehicleState& currentState);
+    void _GetVehicleStateFromROS(VehicleState& currentState);
+    void _UpdateVehicleStateFromROS();
 
     void _UpdateVisuals();
     void _PlaybackLog(double dt);
@@ -137,8 +139,8 @@ protected:
     // ROS variable
     bool m_bEnableROS;
     ros::NodeHandle* m_nh;
-    tf::TransformBroadcaster m_tfbr;
-    tf::TransformListener m_tfls;
+    tf::TransformBroadcaster m_tfcaster;
+    tf::TransformListener m_tflistener;
     tf::StampedTransform m_Twv;
 
     void InitROS();
@@ -157,6 +159,10 @@ protected:
     // ros::Publisher m_meshPub;
     // void _pubMesh();
     // void _pubMesh(aiMesh* );
+
+    ros::Publisher m_waypointPub;
+    void _pubWaypoints();
+    void _pubWaypoints(std::vector<Eigen::MatrixXd*> );
 
     ros::Subscriber m_waypointSub;
     void _waypointCB(const geometry_msgs::PoseStamped::ConstPtr& );

@@ -5,6 +5,8 @@
 #include <geometry_msgs/TransformStamped.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 
+#include <Eigen/Eigen>
+
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -24,11 +26,13 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
   {
     case SOFTBODY_SHAPE_PROXYTYPE:
     {
+      // printf("%s SOFTBODY_SHAPE_PROXYTYPE\n", "[CollisionShape2TriangleMsg]");
       //skip the soft body collision shape for now
       break;
     }
     case STATIC_PLANE_PROXYTYPE:
     {
+      // printf("%s STATIC_PLANE_PROXYTYPE\n", "[CollisionShape2TriangleMsg]");
       //draw a box, oriented along the plane normal
       const btStaticPlaneShape* staticPlaneShape = static_cast<const btStaticPlaneShape*>(collisionShape);
       btScalar planeConst = staticPlaneShape->getPlaneConstant();
@@ -65,6 +69,7 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
     }
     case TRIANGLE_MESH_SHAPE_PROXYTYPE:
     {
+      // printf("%s TRIANGLE_MESH_SHAPE_PROXYTYPE\n", "[CollisionShape2TriangleMsg]");
       btBvhTriangleMeshShape* trimesh = (btBvhTriangleMeshShape*)collisionShape;
       btVector3 trimeshScaling = trimesh->getLocalScaling();
       btStridingMeshInterface* meshInterface = trimesh->getMeshInterface();
@@ -122,6 +127,8 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
           btVector3 triNormal = (triangleVerts[1] - triangleVerts[0]).cross(triangleVerts[2] - triangleVerts[0]);
           btScalar dot = triNormal.dot(triNormal);
 
+          // printf("%d indices before cull\n", indices.size());
+
           //cull degenerate triangles
           if (dot >= SIMD_EPSILON * SIMD_EPSILON)
           {
@@ -134,6 +141,8 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
               vertexNormals.push_back(triNormal);
             }
           }
+
+          // printf("%d indices after cull\n", indicesOut->size());
         }
       }
 
@@ -141,6 +150,7 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
     }
     default:
     {
+      // printf("%s Unknown Shape ProxyType\n", "[CollisionShape2TriangleMsg]");
       if (collisionShape->isConvex())
       {
         btConvexShape* convex = (btConvexShape*)collisionShape;
@@ -244,6 +254,8 @@ inline void convertCollisionShape2MeshMsg(btCollisionShape* collisionShape, cons
   btAlignedObjectArray<btVector3> vertexNormals;
   btAlignedObjectArray<int> indicesOut;
 
+  // printf("%s about to pub mesh with %d faces\n", "[convertCollisionShape2MeshMsg]", dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(collisionShape)->getMeshInterface())->getNumTriangles());
+
   CollisionShape2TriangleMesh(collisionShape, *parentTransform, vertexPositions, vertexNormals, indicesOut);
 
   // printf("%s %d indices, %d vertices\n", "[convertCollisionShape2MeshMsg]", indicesOut.size(), vertexPositions.size());
@@ -269,6 +281,8 @@ inline void convertCollisionShape2MeshMsg(btCollisionShape* collisionShape, cons
       (*meshMsg)->triangles[it].vertex_indices[ii] = indicesOut[it*3+ii];
     }
   }
+
+  // printf("%s %d faces\n", "[convertCollisionShape2MeshMsg]", (*meshMsg)->triangles.size());
 
   return;
 }
@@ -395,5 +409,26 @@ inline void convertMeshMsgToAssimpMesh(mesh_msgs::TriangleMeshStamped*& sMesh, a
   mesh_msgs::TriangleMesh* tmpmesh = &(sMesh->mesh);
   convertMeshMsgToAssimpMesh(tmpmesh, mesh);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline void convertRPY2Quat(const Eigen::Vector3d& rpy, Eigen::Quaterniond* quat)
+{
+  *quat = Eigen::AngleAxisd(rpy[0], Eigen::Vector3d::UnitX())
+        * Eigen::AngleAxisd(rpy[1], Eigen::Vector3d::UnitY())
+        * Eigen::AngleAxisd(rpy[2], Eigen::Vector3d::UnitZ());
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline void convertRPY2Quat(const Eigen::Vector3d& rpy, Eigen::Vector4d* quat_xyzw)
+{
+  Eigen::Quaterniond quat = Eigen::AngleAxisd(rpy[0], Eigen::Vector3d::UnitX())
+                          * Eigen::AngleAxisd(rpy[1], Eigen::Vector3d::UnitY())
+                          * Eigen::AngleAxisd(rpy[2], Eigen::Vector3d::UnitZ());
+  *quat_xyzw << quat.x(), quat.y(), quat.z(), quat.w();
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
 
 #endif
