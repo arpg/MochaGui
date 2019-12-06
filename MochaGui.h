@@ -17,6 +17,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <carplanner_msgs/Command.h>
 #include <carplanner_msgs/VehicleState.h>
+#include <carplanner_msgs/PathArray.h>
 #include <tf/transform_broadcaster.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -25,7 +26,7 @@
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include "conversion_tools.h"
+#include "mesh_conversion_tools.hpp"
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -145,12 +146,19 @@ protected:
 
     void InitROS();
 
-    boost::thread* m_pPublisherThread;
-    void _PublisherFunc();
+    // boost::thread* m_pPublisherThread;
+    // void _PublisherFunc();
+    boost::thread* m_pStatePubThread;
+    void _StatePubFunc();
+    boost::thread* m_pWaypointPubThread;
+    void _WaypointPubFunc();
+    boost::thread* m_pPathPubThread;
+    void _PathPubFunc();
 
     ros::Publisher m_commandPub;
     void _pubCommand();
     void _pubCommand(ControlCommand& );
+    // void _pubCommand(ControlCommand&, Eigen::Vector3d&);
 
     ros::Publisher m_statePub;
     void _pubState();
@@ -160,12 +168,20 @@ protected:
     // void _pubMesh();
     // void _pubMesh(aiMesh* );
 
+    ros::Subscriber m_terrainMeshSub;
+    void _meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
+
+    ros::Publisher m_pathPub;
+    void _pubPath();
+    void _pubPath(list<std::vector<VehicleState> *>&);
+    void _pubPath(Eigen::Vector3dAlignedVec&);
+
     ros::Publisher m_waypointPub;
     void _pubWaypoints();
     void _pubWaypoints(std::vector<Eigen::MatrixXd*> );
 
-    ros::Subscriber m_waypointSub;
-    void _waypointCB(const geometry_msgs::PoseStamped::ConstPtr& );
+    ros::Subscriber m_goalSub;
+    void _goalCB(const geometry_msgs::PoseStamped::ConstPtr& );
 
     boost::thread* m_pDebugPrinterThread;
     void DebugPrinterFunc();
@@ -203,6 +219,7 @@ protected:
     list<std::vector<VehicleState> *> m_lPlanStates;
     GLCachedPrimitives* m_pControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
+    Eigen::Vector3dAlignedVec m_vActualTrajectory;
 
     LocalPlanner m_Planner; // Car planner for trajectory plotting
     CarController m_Controller;

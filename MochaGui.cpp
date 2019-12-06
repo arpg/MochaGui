@@ -39,12 +39,16 @@ MochaGui::MochaGui() :
     m_bControl3dPath( CreateUnsavedCVar("planner.Control3DPath", false, "Drive the car over the path to see the results in real-time") ),
     m_nPathSegments( CreateCVar("planner.PathSegments", 20u, "how many segments to draw") ),
     m_dTimeInterval( CreateCVar("planner.TimeInterval", 0.01, "") ), /* changed TimeInteval to TimeInterval (also in opt.cpp) */
+    m_pDebugPrinterThread( 0 ),
     m_pPlannerThread( 0 ),
     m_pPhysicsThread( 0 ),
     m_pControlThread( 0 ),
     m_pCommandThread( 0 ),
     m_pLocalizerThread( 0 ),
-    m_pPublisherThread( 0 ),
+    // m_pPublisherThread( 0 ),
+    m_pStatePubThread( 0 ),
+    m_pWaypointPubThread( 0 ),
+    m_pPathPubThread( 0 ),
     m_bLoggerEnabled( CreateUnsavedCVar("logger.Enabled", false, "")),
     m_sLogFileName( CreateUnsavedCVar("logger.FileName", std::string(), "/Users/corinsandford/ARPG/MochaGui/logs/mocha.log")),
     m_bFusionLoggerEnabled( CreateUnsavedCVar("logger.FusionEnabled", false, "")),
@@ -56,8 +60,10 @@ MochaGui::MochaGui() :
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
     m_dPlanTime( Tic() ) //the size of the fusion sensor
 {
+	printf("Constructing MochaGui\n");
 
 }
+
 
 ////////////////////////////////////////////////////////////////
 MochaGui::~MochaGui()
@@ -91,9 +97,11 @@ void MochaGui::Run()
     LOG(INFO) << "Starting Threads";
     _StartThreads();
     double lastFrameTime = Tic();
-    while( !pangolin::ShouldQuit() )
-    {
 
+	// ros::spin();
+
+    while( !pangolin::ShouldQuit() && ros::ok() )
+    {
       {
         boost::mutex::scoped_lock lock(m_DrawMutex);
         m_Gui.Render();
@@ -131,6 +139,9 @@ void MochaGui::Run()
             CVarUtils::Save(m_pSaveFileName,filter);
             _UpdateWaypointFiles();
         }
+
+        ros::spinOnce();
+        ros::Rate(100).sleep();
     }
 }
 
@@ -239,11 +250,13 @@ void MochaGui::InitROS()
 
   m_commandPub = m_nh->advertise<carplanner_msgs::Command>("command",1);
   m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
-  // m_meshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("scene_mesh",1);
+//   m_pathPub = m_nh->advertise<carplanner_msgs::PathArray>("path_array",1);
+  m_pathPub = m_nh->advertise<nav_msgs::Path>("path",1);
   m_waypointPub = m_nh->advertise<geometry_msgs::PoseArray>("waypoints",1);
 
-  m_waypointSub = m_nh->subscribe<geometry_msgs::PoseStamped>("waypoint", 1, boost::bind(&MochaGui::_waypointCB, this, _1));
-  // m_meshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("infinitam/mesh", 1, boost::bind(&MochaGui::_meshCB, this, _1));
+  m_goalSub = m_nh->subscribe<geometry_msgs::PoseStamped>("goal", 1, boost::bind(&MochaGui::_goalCB, this, _1));
+  m_terrainMeshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("input_terrain_mesh", 1, boost::bind(&MochaGui::_meshCB, this, _1));
+  
 }
 
 ////////////////////////////////////////////////////////////////
@@ -251,6 +264,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
                     const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
                     const std::string& sCarMesh, const std::string& sWheelMesh, bool enableROS)
 {
+	printf("Init'ing MochaGui\n");
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
     m_bSIL = ( strcmp(sMode.c_str(),"Simulation")==0 ? false : true ); // if in sim mode, don't enable Software In the Loop (ie Experiment)
@@ -263,12 +277,11 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_bPause = false;
     m_bStep = false;
 
-    // Set up ROS stufff
-    std::cout << "Setting up ROS stuff" << std::endl;
-
+    // Set up ROS stuff
     m_bEnableROS = enableROS;
     if( m_bEnableROS )
     {
+        std::cout << "Setting up ROS stuff" << std::endl;
         InitROS();
     }
 
@@ -322,7 +335,6 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     }*/
 
     std::cout << "Assigning target";
-
     if(sMode == "Simulation"){
         std::cout << " to Simulation";
         m_eControlTarget = eTargetSimulation;
@@ -370,13 +382,16 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_LearningCarModel.Init(pCollisionShape,dMin,dMax, m_mDefaultParameters, REGRESSOR_NUM_WORLDS , false, false);
     m_PlanCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,LocalPlanner::GetNumWorldsRequired(OPT_DIM) , false, false);
     m_ControlCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters, LocalPlanner::GetNumWorldsRequired(OPT_DIM)  , false, false);
+    // m_LearningCarModel.Init(pCollisionShape,dMin,dMax, m_mDefaultParameters, 2, false, false);
+    // m_PlanCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters, 2, false, false);
+    // m_ControlCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters, 2, false, false);
     //parameters[CarParameters::SteeringCoef] = -700.0;
 
     /// As well as the car that we're actually driving.
     if ( m_bSIL )
-        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, true , true);
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, true , m_bEnableROS);
     else
-        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, false , true);
+        m_DriveCarModel.Init( pCollisionShape,dMin,dMax, m_mDefaultParameters,1, false , m_bEnableROS);
 
     // Sophus::SE3d startPose(Eigen::Quaterniond(1,0,0,0),Eigen::Vector3d(1,1,0));
     // Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
@@ -444,7 +459,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     std::cout << "Setting waypoints" << std::endl;
     int numWaypoints = 2;
     double radius = 1;
-    std::vector<double> offset{2, 0, 0}; // x y z in NED
+    std::vector<double> offset{2, 1, 0}; // x y z in NED
     for(int ii = 0; ii < numWaypoints ; ii++){
         char buf[100];
         snprintf( buf, 100, "waypnt.%d", ii );
@@ -590,19 +605,49 @@ void MochaGui::_StartThreads()
     m_pPlannerThread = new boost::thread(std::bind(&MochaGui::_PlannerFunc,this));
     m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
+
     if( m_bEnableROS )
     {
-        m_pPublisherThread = new boost::thread(std::bind(&MochaGui::_PublisherFunc,this));
+        // m_pPublisherThread = new boost::thread(std::bind(&MochaGui::_PublisherFunc,this));
+        m_pStatePubThread = new boost::thread(std::bind(&MochaGui::_StatePubFunc,this));
+        m_pWaypointPubThread = new boost::thread(std::bind(&MochaGui::_WaypointPubFunc,this));
+        m_pPathPubThread = new boost::thread(std::bind(&MochaGui::_PathPubFunc,this));
+    }
+    else
+    {
+        // if(m_pPublisherThread)
+        // {
+        //     m_pPublisherThread->interrupt();
+        //     m_pPublisherThread->join();
+        // }
+        if(m_pStatePubThread)
+        {
+            m_pStatePubThread->interrupt();
+            m_pStatePubThread->join();
+        }
+        if(m_pWaypointPubThread)
+        {
+            m_pWaypointPubThread->interrupt();
+            m_pWaypointPubThread->join();
+        }
+        if(m_pPathPubThread)
+        {
+            m_pPathPubThread->interrupt();
+            m_pPathPubThread->join();
+        }
     }
 
     if(m_eControlTarget == eTargetSimulation){
         LOG(INFO) << "Stopping localizer thread";
 
-        if(m_pLocalizerThread) {
+        if(m_pLocalizerThread)
+        {
             m_pLocalizerThread->interrupt();
             m_pLocalizerThread->join();
         }
-    }else{
+    }
+    else
+    {
         m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
         if(m_pLocalizerThread == NULL){
             //LOG(INFO) << "Starting Localizer Thread";
@@ -650,8 +695,18 @@ void MochaGui::_KillThreads()
         m_pCommandThread->join();
     }
 
-    if(m_pPublisherThread) {
-        m_pPublisherThread->join();
+    // if(m_pPublisherThread) {
+    //     m_pPublisherThread->join();
+    // }
+
+    if(m_pStatePubThread) {
+        m_pStatePubThread->join();
+    }
+    if(m_pWaypointPubThread) {
+        m_pWaypointPubThread->join();
+    }
+    if(m_pPathPubThread) {
+        m_pPathPubThread->join();
     }
 
     if(m_pDebugPrinterThread) {
@@ -663,14 +718,20 @@ void MochaGui::_KillThreads()
     delete m_pPlannerThread;
     delete m_pLocalizerThread;
     delete m_pCommandThread;
-    delete m_pPublisherThread;
+    // delete m_pPublisherThread;
+    delete m_pStatePubThread;
+    delete m_pWaypointPubThread;
+    delete m_pPathPubThread;
     delete m_pDebugPrinterThread;
 
     m_pControlThread = 0;
     m_pPhysicsThread = 0;
     m_pPlannerThread = 0 ;
     m_pLocalizerThread = 0;
-    m_pPublisherThread = 0;
+    // m_pPublisherThread = 0;
+    m_pStatePubThread = 0;
+    m_pWaypointPubThread = 0;
+    m_pPathPubThread = 0;
     m_pDebugPrinterThread = 0;
 
     m_Localizer.Stop();
@@ -882,26 +943,27 @@ void MochaGui::_UpdateVisuals()
 {
     if(g_bPlaybackControlPaths == false || m_bPause == false){
         VehicleState state;
-        if(m_bSimulate3dPath == true )
+        // if(m_bSimulate3dPath == true )
         // if(m_bControl3dPath == true )
-        {
+        // {
             //LOG(INFO) << "m_bSimulate3dPath == true";
             m_DriveCarModel.GetVehicleState(0,state);
 
             m_Gui.SetCarState( m_nDriveCarId, state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
 
-        }else{
+        // }else{
             // _UpdateVehicleStateFromFusion(state);
-            _GetVehicleStateFromROS(state);
+            // _GetVehicleStateFromROS(state);
+            // m_DriveCarModel.GetVehicleState(0,state);
             //LOG(INFO) << "Updated Vehicle State from Fusion";
 
-            Sophus::SE3d state_pose = state.ToSE3d();
-            Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
-            state_pose = rot_180_x*state_pose*rot_180_x;
-            VehicleState new_state(state_pose, state.GetNormalVelocity(), state.GetCurvature());
+            // Sophus::SE3d state_pose = state.FlipCoordFrame().ToSE3d();
+            // Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+            // state_pose = rot_180_x*state_pose*rot_180_x;
+            // VehicleState new_state(state_pose, state.GetNormalVelocity(), state.GetCurvature());
 
-            m_Gui.SetCarState( m_nDriveCarId, new_state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
-        }
+            // m_Gui.SetCarState( m_nDriveCarId, state, (m_bSimulate3dPath == true || m_eControlTarget == eTargetExperiment) );
+        // }
 
 
 
@@ -1002,8 +1064,12 @@ void MochaGui::_GetVehicleStateFromROS(VehicleState& currentState)
     currentState.m_dTwv = Sophus::SE3d(
       Eigen::Quaterniond(m_Twv.getRotation().getW(), m_Twv.getRotation().getX(), m_Twv.getRotation().getY(), m_Twv.getRotation().getZ()),
       Eigen::Vector3d(m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ()));
+
+    currentState.FlipCoordFrame();
+    
     currentState.m_dV = GetBasisVector(currentState.m_dTwv,0).normalized()*currentState.m_dV.norm();
     currentState.m_dW[0] = currentState.m_dW[1] = 0;
+
 
     Eigen::Vector3d dIntersect;
     if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*0.2,dIntersect,true)){
@@ -1021,85 +1087,30 @@ void MochaGui::_GetVehicleStateFromROS(VehicleState& currentState)
 ///////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_UpdateVehicleStateFromROS()
 {
-    VehicleState state;
+    /*static*/ VehicleState state;
     _GetVehicleStateFromROS(state);
-    Sophus::SE3d state_pose = state.ToSE3d();
-    Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
-    state_pose = rot_180_x*state_pose*rot_180_x;
-    state = *(new VehicleState(state_pose, state.GetNormalVelocity(), state.GetCurvature()));
     m_DriveCarModel.SetState(0, state);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-// void MochaGui::_LocalizerReadFunc()
-// {
-//     double lastTime = Tic();
-//     int numPoses = 0;
-//     int counter = 1;
-//     //double localizerTime = 0;
-//     m_Localizer.Start();
-//
-//    LOG(INFO) << "Starting Localizer Thread.";
-//
-//     while(1){
-//         //this is a blocking call
-//         double localizerTime;
-//         const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
-//
-//         double sysTime = Tic();
-//
-//         double dt = Tic()-lastTime;
-//         if(dt > 0.5){
-//             m_dLocalizerFreq = numPoses/dt;
-//             lastTime = Tic();
-//             numPoses = 0;
-//         }
-//         numPoses++;
-//
-//
-//         if(g_bImuIntegrationOnly == false){
-//             counter++;
-//             //double dTemp = Tic();
-//             //if(counter > 1){
-//             //std::cout << "Global pose received at:" << sysTime << "seconds." << std::endl;
-//             if(g_bProcessModelActive){
-//                 ControlCommand command;
-//                 {
-//                     boost::mutex::scoped_lock lock(m_ControlMutex);
-//                     command = m_ControlCommand;
-//                 }
-//                 m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
-//             }else{
-//                 m_Fusion.RegisterGlobalPose(Twb,sysTime,sysTime);
-//                 //LOG(INFO) << "Set pose";
-//             }
-//             //dout("Fusion process took" << Toc(dTemp) << " seconds.");
-//             counter = 0;
-//
-//             if(m_FusionLogger.IsReady() && m_bFusionLoggerEnabled){
-//                 m_FusionLogger.LogLocalizerData(Tic(),localizerTime,Twb);
-//             }
-//
-//         }
-//         //}
-//     }
-// }
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_LocalizerReadFunc()
 {
     double lastTime = Tic();
     double dt = 0;
     tf::StampedTransform Twv;
-    tf::StampedTransform offset;
-    offset.setData(tf::Transform(tf::Quaternion(0,0,0,1),tf::Vector3(0,0,-0.6))); // qx qy qz qw x y z
+    // tf::StampedTransform offset;
+    // offset.setData(tf::Transform(tf::Quaternion(0,0,0,1),tf::Vector3(0,0,0))); // qx qy qz qw x y z
 
-    LOG(INFO) << "Starting Localizer Thread.";
+    // LOG(INFO) << "Starting Localizer Thread.";
+    std::cout << "Starting Localizer Thread" << std::endl;
 
     while(1)
     {
         try
         {
-          m_tflistener.waitForTransform("world", "base_link", ros::Time::now(), ros::Duration(1.0));
-          m_tflistener.lookupTransform("world", "base_link", ros::Time(0), Twv);
+            // ROS_INFO("looking up transform");
+          m_tflistener.waitForTransform("world", "base_link", ros::Time::now(), ros::Duration(1.0 ));
+          m_tflistener.lookupTransform("world", "base_link", ros::Time(0), m_Twv);
         }
         catch (tf::TransformException ex)
         {
@@ -1107,8 +1118,8 @@ void MochaGui::_LocalizerReadFunc()
           continue;
         }
 
-        m_Twv = Twv;
-        m_Twv.setData(Twv*offset); // NWU
+        // m_Twv = Twv;
+        // m_Twv.setData(Twv*offset);
 
         // ROS_INFO_THROTTLE(.1,"\nSetting m_Twv in LocalizerReadFunc:\n\tx %02.2f y %02.2f z %02.2f\n\tqx %02.2f qy %02.2f qz %02.2f qw %02.2f \n",
         //   m_Twv.getOrigin().getX(), m_Twv.getOrigin().getY(), m_Twv.getOrigin().getZ(),
@@ -1128,122 +1139,441 @@ void MochaGui::_LocalizerReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlCommandFunc()
 {
+        
     double dLastTime = Tic();
-    //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
     while(1)
     {
         //only go ahead if the controller is running, and we are targeting the real vehicle
-        if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false)
+        if(m_bControllerRunning == true)
         {
             //get commands from the controller, apply to the car and update the position
             //of the car in the controller
+            double dCurrentTime;
             {
                 boost::mutex::scoped_lock lock(m_ControlMutex);
-                double dCurrentTime = Tic();
+                dCurrentTime = Tic();
                 m_Controller.GetCurrentCommands(dCurrentTime,
                                                 m_ControlCommand,
                                                 m_vTargetVel,
                                                 m_dTargetPose);
 
-                //TODO: This is in fact incorrect. The dT specified here is from the last command to the
-                //current command, not from the current command to the next
-                m_ControlCommand.m_dT = dCurrentTime - dLastTime;
-                dLastTime = dCurrentTime;
             }
 
-            if(m_bLoggerEnabled && m_Logger.IsReady()){
-                m_Logger.LogControlCommand(m_ControlCommand);
-            }
+            //TODO: This is in fact incorrect. The dT specified here is from the last command to the
+            //current command, not from the current command to the next
+            m_ControlCommand.m_dT = dCurrentTime - dLastTime;
+            dLastTime = dCurrentTime;
 
-            if(g_bProcessModelActive){
-                m_Fusion.RegisterInputCommands(m_ControlCommand);
-            }else{
-                //this update does not actually run the simulation. It only serves to push in
-                //a delayed command and update the steering (so we know where the steering value
-                //is when we pass the state to the controller)
-                if ( !m_bSIL )
-                    m_DriveCarModel.UpdateState( 0, m_ControlCommand, m_ControlCommand.m_dT, false, true );
-            }
+            // if(m_bLoggerEnabled && m_Logger.IsReady()){
+            //     m_Logger.LogControlCommand(m_ControlCommand);
+            // }
 
-            //send the commands to the car via udp
+            // if(g_bProcessModelActive){
+            //     m_Fusion.RegisterInputCommands(m_ControlCommand);
+            // }else{
+            //     //this update does not actually run the simulation. It only serves to push in
+            //     //a delayed command and update the steering (so we know where the steering value
+            //     //is when we pass the state to the controller)
+            //     if ( !m_bSIL )
+            //         m_DriveCarModel.UpdateState( 0, m_ControlCommand, m_ControlCommand.m_dT, false, true );
+            // }
+
             m_nNumPoseUpdates++;
-//            hal::CommanderMsg* Command = new hal::CommanderMsg();
-//            CommandMsg Req;
-//            CommandReply Rep;
-
-//            Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
-//            Req.set_phi(m_ControlCommand.m_dPhi);
+            
             double time = Tic();
 
-
-            //if we are not currently simulating, send these to the ppm
-            if( m_bSimulate3dPath == false )
-            {
-//                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true/*true*/, Command );
-//                unsigned char buffer[Command->ByteSize() + 4];
-//                google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
-//                google::protobuf::io::CodedOutputStream coded_output( &aos );
-//                coded_output.WriteVarint32( Command->ByteSize() );
-//                Command->SerializeToCodedStream( &coded_output );
-
-//                carplanner_msgs::Command cmd_msg;
-//                cmd_msg.force = m_ControlCommand.m_dForce;
-//                cmd_msg.curvature = m_ControlCommand.m_dCurvature;
-//                cmd_msg.dt = m_ControlCommand.m_dTime;
-//                cmd_msg.phi = m_ControlCommand.m_dPhi;
-//                for( unsigned int i=0; i<m_ControlCommand.m_dTorque.size(); i++ )
-//                {
-//                  cmd_msg.torques[i] = m_ControlCommand.m_dTorque[i];
-//                }
-
-                if ( m_bSIL ) {
-                    //send Command to BulletCarModel
-//                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) { LOG(ERROR) << "Did not send message"; }
-//                    m_expCmdPub.publish(cmd_msg);
-                    //else { LOG(INFO) << "Sent Command"; }
-
-                }
-                else {
-                    //send Command to NinjaCar
-//                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
-//                    m_simCmdPub.publish(cmd_msg);
-
-                }
-//                ros::spinOnce();
-
-            }
+            _pubCommand(m_ControlCommand);
 
             m_dControlDelay = Toc(time);
-        }
 
-        //about 100 commands/sec
-        usleep(1E6 * 0.008);
-        //usleep(1E6 * 0.016);
+            // usleep(1E6 * 0.008);
+        }
+    }
+
+//     double dLastTime = Tic();
+//     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
+//     while(1)
+//     {
+//         //only go ahead if the controller is running, and we are targeting the real vehicle
+//         if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false)
+//         {
+//             //get commands from the controller, apply to the car and update the position
+//             //of the car in the controller
+//             {
+//                 boost::mutex::scoped_lock lock(m_ControlMutex);
+//                 double dCurrentTime = Tic();
+//                 m_Controller.GetCurrentCommands(dCurrentTime,
+//                                                 m_ControlCommand,
+//                                                 m_vTargetVel,
+//                                                 m_dTargetPose);
+
+//                 //TODO: This is in fact incorrect. The dT specified here is from the last command to the
+//                 //current command, not from the current command to the next
+//                 m_ControlCommand.m_dT = dCurrentTime - dLastTime;
+//                 dLastTime = dCurrentTime;
+//             }
+
+//             if(m_bLoggerEnabled && m_Logger.IsReady()){
+//                 m_Logger.LogControlCommand(m_ControlCommand);
+//             }
+
+//             if(g_bProcessModelActive){
+//                 m_Fusion.RegisterInputCommands(m_ControlCommand);
+//             }else{
+//                 //this update does not actually run the simulation. It only serves to push in
+//                 //a delayed command and update the steering (so we know where the steering value
+//                 //is when we pass the state to the controller)
+//                 if ( !m_bSIL )
+//                     m_DriveCarModel.UpdateState( 0, m_ControlCommand, m_ControlCommand.m_dT, false, true );
+//             }
+
+//             //send the commands to the car via udp
+//             m_nNumPoseUpdates++;
+// //            hal::CommanderMsg* Command = new hal::CommanderMsg();
+// //            CommandMsg Req;
+// //            CommandReply Rep;
+
+// //            Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
+// //            Req.set_phi(m_ControlCommand.m_dPhi);
+//             double time = Tic();
+
+
+//             //if we are not currently simulating, send these to the ppm
+//             if( m_bSimulate3dPath == false )
+//             {
+// //                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true/*true*/, Command );
+// //                unsigned char buffer[Command->ByteSize() + 4];
+// //                google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
+// //                google::protobuf::io::CodedOutputStream coded_output( &aos );
+// //                coded_output.WriteVarint32( Command->ByteSize() );
+// //                Command->SerializeToCodedStream( &coded_output );
+
+// //                carplanner_msgs::Command cmd_msg;
+// //                cmd_msg.force = m_ControlCommand.m_dForce;
+// //                cmd_msg.curvature = m_ControlCommand.m_dCurvature;
+// //                cmd_msg.dt = m_ControlCommand.m_dTime;
+// //                cmd_msg.phi = m_ControlCommand.m_dPhi;
+// //                for( unsigned int i=0; i<m_ControlCommand.m_dTorque.size(); i++ )
+// //                {
+// //                  cmd_msg.torques[i] = m_ControlCommand.m_dTorque[i];
+// //                }
+
+//                 if ( m_bSIL ) {
+//                     //send Command to BulletCarModel
+// //                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) { LOG(ERROR) << "Did not send message"; }
+// //                    m_expCmdPub.publish(cmd_msg);
+//                     //else { LOG(INFO) << "Sent Command"; }
+//                     _pubCommand(m_ControlCommand);
+
+//                 }
+//                 else {
+//                     //send Command to NinjaCar
+// //                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
+// //                    m_simCmdPub.publish(cmd_msg);
+
+//                 }
+// //                ros::spinOnce();
+
+//             }
+
+//             m_dControlDelay = Toc(time);
+//         }
+
+//         //about 100 commands/sec
+//         usleep(1E6 * 0.008);
+//         //usleep(1E6 * 0.016);
+//     }
+}
+
+// ///////////////////////////////////////////////////////////////////////////////////////
+// void MochaGui::_PublisherFunc()
+// {
+//     std::cout << "Starting Publisher Thread" << std::endl;
+//     while( ros::ok() && m_StillRun )
+//     {
+//         // if( m_bControl3dPath && m_eControlTarget==eTargetExperiment ){ _pubCommand(); }
+//         _pubState();
+//         _pubWaypoints();
+//         // _pubMesh();
+//         _pubPath();
+
+//         // ros::Rate(100).sleep();
+//     }
+
+//     // usleep(1E6 * 0.005);
+// }
+
+void MochaGui::_StatePubFunc()
+{
+    std::cout << "Starting State Publisher Thread" << std::endl;
+    while( ros::ok() && m_StillRun )
+    {
+        _pubState();
+        ros::Rate(100).sleep();
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_PublisherFunc()
+void MochaGui::_WaypointPubFunc()
 {
+    std::cout << "Starting Waypoint Publisher Thread" << std::endl;
     while( ros::ok() && m_StillRun )
     {
-        _pubCommand();
-        _pubState();
         _pubWaypoints();
-        // _pubMesh();
-
         ros::Rate(100).sleep();
     }
+}
 
-    usleep(1E6 * 0.005);
+void MochaGui::_PathPubFunc()
+{
+    std::cout << "Starting Path Publisher Thread" << std::endl;
+    while( ros::ok() && m_StillRun )
+    {
+        _pubPath();
+        ros::Rate(100).sleep();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubCommand()
+{
+    _pubCommand(m_ControlCommand);
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubCommand(ControlCommand& cmd)
+{
+    carplanner_msgs::Command cmd_msg;
+    cmd_msg.force       = cmd.m_dForce;
+    cmd_msg.curvature   = cmd.m_dCurvature;
+    cmd_msg.dt          = cmd.m_dTime;
+    cmd_msg.phi         = cmd.m_dPhi;
+    for(unsigned int i=0; i<3; i++)
+    {
+        cmd_msg.torques.push_back(cmd.m_dTorque[i]);
+    }
+
+    m_commandPub.publish(cmd_msg);
+    ros::spinOnce();
+}
+
+// void MochaGui::_pubCommand(ControlCommand& cmd, Eigen::Vector3d& vel)
+// {
+//     carplanner_msgs::Command cmd_msg;
+//     cmd_msg.force       = cmd.m_dForce;
+//     cmd_msg.curvature   = cmd.m_dCurvature;
+//     cmd_msg.dt          = cmd.m_dTime;
+//     cmd_msg.phi         = cmd.m_dPhi;
+//     for(unsigned int i=0; i<3; i++)
+//     {
+//         cmd_msg.torques.push_back(cmd.m_dTorque[i]);
+//     }
+//     for(unsigned int i=0; i<3; i++)
+//     {
+//         cmd_msg.target_vel.push_back(vel[i]);
+//     }
+    
+//     m_commandPub.publish(cmd_msg);
+//     ros::spinOnce();
+// }
+
+////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPath()
+{
+    // if(!m_lPlanStates.empty())
+    // {
+    //     _pubPath(m_lPlanStates);
+    // }
+    // if(!m_vTerrainLineSegments.empty())
+    // {
+    //     _pubPath(m_vTerrainLineSegments);
+    // }
+    if(!m_vActualTrajectory.empty())
+    {
+        _pubPath(m_vActualTrajectory);
+    }
+    
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPath(list<std::vector<VehicleState> *>& path_in)
+{   
+    list<std::vector<VehicleState> *> path = path_in;
+    carplanner_msgs::PathArray patharr_msg;
+    patharr_msg.header.frame_id = "world";
+    patharr_msg.header.stamp = ros::Time::now();
+    for(list<std::vector<VehicleState> *>::iterator i_seg=path.begin(); i_seg!=path.end(); advance(i_seg,1))
+    {
+        nav_msgs::Path path_msg;
+        path_msg.header.frame_id = "world";
+        path_msg.header.stamp = ros::Time::now();
+        for(uint i_state=0; i_state < (*i_seg)->size(); i_state++)
+        {
+            carplanner_msgs::VehicleState state_msg = (**i_seg)[i_state].FlipCoordFrame().toROS();
+            geometry_msgs::PoseStamped pose_msg;
+            pose_msg.header.frame_id = "world";
+            pose_msg.header.stamp = ros::Time::now();
+            pose_msg.pose.position.x = state_msg.pose.transform.translation.x;
+            pose_msg.pose.position.y = state_msg.pose.transform.translation.y;
+            pose_msg.pose.position.z = state_msg.pose.transform.translation.z;
+            pose_msg.pose.orientation.x = state_msg.pose.transform.rotation.x;
+            pose_msg.pose.orientation.y = state_msg.pose.transform.rotation.y;
+            pose_msg.pose.orientation.z = state_msg.pose.transform.rotation.z;
+            pose_msg.pose.orientation.w = state_msg.pose.transform.rotation.w;
+
+            path_msg.poses.push_back(pose_msg);
+        }
+        patharr_msg.paths.push_back(path_msg);
+    }
+
+    m_pathPub.publish(patharr_msg);
+    ros::spinOnce();
+}
+
+void MochaGui::_pubPath(Eigen::Vector3dAlignedVec& path_in)
+{   
+    Eigen::Vector3dAlignedVec path = path_in;
+    nav_msgs::Path path_msg;
+    path_msg.header.frame_id = "world";
+    path_msg.header.stamp = ros::Time::now();
+    for(Eigen::Vector3dAlignedVec::iterator i_seg=path.begin(); i_seg!=path.end(); advance(i_seg,1))
+    {
+        // carplanner_msgs::VehicleState state_msg = i_seg[i_state].FlipCoordFrame().toROS();
+        
+        tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+        tf::Transform pose(tf::Quaternion(0,0,0,1),tf::Vector3((*i_seg)[0],(*i_seg)[1],(*i_seg)[2]));
+        pose = rot_180_x * pose * rot_180_x;
+
+        geometry_msgs::PoseStamped pose_msg;
+        pose_msg.header.frame_id = "world";
+        pose_msg.header.stamp = ros::Time::now();
+        pose_msg.pose.position.x = pose.getOrigin().getX();
+        pose_msg.pose.position.y = pose.getOrigin().getY();
+        pose_msg.pose.position.z = pose.getOrigin().getZ();
+
+        path_msg.poses.push_back(pose_msg);
+    }
+
+    m_pathPub.publish(path_msg);
+    ros::spinOnce();
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubState()
+{
+    // ROS_INFO("Pubbing state");
+    VehicleState state;
+    m_DriveCarModel.GetVehicleState(0,state);
+    state.FlipCoordFrame();
+    _pubState(state);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubState(VehicleState& state)
+{
+  carplanner_msgs::VehicleState state_msg = state.toROS();
+
+  m_statePub.publish(state_msg);
+  // m_tfcaster.sendTransform(state_msg.pose);
+  ros::spinOnce();
+}
+
+////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubWaypoints()
+{
+    _pubWaypoints(m_vWayPoints);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubWaypoints(std::vector<Eigen::MatrixXd*> pts)
+{
+  tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+
+  geometry_msgs::PoseArray pts_msg;
+  pts_msg.header.frame_id = "world";
+  pts_msg.header.stamp = ros::Time::now();
+
+  for( uint ii=0; ii<pts.size(); ii++ )
+  {
+    Eigen::MatrixXd* pt = pts[ii];
+    double roll =   (*pt)(3);
+    double pitch =  (*pt)(4);
+    double yaw =    (*pt)(5);
+    Eigen::Quaterniond quat;
+    convertRPY2Quat(Eigen::Vector3d(roll, pitch, yaw), &quat);
+
+    tf::Transform pt_tf(tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()),
+                        tf::Vector3((*pt)(0),(*pt)(1),(*pt)(2)));
+    pt_tf = rot_180_x*pt_tf*rot_180_x;
+
+    geometry_msgs::Pose pt_msg;
+    pt_msg.position.x = pt_tf.getOrigin().x();
+    pt_msg.position.y = pt_tf.getOrigin().y();
+    pt_msg.position.z = pt_tf.getOrigin().z();
+    pt_msg.orientation.x = pt_tf.getRotation().x();
+    pt_msg.orientation.y = pt_tf.getRotation().y();
+    pt_msg.orientation.z = pt_tf.getRotation().z();
+    pt_msg.orientation.w = pt_tf.getRotation().w();
+
+    pts_msg.poses.push_back(pt_msg);
+  }
+
+  m_waypointPub.publish(pts_msg);
+  // m_tfcaster.sendTransform(state_msg.pose);
+  ros::spinOnce();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
+{
+  static tf::StampedTransform Twm;
+  try
+  {
+    m_tflistener.waitForTransform("world", "infinitam", ros::Time::now(), ros::Duration(1.0));
+    m_tflistener.lookupTransform("world", "infinitam", ros::Time(0), Twm);
+  }
+  catch (tf::TransformException ex)
+  {
+    ROS_ERROR("%s",ex.what());
+    usleep(10000);
+    return;
+  }
+
+  tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+  Twm.setData(rot_180_x*Twm);
+
+  time_t t0 = std::clock();
+
+  btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+  convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape);
+
+  for (uint i=0; i<m_PlanCarModel.GetNumWorlds(); i++)
+  {
+    m_PlanCarModel.appendMesh(i, meshShape, Twm);
+  }
+  for (uint i=0; i<m_LearningCarModel.GetNumWorlds(); i++)
+  {
+    m_LearningCarModel.appendMesh(i, meshShape, Twm);
+  }
+  for (uint i=0; i<m_DriveCarModel.GetNumWorlds(); i++)
+  {
+    m_DriveCarModel.appendMesh(i, meshShape, Twm);
+  }
+  for (uint i=0; i<m_ControlCarModel.GetNumWorlds(); i++)
+  {
+    m_ControlCarModel.appendMesh(i, meshShape, Twm);
+  }
+
+  time_t t1 = std::clock();
+  ROS_INFO("got mesh, %d faces, %d vertices, %.2f sec", mesh_msg->mesh.triangles.size(), mesh_msg->mesh.vertices.size(), difftime(t1,t0)/CLOCKS_PER_SEC);
+
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_ptr)
+void MochaGui::_goalCB(const geometry_msgs::PoseStamped::ConstPtr& goal_ptr)
 {
   // ROS_INFO("Got waypoint");
 
-  geometry_msgs::PoseStamped waypoint = *waypoint_ptr;
+  geometry_msgs::PoseStamped waypoint = *goal_ptr;
 
   // printf("got waypoint %.2f %.2f %.2f\n",waypoint.pose.position.x,waypoint.pose.position.y,waypoint.pose.position.z);
 
@@ -1314,52 +1644,69 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
   // return;
 
   m_Controller.Reset();
-  _RefreshWaypoints();
+//   CVarUtils::Load("cvars.xml");
+  _RefreshWaypoints(); 
 
-  return;
+  _pubWaypoints();
+  ros::spinOnce();
 
-  ROS_INFO("Starting Planner.");
-
-  m_bSimulate3dPath = true;
+//   ROS_INFO("Starting Planner.");
+//   m_bSimulate3dPath = true;
   m_bPlannerOn = true;
-  // usleep(1000000);
-  while( m_bPlanning ){ usleep(10000); }
-  ROS_INFO("Planner finished. Starting Controller.");
+  ROS_INFO("Planner started.");
+
+  usleep(.1e6);
+  while( m_bPlanning )
+  {
+    ROS_INFO("Waiting for planner to finish.");
+    usleep(.1e6);
+  }
+//   ROS_INFO("Planner finished. Starting Controller.");
+//   m_bPlannerOn = false;
+//   m_bAllClean = false;
   m_bControl3dPath = true;
 
   bool movingTowardGoal = true;
-  double eps_dist = 0.5;
+  double eps_dist = 0.1;
   double eps_timeout = 20.0;
   double timeoutStart = Tic();
-  ROS_INFO("Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
+//   ROS_INFO("Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
   Eigen::Vector7d state_vec;
+  // state_vec = state.ToXYZQuat();
 
   while(!m_bControllerRunning)
   {
     ROS_INFO("Waiting for controller to start.");
-    usleep(10000);
+    usleep(.1e6);
   }
 
-  while( movingTowardGoal && m_bControllerRunning && m_bControl3dPath )
+  ROS_INFO("Controller started.");
+//   usleep(10000);
+
+  double dist_to_goal;
+  while( movingTowardGoal )
   {
-    // printf("goal not reached\n");
+    // _pubCommand();
+
+    // ROS_INFO_THROTTLE(.05,"Controlling. m_StillControl=%s. m_bControllerRunning=%s. m_bControl3dPath=%s.", (m_StillControl?"ON":"OFF"), (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
 
     // _GetVehicleStateFromROS(state);
+    // _UpdateVehicleStateFromROS();
     m_DriveCarModel.GetVehicleState(0, state);
+    state.FlipCoordFrame();
     state_vec = state.ToXYZQuat();
 
-    // printf("state_vec %.2f %.2f %.2f\n", state_vec[0], state_vec[1], state_vec[2]);
-    // printf("waypoint pose %.2f %.2f %.2f\n", waypointPose.translation()[0], waypointPose.translation()[1], waypointPose.translation()[2]);
-    double dist_to_goal = sqrt( pow(state_vec[0]-waypointPose.translation()[0],2) + pow(state_vec[1]-waypointPose.translation()[1],2) /*+ (state_vec[2]-waypoint.transform.translation.z)**2*/ );
-    // printf("diff %.2f %.2f %.2f = %.2f\n", state_vec[0]-waypointPose.translation()[0], state_vec[1]-waypointPose.translation()[1], state_vec[2]-waypointPose.translation()[2], dist_to_goal);
+    dist_to_goal = sqrt( pow(state_vec[0]-waypointPose.translation()[0],2) + pow(state_vec[1]-waypointPose.translation()[1],2) /*+ (state_vec[2]-waypoint.transform.translation.z)**2*/ );
 
-    movingTowardGoal &= ( dist_to_goal > eps_dist );
-    movingTowardGoal &= ( Toc(timeoutStart) < eps_timeout );
+    // ROS_INFO_THROTTLE(.1, "state_vec %.2f %.2f %.2f", state_vec[0], state_vec[1], state_vec[2]);
+    // ROS_INFO_THROTTLE(.1, "waypoint pose %.2f %.2f %.2f\n", waypointPose.translation()[0], waypointPose.translation()[1], waypointPose.translation()[2]);
+    // ROS_INFO_THROTTLE(.1, "diff %.2f %.2f %.2f = %.2f\n", state_vec[0]-waypointPose.translation()[0], state_vec[1]-waypointPose.translation()[1], state_vec[2]-waypointPose.translation()[2], dist_to_goal);
 
-    usleep(10000);
+    movingTowardGoal &= ( dist_to_goal > eps_dist ); if(!movingTowardGoal){ ROS_INFO("Goal reached."); break; }
+    movingTowardGoal &= ( Toc(timeoutStart) < eps_timeout ); if(!movingTowardGoal){ ROS_INFO("Not moving toward goal. Timed out."); break; }
+    movingTowardGoal &= m_bControllerRunning; if(!movingTowardGoal){ ROS_INFO("Not moving toward goal. Control disabled."); break; }
 
-
-    ROS_INFO("Controlling. m_bControllerRunning=%s. m_bControl3dPath=%s.", (m_bControllerRunning?"ON":"OFF"), (m_bControl3dPath?"ON":"OFF"));
+    ros::spinOnce();
   }
 
   // printf("goal reached\n");
@@ -1367,182 +1714,434 @@ void MochaGui::_waypointCB(const geometry_msgs::PoseStamped::ConstPtr& waypoint_
   m_bControl3dPath = false;
   usleep(100000);
   m_bSimulate3dPath = false;
-  // m_bPlannerOn = false;
+  m_bPlannerOn = false;
 
   return;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////
-// void MochaGui::_meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
-// {
-  // ROS_INFO("mochagui got a mesh!");
-
-  // btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
-  // mochagui::convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape);
-  //
-
-  // convert mesh from mesh_tools to assimp format
-  // aiMesh* tmpMesh = new aiMesh();
-  // mesh_msgs::TriangleMeshStamped tmpmesh_msg = *mesh_msg;
-  // mesh_msgs::TriangleMesh* tmpmesh_msgptr = &(tmpmesh_msg.mesh);
-  // mochagui::convertMeshMsgToAssimpMesh(tmpmesh_msgptr, tmpMesh);
-
-  // ROS_INFO("mochagui got mesh with %d faces",tmpMesh->mNumFaces);
-
-  // now that we have populated the mesh, we can use it to build a new aiScene, which we'll use to generate a new m_TerrainMesh for visualization
-  // aiScene* tmpScene = new aiScene();
-  // tmpScene->mMeshes = new aiMesh*[ 1 ];
-  // tmpScene->mMeshes[0] = nullptr;
-  // tmpScene->mNumMeshes = 1;
-  // tmpScene->mMeshes[0] = tmpMesh;
-  //
-  // tmpScene->mRootNode = new aiNode();
-  // tmpScene->mRootNode->mMeshes = new unsigned int[ 1 ];
-  // tmpScene->mRootNode->mMeshes[0] = 0;
-  // tmpScene->mRootNode->mNumMeshes = 1;
-  // tmpScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
-  //                                                    0,1,0,0,
-  //                                                    0,0,-1,0,
-  //                                                    0,0,0,1);
-
-  // const aiScene* tmpScenePtr(tmpScene);
-  // GLMesh tmpTerrainMesh;
-  // tmpTerrainMesh.Init(tmpScenePtr);
-
-  // m_TerrainMesh = tmpTerrainMesh;
-
-  // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
-  // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
-  // btTriangleMesh* pTriangleMesh = new btTriangleMesh();
-  // BulletCarModel::GenerateStaticHull(scene,scene->mRootNode,scene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
-  // m_TerrainMesh.Init(pScene);
-
-
-// }
-
-////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubCommand()
+/////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_LoadDefaultParams()
 {
-    _pubCommand(m_ControlCommand);
+    for(RegressionParameter& param : m_vControlParams){
+        param.m_dVal = m_mDefaultParameters[param.m_nKey];
+    }
+    m_ControlCarModel.UpdateParameters(m_vControlParams);
+
+    for(RegressionParameter& param : m_vPlannerParams){
+        param.m_dVal = m_mDefaultParameters[param.m_nKey];
+    }
+    m_PlanCarModel.UpdateParameters(m_vPlannerParams);
+
+    for(RegressionParameter& param : m_vDriveParams){
+        param.m_dVal = m_mDefaultParameters[param.m_nKey];
+    }
+    m_DriveCarModel.UpdateParameters(m_vDriveParams);
 }
 
-//////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubCommand(ControlCommand& cmd)
+////////////////////////////////////////////////////////////////
+void MochaGui::_PlannerFunc()
 {
-    carplanner_msgs::Command cmd_msg;
-    cmd_msg.force       = cmd.m_dForce;
-    cmd_msg.curvature   = cmd.m_dCurvature;
-    cmd_msg.dt          = cmd.m_dTime;
-    cmd_msg.phi         = cmd.m_dPhi;
-    for(unsigned int i=0; i<3; i++)
-    {
-        cmd_msg.torques.push_back(cmd.m_dTorque[i]);
+    SetThreadName("mochagui-planner");
+    // LOG(INFO) << "Starting Planner Thread";
+    std::cout << "Starting Planner Thread" << std::endl;
+    int numInterations = 0;
+    m_bPlanning = false;
+    // now add line segments
+    bool previousOpenLoopSetting = m_bPlannerOn;
+    // printf("MochaGui::_PlannerFunc 0\n");
+    // while (m_StillRun) {
+    while (1) {
+        boost::this_thread::interruption_point();
+        // printf("MochaGui::_PlannerFunc 1\n");
+
+        static time_t t0;
+        static time_t t1;
+        t1 = clock();
+        if ((double)(t1-t0)/CLOCKS_PER_SEC > 0.2)
+        {
+            t0 = clock();
+        }
+
+        //if the user has changed the openloop setting, dirty all
+        //the waypoints
+        // 6/8/16 this will not run because of line above while(1) "bool previousOpenLoopSetting = m_bPlannerOn"
+        if( previousOpenLoopSetting != m_bPlannerOn) {
+            m_Gui.SetWaypointDirtyFlag(true);
+            previousOpenLoopSetting = m_bPlannerOn;
+        }
+
+        std::vector<int> vDirtyIds;
+        bool allClean = true;
+        for (size_t ii = 0; ii < m_Path.size() - 1; ii++) {
+            // printf("MochaGui::_PlannerFunc 2\n");
+            int nStartIdx = m_Path[ii];
+            int nEndIdx = m_Path[ii + 1];
+            GLWayPoint* a = &m_Gui.GetWaypoint(nStartIdx)->m_Waypoint;
+            GLWayPoint* b = &m_Gui.GetWaypoint(nEndIdx)->m_Waypoint;
+
+            //make sure both waypoints have well defined poses (no nans)
+            if(std::isfinite(a->GetPose5d().norm()) == false || std::isfinite(b->GetPose5d().norm()) == false )
+            {
+                ROS_ERROR("Poorly defined waypoint in MochaGui::_PlannerFunc");
+                continue;
+            }
+
+            if (a->GetDirty() || b->GetDirty() )
+            {
+                allClean = false;
+                //if the controller is running, we have to stop it
+                if(m_bControllerRunning){
+                    m_bControl3dPath = false;
+                    while(m_bControllerRunning == true) {
+                        usleep(1000);
+                    }
+                }
+
+                m_bPlanning = true;
+                Eigen::Vector3d dIntersect;
+                Eigen::Vector6d newPose;
+
+                // printf("MochaGui::_PlannerFunc 3\n");
+
+                {
+                    //lock the drawing lock as we will be modifying things here
+                    boost::mutex::scoped_lock lock( m_DrawMutex );
+                    if( a->GetDirty() )
+                    {
+                        Sophus::SE3d pose( a->GetPose4x4_po() );
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
+                            pose.translation() = dIntersect;
+                            a->SetPose( pose.matrix() );
+                        }
+                        *m_vWayPoints[nStartIdx] << a->GetPose(), a->GetVelocity(), a->GetAerial();
+                    }
+                    if( b->GetDirty() )
+                    {
+                        Sophus::SE3d pose( b->GetPose4x4_po() );
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
+                            pose.translation() = dIntersect;
+                            b->SetPose( pose.matrix() );
+                        }
+                        *m_vWayPoints[nEndIdx] << b->GetPose(), b->GetVelocity(), a->GetAerial();
+                    }
+                }
+
+                // printf("MochaGui::_PlannerFunc 4\n");
+
+                //iterate the planner
+                VehicleState startState(Sophus::SE3d(a->GetPose4x4_po()),a->GetVelocity(),0);
+                VehicleState goalState(Sophus::SE3d(b->GetPose4x4_po()),b->GetVelocity(),0);
+
+//                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
+//                GLWayPoint* pPrevWaypoint = &m_Gui.GetWaypoint((ii ==  0) ? m_Path[m_Path.size()-2] : m_Path[ii-1])->m_Waypoint;
+//                VehicleState prevState = VehicleState(Sophus::SE3d(pPrevWaypoint->GetPose4x4_po()),pPrevWaypoint->GetVelocity());
+//                GLWayPoint* pNextWaypoint = &m_Gui.GetWaypoint((ii >=  m_Path.size()-1) ? m_Path[0] : m_Path[ii+2])->m_Waypoint;
+//                VehicleState nextState = VehicleState(Sophus::SE3d(pNextWaypoint->GetPose4x4_po()),pNextWaypoint->GetVelocity());
+
+//                //now calculate curvatures for each side
+//                double startToGoalCurvature = rpg::AngleWrap(goalState.GetTheta()-startState.GetTheta())/(goalState.m_dTwv.translation().head(2) - startState.m_dTwv.translation().head(2)).norm() ;
+//                startState.m_dCurvature = (rpg::AngleWrap(startState.GetTheta()-prevState.GetTheta())/(startState.m_dTwv.translation().head(2) - prevState.m_dTwv.translation().head(2)).norm() +
+//                                          startToGoalCurvature)/2;
+//                goalState.m_dCurvature = (startToGoalCurvature +
+//                                         rpg::AngleWrap(nextState.GetTheta()-goalState.GetTheta())/(nextState.m_dTwv.translation().head(2) - goalState.m_dTwv.translation().head(2)).norm())/2;
+
+
+//                startState.m_dCurvature = std::isfinite(startState.m_dCurvature) ? startState.m_dCurvature : 0;
+//                goalState.m_dCurvature = std::isfinite(goalState.m_dCurvature) ? goalState.m_dCurvature : 0;
+
+                //do connected planning if possibles
+                if(g_bContinuousPathPlanning == true){
+                    if( !(ii == 0 || m_vSegmentSamples[ii-1].m_vStates.empty() == true || m_bPlannerOn == false) ){
+                        startState = m_vSegmentSamples[ii-1].m_vStates.back();
+                        startState.m_dCurvature = m_vSegmentSamples[ii-1].m_vCommands.back().m_dCurvature;
+                    }
+                }
+
+                // printf("MochaGui::_PlannerFunc 5\n");
+
+                ApplyVelocitesFunctor5d f(&m_PlanCarModel, Eigen::Vector3d::Zero(), NULL);
+                f.SetNoDelay(true);
+                LocalProblem problem(&f,startState,goalState,m_dTimeInterval);
+                m_Planner.InitializeLocalProblem(problem,0,NULL,eCostPoint);
+                problem.m_bInertialControlActive = g_bInertialControl;
+                //problem.m_lPreviousCommands = previousCommands;
+
+                // printf("MochaGui::_PlannerFunc 6\n");
+
+                bool success = false;
+                while(success == false && m_StillRun){
+                    //if we are paused, then wait
+                    while(m_bPause == true && m_StillRun)
+                    {
+                        usleep(1000);
+                        if(m_bStep == true)
+                        {
+                            m_bStep = false;
+                            break;
+                        }
+                    }
+
+                    Eigen::Vector3dAlignedVec vActualTrajectory, vControlTrajectory;
+                    bool res;
+                    if(numInterations > g_nIterationLimit)
+                    {
+                        dout("Reached iteration limit. Skipping");
+                        success = true;
+                        numInterations = 0;
+                    }
+                    else
+                    {
+                        //dout("Distance delta is " << problem.m_dDistanceDelta);
+                        // get plan for current motion sample under consideration
+                        // printf("MochaGui::_PlannerFunc 7\n");
+                        res = _IteratePlanner(problem,m_vSegmentSamples[ii],vActualTrajectory,vControlTrajectory);
+                        numInterations++;
+
+                        m_vActualTrajectory = vActualTrajectory;
+
+                        // printf("MochaGui::_PlannerFunc 8\n");
+
+
+                        //lock the mutex as this next bit will modify object
+                        boost::mutex::scoped_lock lock(m_DrawMutex);
+
+                        if (m_bCompute3dPath == true )
+                        {
+                            success =  res;
+                            m_vGLLineSegments[ii].AddVerticesFromTrajectory(vControlTrajectory);
+                            m_vTerrainLineSegments[ii].AddVerticesFromTrajectory(vActualTrajectory);
+                        }
+                        else
+                        {
+                            success = true;
+                        }
+
+                        // draw simple 2d path projected onto surface first since it's fast
+                        if (m_bShowProjectedPath) {
+                            m_vGLLineSegments[ii].AddVerticesFromTrajectory(vControlTrajectory);
+                        }else {
+                            m_vGLLineSegments[ii].Clear();
+                        }
+                    }
+
+                }
+
+                if( success == true  ){
+                    numInterations = 0;
+                    vDirtyIds.push_back(nStartIdx);
+                    vDirtyIds.push_back(nEndIdx);
+                }
+            }
+        }
+
+        // printf("MochaGui::_PlannerFunc 9\n");
+
+        //if there are no more to be done, mark the all clean
+        if(allClean == true) {
+            numInterations = 0;
+            m_bAllClean = true;
+            m_bPlanning = false;
+        }else{
+            m_bAllClean = false;
+        }
+
+        // mark all moved waypints as clean
+        m_Gui.SetWaypointDirtyFlag(false);
+        vDirtyIds.clear();
+
+        if(m_bPlanning == false) {
+            usleep(10000);
+        }
+
     }
 
-    m_commandPub.publish(cmd_msg);
-    ros::spinOnce();
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubState()
+/////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_PhysicsFunc()
 {
-    VehicleState state;
-    m_DriveCarModel.GetVehicleState(0,state);
-    _pubState(state);
+    SetThreadName("mochagui-physics");
+    // LOG(INFO) << "Starting Physics Thread.";
+    std::cout << "Starting Physics Thread" << std::endl;
+
+    double currentDt;
+    int nCurrentSample = 0;
+    int nCurrentSegment = 0;
+    double dCurrentTic = -1;
+    double dPlanTimer = 0;
+
+    while(m_StillRun){
+
+        while(m_bSimulate3dPath == false && m_StillRun){
+            dCurrentTic = Tic();
+            usleep(10000);
+        }
+
+        //this is so pausing doesn't shoot the car in the air
+        double pauseStartTime = Tic();
+        while(m_bPause == true && m_bSimulate3dPath == true && m_StillRun) {
+            usleep(1000);
+
+            //This section will play back control paths, if the user has elected to do so
+            // Currently set to default false 6/8/16
+            if(g_bPlaybackControlPaths){
+                //then we need to play through the control paths
+                for(std::vector<VehicleState>*& pStates: m_lPlanStates){
+                    for(const VehicleState& state: *pStates){
+                        while(m_bPause){
+                            usleep(10000);
+                            if(m_bStep){
+                                m_bStep = false;
+                                break;
+                            }
+                        }
+                        m_Gui.SetCarState(m_nDriveCarId,state);
+                        //m_DriveCarModel.SetState(0,state);
+                        usleep(1E6*0.01);
+                    }
+                }
+                m_bPause = true;
+                continue;
+            }
+            if(m_bStep == true){
+                m_bStep = false;
+                break;
+            }
+        }
+        dCurrentTic += Toc(pauseStartTime); //subtract the pause time
+
+        if(m_bSimulate3dPath == true)
+        {
+            //m_Gui.SetCarVisibility(m_nDriveCarId,true);
+
+            //calculate the current dT
+            if(dCurrentTic < 0  && m_bControl3dPath == false )
+            {
+                dCurrentTic = Tic();
+                VehicleState startState = m_vSegmentSamples[0].m_vStates[0];
+                // startState.m_dTwv.translation() += Eigen::Vector3d(0,0,-1);
+                //startState.m_dV = Eigen::Vector3d::Zero();
+                m_DriveCarModel.SetState(0,startState);
+            }
+
+            //update the drive car position based on the car model
+            ControlCommand currentCommand;
+            if(m_bControl3dPath) // m_bControl3dPath = True , m_bSimulate3dPath = True
+            {
+                if(m_bControllerRunning)
+                {
+                    while((Toc(dCurrentTic)) < 0.002)
+                    {
+                        usleep(100);
+                    }
+                    currentDt = Toc(dCurrentTic);
+                    dCurrentTic = Tic();
+
+                    if(m_bPause == true)
+                    {
+                        currentDt = m_dTimeInterval;
+                    }
+
+                    if(g_bInfiniteTime == true)
+                    {
+                        double timeDelta = (m_dPlanTime-m_Controller.GetLastPlanStartTime());
+                        if(timeDelta < 0){
+                            m_dPlanTime = m_Controller.GetLastPlanStartTime();
+                        }
+                        double lookaheadLimit = 1.0/10.0;
+                        // double lookaheadLimit = (*m_Controller.GetLookaheadTimePtr()/3.0);
+                        if(timeDelta > lookaheadLimit){
+                            continue;
+                        }
+                    }
+
+                    //push forward the plan time
+                    dPlanTimer += currentDt;
+
+                    //get the current commands
+                    {
+                        boost::mutex::scoped_lock lock(m_ControlMutex);
+
+                        if(m_bPause == false && g_bInfiniteTime == false){
+                            m_dPlanTime = Tic();
+                        }
+
+
+                        m_Controller.GetCurrentCommands(m_dPlanTime,
+                                                        m_ControlCommand,
+                                                        m_vTargetVel,
+                                                        m_dTargetPose);
+
+                        currentCommand = m_ControlCommand;
+                    }
+
+                //    if( m_bEnableROS )
+                //        _pubCommand(currentCommand);
+
+                    //dout("Sending accel: "<< currentCommand.m_dForce << " and steering: " << currentCommand.m_dPhi);
+
+                    if(m_bLoggerEnabled && m_Logger.IsReady()){
+                        m_Logger.LogControlCommand(currentCommand);
+                    }
+
+                    m_DriveCarModel.UpdateState(0,currentCommand,currentDt, false, false );
+
+                    m_dPlanTime = m_dPlanTime + currentDt;
+
+                    currentCommand.m_dT = currentDt;
+                    VehicleState currentState;
+                    m_DriveCarModel.GetVehicleState(0,currentState);
+
+//                    if( m_bEnableROS )
+//                        _pubState(currentState);
+
+                    if(m_bLoggerEnabled && m_Logger.IsReady()){
+                        m_Logger.LogPoseUpdate(currentState,EventLogger::eSimulation);
+                    }
+                }
+            }
+            else // m_bControl3dPath = False , m_bSimulate3dPath = True
+            {
+                //dout("Simulating with force " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dForce <<
+                //     " and accel " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dPhi <<
+                //     " and torque " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dTorques.transpose());
+                m_DriveCarModel.UpdateState( 0, m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ], m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ].m_dT, true ); //no delay for simulation
+                currentCommand = m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample];
+
+                //wait until we have reached the correct dT to
+                //apply the next set of commands
+                while((Toc(dCurrentTic)) < m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dT) {
+                    usleep(100);
+                }
+                dCurrentTic = Tic();
+
+                //progress to the next pose
+                nCurrentSample++;
+                if( nCurrentSample >= (int)m_vSegmentSamples[nCurrentSegment].m_vCommands.size()) {
+                    nCurrentSegment++;
+                    //we can progress to the next segment
+                    if(nCurrentSegment >= (int)m_vSegmentSamples.size()) {
+                        nCurrentSegment = 0;
+                    }
+
+                    nCurrentSample = 0;
+                    m_DriveCarModel.SetState(0,m_vSegmentSamples[nCurrentSegment].m_vStates[0]);
+                    //reset the command history
+                    m_DriveCarModel.ResetCommandHistory(0);
+                }
+            }
+
+        }
+        else // m_bSimulate3dPath = False
+        {
+            //m_GLDriveCar.SetInVisible();
+            nCurrentSegment = 0;
+            nCurrentSample = 0;
+            dCurrentTic = -1;
+            usleep(1000);
+        }
+    }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubState(VehicleState& state)
-{
-  carplanner_msgs::VehicleState state_msg = state.toROS();
-
-  m_statePub.publish(state_msg);
-  // m_tfcaster.sendTransform(state_msg.pose);
-  ros::spinOnce();
-}
-
-////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubWaypoints()
-{
-    _pubWaypoints(m_vWayPoints);
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_pubWaypoints(std::vector<Eigen::MatrixXd*> pts)
-{
-  tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
-
-  geometry_msgs::PoseArray pts_msg;
-  pts_msg.header.frame_id = "world";
-  pts_msg.header.stamp = ros::Time::now();
-
-  for( uint ii=0; ii<pts.size(); ii++ )
-  {
-    Eigen::MatrixXd* pt = pts[ii];
-    double roll =   (*pt)(3);
-    double pitch =  (*pt)(4);
-    double yaw =    (*pt)(5);
-    Eigen::Quaterniond quat;
-    convertRPY2Quat(Eigen::Vector3d(roll, pitch, yaw), &quat);
-
-    tf::Transform pt_tf(tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()),
-                        tf::Vector3((*pt)(0),(*pt)(1),(*pt)(2)));
-    pt_tf = rot_180_x*pt_tf*rot_180_x;
-
-    geometry_msgs::Pose pt_msg;
-    pt_msg.position.x = pt_tf.getOrigin().x();
-    pt_msg.position.y = pt_tf.getOrigin().y();
-    pt_msg.position.z = pt_tf.getOrigin().z();
-    pt_msg.orientation.x = pt_tf.getRotation().x();
-    pt_msg.orientation.y = pt_tf.getRotation().y();
-    pt_msg.orientation.z = pt_tf.getRotation().z();
-    pt_msg.orientation.w = pt_tf.getRotation().w();
-
-    pts_msg.poses.push_back(pt_msg);
-  }
-
-  m_waypointPub.publish(pts_msg);
-  // m_tfcaster.sendTransform(state_msg.pose);
-  ros::spinOnce();
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-// void MochaGui::_pubMesh()
-// {
-//     const aiScene* scene = m_TerrainMesh.GetScene();
-//     if( !scene )
-//     {
-//         std::cout << "Scene is invalid." << std::endl;
-//         return;
-//     }
-//     if( !scene->HasMeshes() )
-//     {
-//         std::cout << "Scene has no meshes." << std::endl;
-//         return;
-//     }
-//     aiMesh* mesh = scene->mMeshes[scene->mRootNode->mMeshes[0]];
-//     if( !mesh )
-//     {
-//         std::cout << "Scene mesh is invalid." << std::endl;
-//         return;
-//     }
-//
-//     _pubMesh(mesh);
-//
-// }
-/////////////////////////////////////////////////////////////////
-
-// void MochaGui::_pubMesh(aiMesh* mesh)
-// {
-//     mesh_msgs::TriangleMeshStamped* mesh_msg = new mesh_msgs::TriangleMeshStamped();
-//     mesh_msg->header.stamp = ros::Time::now();
-//     mesh_msg->header.frame_id = "map";
-//     convertAssimpMeshToMeshMsg(mesh, &mesh_msg);
-//     m_meshPub.publish(*mesh_msg);
-//     ros::spinOnce();
-//     ros::Rate(10).sleep();
-// }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlFunc()
@@ -1555,7 +2154,8 @@ void MochaGui::_ControlFunc()
     m_Log.SetLabels(vLabels);
 
     SetThreadName("mochagui-control");
-    LOG(INFO) << "Starting Control Thread";
+    // LOG(INFO) << "Starting Control Thread";
+    std::cout << "Starting Control Thread" << std::endl;
     try
     {
         m_bControllerRunning = false;
@@ -1602,7 +2202,8 @@ void MochaGui::_ControlFunc()
             VehicleState startingState = m_vSegmentSamples[g_nStartSegmentIndex].m_vStates[0];
             startingState.m_dV = Eigen::Vector3d::Zero();
             startingState.m_dW = Eigen::Vector3d::Zero();
-            startingState.m_dTwv.translation() += (GetBasisVector(startingState.m_dTwv,1)*0.25);
+            //put the drive car NEXT TO the first waypoint
+            // startingState.m_dTwv.translation() += (GetBasisVector(startingState.m_dTwv,1)*0.25);
 
             if ( m_eControlTarget == eTargetExperiment )
             {
@@ -1614,6 +2215,7 @@ void MochaGui::_ControlFunc()
               startingState.m_dTwv.setRotationMatrix(rm);
             }
             m_DriveCarModel.SetState(0,startingState);
+            // if(m_eControlTarget==eTargetSimulation){ m_DriveCarModel.SetState(0,startingState); }
             m_DriveCarModel.ResetCommandHistory(0);
 
             m_Controller.Init(m_vSegmentSamples,&m_Planner,&m_ControlCarModel,m_dTimeInterval);
@@ -1644,18 +2246,18 @@ void MochaGui::_ControlFunc()
                 else if(m_eControlTarget == eTargetExperiment)
                 {
                     //get current pose from the Localizer
-                    // _UpdateVehicleStateFromFusion(currentState);
-                    _GetVehicleStateFromROS(currentState);
+                    // _GetVehicleStateFromROS(currentState);
+                    m_DriveCarModel.GetVehicleState(0,currentState);
 
-                    Sophus::SE3d state_pose = currentState.ToSE3d();
-                    Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
-                    state_pose = rot_180_x*state_pose*rot_180_x;
-                    VehicleState new_state(state_pose, currentState.GetNormalVelocity(), currentState.GetCurvature());
+                    // Sophus::SE3d state_pose = currentState.ToSE3d();
+                    // Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
+                    // state_pose = rot_180_x*state_pose*rot_180_x;
+                    // VehicleState new_state(state_pose, currentState.GetNormalVelocity(), currentState.GetCurvature());
 
                     //set the command history and current pose on the controller
                     {
                         boost::mutex::scoped_lock lock(m_ControlMutex);
-                        m_Controller.SetCurrentPose(new_state,&m_DriveCarModel.GetCommandHistoryRef(0));
+                        m_Controller.SetCurrentPose(currentState,&m_DriveCarModel.GetCommandHistoryRef(0));
                     }
                 }
                 else
@@ -1723,406 +2325,12 @@ void MochaGui::_ControlFunc()
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_LoadDefaultParams()
-{
-    for(RegressionParameter& param : m_vControlParams){
-        param.m_dVal = m_mDefaultParameters[param.m_nKey];
-    }
-    m_ControlCarModel.UpdateParameters(m_vControlParams);
-
-    for(RegressionParameter& param : m_vPlannerParams){
-        param.m_dVal = m_mDefaultParameters[param.m_nKey];
-    }
-    m_PlanCarModel.UpdateParameters(m_vPlannerParams);
-
-    for(RegressionParameter& param : m_vDriveParams){
-        param.m_dVal = m_mDefaultParameters[param.m_nKey];
-    }
-    m_DriveCarModel.UpdateParameters(m_vDriveParams);
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-void MochaGui::_PhysicsFunc()
-{
-    SetThreadName("mochagui-physics");
-    LOG(INFO) << "Starting Physics Thread.";
-
-    double currentDt;
-    int nCurrentSample = 0;
-    int nCurrentSegment = 0;
-    double dCurrentTic = -1;
-    double dPlanTimer = 0;
-
-    while(m_StillRun){
-
-        while(m_bSimulate3dPath == false && m_StillRun){
-            dCurrentTic = Tic();
-            usleep(10000);
-        }
-
-        //this is so pausing doesn't shoot the car in the air
-        double pauseStartTime = Tic();
-        while(m_bPause == true && m_bSimulate3dPath == true && m_StillRun) {
-            usleep(1000);
-
-            //This section will play back control paths, if the user has elected to do so
-            // Currently set to default false 6/8/16
-            if(g_bPlaybackControlPaths){
-                //then we need to play through the control paths
-                for(std::vector<VehicleState>*& pStates: m_lPlanStates){
-                    for(const VehicleState& state: *pStates){
-                        while(m_bPause){
-                            usleep(10000);
-                            if(m_bStep){
-                                m_bStep = false;
-                                break;
-                            }
-                        }
-                        m_Gui.SetCarState(m_nDriveCarId,state);
-                        //m_DriveCarModel.SetState(0,state);
-                        usleep(1E6*0.01);
-                    }
-                }
-                m_bPause = true;
-                continue;
-            }
-            if(m_bStep == true){
-                m_bStep = false;
-                break;
-            }
-        }
-        dCurrentTic += Toc(pauseStartTime); //subtract the pause time
-
-        if(m_bSimulate3dPath == true)
-        {
-            //m_Gui.SetCarVisibility(m_nDriveCarId,true);
-
-            //calculate the current dT
-            if(dCurrentTic < 0  && m_bControl3dPath == false )
-            {
-                dCurrentTic = Tic();
-                VehicleState startState = m_vSegmentSamples[0].m_vStates[0];
-                //startState.m_dV = Eigen::Vector3d::Zero();
-                m_DriveCarModel.SetState(0,startState);
-            }
-
-            //update the drive car position based on the car model
-            ControlCommand currentCommand;
-            if(m_bControl3dPath) // m_bControl3dPath = True , m_bSimulate3dPath = True
-            {
-                if(m_bControllerRunning)
-                {
-                    while((Toc(dCurrentTic)) < 0.002)
-                    {
-                        usleep(100);
-                    }
-                    currentDt = Toc(dCurrentTic);
-                    dCurrentTic = Tic();
-
-                    if(m_bPause == true)
-                    {
-                        currentDt = m_dTimeInterval;
-                    }
-
-                    if(g_bInfiniteTime == true)
-                    {
-                        double timeDelta = (m_dPlanTime-m_Controller.GetLastPlanStartTime());
-                        if(timeDelta < 0){
-                            m_dPlanTime = m_Controller.GetLastPlanStartTime();
-                        }
-                        double lookaheadLimit = 1.0/10.0;
-                        // double lookaheadLimit = (*m_Controller.GetLookaheadTimePtr()/3.0);
-                        if(timeDelta > lookaheadLimit){
-                            continue;
-                        }
-                    }
-
-                    //push forward the plan time
-                    dPlanTimer += currentDt;
-
-                    //get the current commands
-                    {
-                        boost::mutex::scoped_lock lock(m_ControlMutex);
-
-                        if(m_bPause == false && g_bInfiniteTime == false){
-                            m_dPlanTime = Tic();
-                        }
-
-
-                        m_Controller.GetCurrentCommands(m_dPlanTime,
-                                                        m_ControlCommand,
-                                                        m_vTargetVel,
-                                                        m_dTargetPose);
-
-                        currentCommand = m_ControlCommand;
-                    }
-
-//                    if( m_bEnableROS )
-//                        _pubCommand();
-
-                    //dout("Sending accel: "<< currentCommand.m_dForce << " and steering: " << currentCommand.m_dPhi);
-
-                    if(m_bLoggerEnabled && m_Logger.IsReady()){
-                        m_Logger.LogControlCommand(currentCommand);
-                    }
-
-                    m_DriveCarModel.UpdateState(0,currentCommand,currentDt, false, false );
-
-                    m_dPlanTime = m_dPlanTime + currentDt;
-
-                    currentCommand.m_dT = currentDt;
-                    VehicleState currentState;
-                    m_DriveCarModel.GetVehicleState(0,currentState);
-
-//                    if( m_bEnableROS )
-//                        _pubState(currentState);
-
-                    if(m_bLoggerEnabled && m_Logger.IsReady()){
-                        m_Logger.LogPoseUpdate(currentState,EventLogger::eSimulation);
-                    }
-                }
-            }
-            else // m_bControl3dPath = False , m_bSimulate3dPath = True
-            {
-                //dout("Simulating with force " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dForce <<
-                //     " and accel " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dPhi <<
-                //     " and torque " << m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dTorques.transpose());
-                m_DriveCarModel.UpdateState( 0, m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ], m_vSegmentSamples[ nCurrentSegment ].m_vCommands[ nCurrentSample ].m_dT, true ); //no delay for simulation
-                currentCommand = m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample];
-
-                //wait until we have reached the correct dT to
-                //apply the next set of commands
-                while((Toc(dCurrentTic)) < m_vSegmentSamples[nCurrentSegment].m_vCommands[nCurrentSample].m_dT) {
-                    usleep(100);
-                }
-                dCurrentTic = Tic();
-
-                //progress to the next pose
-                nCurrentSample++;
-                if( nCurrentSample >= (int)m_vSegmentSamples[nCurrentSegment].m_vCommands.size()) {
-                    nCurrentSegment++;
-                    //we can progress to the next segment
-                    if(nCurrentSegment >= (int)m_vSegmentSamples.size()) {
-                        nCurrentSegment = 0;
-                    }
-
-                    nCurrentSample = 0;
-                    m_DriveCarModel.SetState(0,m_vSegmentSamples[nCurrentSegment].m_vStates[0]);
-                    //reset the command history
-                    m_DriveCarModel.ResetCommandHistory(0);
-                }
-            }
-
-        }
-        else
-        {
-            //m_GLDriveCar.SetInVisible();
-            nCurrentSegment = 0;
-            nCurrentSample = 0;
-            dCurrentTic = -1;
-            usleep(1000);
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////
-void MochaGui::_PlannerFunc()
-{
-    SetThreadName("mochagui-planner");
-    // LOG(INFO) << "Starting Planner Thread";
-    std::cout << "Starting Planner Thread" << std::endl;
-    int numInterations = 0;
-    m_bPlanning = false;
-    // now add line segments
-    bool previousOpenLoopSetting = m_bPlannerOn;
-    // while (m_StillRun) {
-    while (1) {
-        boost::this_thread::interruption_point();
-
-        //if the user has changed the openloop setting, dirty all
-        //the waypoints
-        // 6/8/16 this will not run because of line above while(1) "bool previousOpenLoopSetting = m_bPlannerOn"
-        if( previousOpenLoopSetting != m_bPlannerOn) {
-            m_Gui.SetWaypointDirtyFlag(true);
-            previousOpenLoopSetting = m_bPlannerOn;
-        }
-
-        std::vector<int> vDirtyIds;
-        bool allClean = true;
-        for (size_t ii = 0; ii < m_Path.size() - 1; ii++) {
-            int nStartIdx = m_Path[ii];
-            int nEndIdx = m_Path[ii + 1];
-            GLWayPoint* a = &m_Gui.GetWaypoint(nStartIdx)->m_Waypoint;
-            GLWayPoint* b = &m_Gui.GetWaypoint(nEndIdx)->m_Waypoint;
-
-            //make sure both waypoints have well defined poses (no nans)
-            if(std::isfinite(a->GetPose5d().norm()) == false || std::isfinite(b->GetPose5d().norm()) == false )
-            {
-                ROS_ERROR("Poorly defined waypoint in MochaGui::_PlannerFunc");
-                continue;
-            }
-
-            if (a->GetDirty() || b->GetDirty() )
-            {
-                allClean = false;
-                //if the controller is running, we have to stop it
-                if(m_bControllerRunning){
-                    m_bControl3dPath = false;
-                    while(m_bControllerRunning == true) {
-                        usleep(1000);
-                    }
-                }
-
-                m_bPlanning = true;
-                Eigen::Vector3d dIntersect;
-                Eigen::Vector6d newPose;
-
-                {
-                    //lock the drawing lock as we will be modifying things here
-                    boost::mutex::scoped_lock lock( m_DrawMutex );
-                    if( a->GetDirty() )
-                    {
-                        Sophus::SE3d pose( a->GetPose4x4_po() );
-                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
-                            pose.translation() = dIntersect;
-                            a->SetPose( pose.matrix() );
-                        }
-                        *m_vWayPoints[nStartIdx] << a->GetPose(), a->GetVelocity(), a->GetAerial();
-                    }
-                    if( b->GetDirty() )
-                    {
-                        Sophus::SE3d pose( b->GetPose4x4_po() );
-                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
-                            pose.translation() = dIntersect;
-                            b->SetPose( pose.matrix() );
-                        }
-                        *m_vWayPoints[nEndIdx] << b->GetPose(), b->GetVelocity(), a->GetAerial();
-                    }
-                }
-
-                //iterate the planner
-                VehicleState startState(Sophus::SE3d(a->GetPose4x4_po()),a->GetVelocity(),0);
-                VehicleState goalState(Sophus::SE3d(b->GetPose4x4_po()),b->GetVelocity(),0);
-
-//                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
-//                GLWayPoint* pPrevWaypoint = &m_Gui.GetWaypoint((ii ==  0) ? m_Path[m_Path.size()-2] : m_Path[ii-1])->m_Waypoint;
-//                VehicleState prevState = VehicleState(Sophus::SE3d(pPrevWaypoint->GetPose4x4_po()),pPrevWaypoint->GetVelocity());
-//                GLWayPoint* pNextWaypoint = &m_Gui.GetWaypoint((ii >=  m_Path.size()-1) ? m_Path[0] : m_Path[ii+2])->m_Waypoint;
-//                VehicleState nextState = VehicleState(Sophus::SE3d(pNextWaypoint->GetPose4x4_po()),pNextWaypoint->GetVelocity());
-
-//                //now calculate curvatures for each side
-//                double startToGoalCurvature = rpg::AngleWrap(goalState.GetTheta()-startState.GetTheta())/(goalState.m_dTwv.translation().head(2) - startState.m_dTwv.translation().head(2)).norm() ;
-//                startState.m_dCurvature = (rpg::AngleWrap(startState.GetTheta()-prevState.GetTheta())/(startState.m_dTwv.translation().head(2) - prevState.m_dTwv.translation().head(2)).norm() +
-//                                          startToGoalCurvature)/2;
-//                goalState.m_dCurvature = (startToGoalCurvature +
-//                                         rpg::AngleWrap(nextState.GetTheta()-goalState.GetTheta())/(nextState.m_dTwv.translation().head(2) - goalState.m_dTwv.translation().head(2)).norm())/2;
-
-
-//                startState.m_dCurvature = std::isfinite(startState.m_dCurvature) ? startState.m_dCurvature : 0;
-//                goalState.m_dCurvature = std::isfinite(goalState.m_dCurvature) ? goalState.m_dCurvature : 0;
-
-                //do connected planning if possibles
-                if(g_bContinuousPathPlanning == true){
-                    if( !(ii == 0 || m_vSegmentSamples[ii-1].m_vStates.empty() == true || m_bPlannerOn == false) ){
-                        startState = m_vSegmentSamples[ii-1].m_vStates.back();
-                        startState.m_dCurvature = m_vSegmentSamples[ii-1].m_vCommands.back().m_dCurvature;
-                    }
-                }
-
-                ApplyVelocitesFunctor5d f(&m_PlanCarModel, Eigen::Vector3d::Zero(), NULL);
-                f.SetNoDelay(true);
-                LocalProblem problem(&f,startState,goalState,m_dTimeInterval);
-                m_Planner.InitializeLocalProblem(problem,0,NULL,eCostPoint);
-                problem.m_bInertialControlActive = g_bInertialControl;
-                //problem.m_lPreviousCommands = previousCommands;
-
-                bool success = false;
-                while(success == false && m_StillRun){
-                    //if we are paused, then wait
-                    while(m_bPause == true && m_StillRun)
-                    {
-                        usleep(1000);
-                        if(m_bStep == true)
-                        {
-                            m_bStep = false;
-                            break;
-                        }
-                    }
-
-                    Eigen::Vector3dAlignedVec vActualTrajectory, vControlTrajectory;
-                    bool res;
-                    if(numInterations > g_nIterationLimit)
-                    {
-                        dout("Reached iteration limit. Skipping");
-                        success = true;
-                        numInterations = 0;
-                    }
-                    else
-                    {
-                        //dout("Distance delta is " << problem.m_dDistanceDelta);
-                        // get plan for current motion sample under consideration
-                        res = _IteratePlanner(problem,m_vSegmentSamples[ii],vActualTrajectory,vControlTrajectory);
-                        numInterations++;
-
-                        //lock the mutex as this next bit will modify object
-                        boost::mutex::scoped_lock lock(m_DrawMutex);
-
-                        if (m_bCompute3dPath == true )
-                        {
-                            success =  res;
-                            m_vGLLineSegments[ii].AddVerticesFromTrajectory(vControlTrajectory);
-                            m_vTerrainLineSegments[ii].AddVerticesFromTrajectory(vActualTrajectory);
-                        }
-                        else
-                        {
-                            success = true;
-                        }
-
-                        // draw simple 2d path projected onto surface first since it's fast
-                        if (m_bShowProjectedPath) {
-                            m_vGLLineSegments[ii].AddVerticesFromTrajectory(vControlTrajectory);
-                        }else {
-                            m_vGLLineSegments[ii].Clear();
-                        }
-                    }
-
-                }
-
-                if( success == true  ){
-                    numInterations = 0;
-                    vDirtyIds.push_back(nStartIdx);
-                    vDirtyIds.push_back(nEndIdx);
-                }
-            }
-        }
-
-        //if there are no more to be done, mark the all clean
-        if(allClean == true) {
-            numInterations = 0;
-            m_bAllClean = true;
-            m_bPlanning = false;
-        }else{
-            m_bAllClean = false;
-        }
-
-        // mark all moved waypints as clean
-        m_Gui.SetWaypointDirtyFlag(false);
-        vDirtyIds.clear();
-
-        if(m_bPlanning == false) {
-            usleep(10000);
-        }
-
-    }
-
-}
-
 ////////////////////////////////////////////////////////////////
 void MochaGui::_PopulateSceneGraph()
 {
   _RefreshWaypoints();
 
+    // black lines representing plan projected to flat plane
   m_vGLLineSegments.resize(m_Path.size() - 1);
   for (size_t ii = 0; ii < m_vGLLineSegments.size(); ii++) {
     m_vGLLineSegments[ii].SetColor(GLColor(0.0f,0.0f,0.0f));
@@ -2130,6 +2338,7 @@ void MochaGui::_PopulateSceneGraph()
     m_Gui.AddGLObject(&m_vGLLineSegments[ii],true);
   }
 
+    // red lines representing plan projected to terrain
   // also add segments for curve that takes terrain into account
   m_vTerrainLineSegments.resize(m_Path.size() - 1);
   for (size_t ii = 0; ii < m_vTerrainLineSegments.size(); ii++) {
@@ -2138,6 +2347,7 @@ void MochaGui::_PopulateSceneGraph()
     m_vTerrainLineSegments[ii].SetIgnoreDepth(true);
   }
 
+    // blue lines representing 'shot' plans
   //maximum number of plans
   m_lPlanLineSegments.resize(25);
   for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
@@ -2154,51 +2364,56 @@ void MochaGui::_PopulateSceneGraph()
 /////////////////////////////////////////////////////////////////////
 void MochaGui::DebugPrinterFunc()
 {
-  // printf("\n");
-  //
-  // m_PlanCarModel;
-  // BulletCarModel m_LearningCarModel;
-  // BulletCarModel m_DriveCarModel;
-  // BulletCarModel m_ControlCarModel;
 
   while(1)
   {
+    printf("m_StillRun: %s\n", m_StillRun ? "TRUE" : "FALSE" );
 
-    printf("Simulate: %s\n", m_bSimulate3dPath ? "ON" : "OFF" );
+    printf("m_bSimulate3dPath: %s\n", m_bSimulate3dPath ? "TRUE" : "FALSE" );
 
-    printf("Control: %s\n", m_bControl3dPath ? "ON" : "OFF" );
+    printf("m_bPlannerOn: %s\n", m_bPlannerOn ? "TRUE" : "FALSE" );
+    printf("m_bPlanning: %s\n", m_bPlanning ? "TRUE" : "FALSE" );
 
-    for(uint ii=0; ii<m_PlanCarModel.GetWorldCount(); ii++)
-    {
-      BulletWorldInstance* pWorld = m_PlanCarModel.GetWorldInstance(ii);
-      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
-      printf("Model %s World %d has %d collision objects.\n", "m_PlanCarModel", ii, objarr.size());
-    }
+    printf("m_StillControl: %s\n", m_StillControl ? "TRUE" : "FALSE" );
+    printf("m_bControl3dPath: %s\n", m_bControl3dPath ? "TRUE" : "FALSE" );
+    printf("m_bControllerRunning: %s\n", m_bControllerRunning ? "TRUE" : "FALSE" );
+    printf("m_eControlTarget: %s\n", m_eControlTarget==eTargetExperiment ? "Experiment" : "Simulation" );
 
-    for(uint ii=0; ii<m_LearningCarModel.GetWorldCount(); ii++)
-    {
-      BulletWorldInstance* pWorld = m_LearningCarModel.GetWorldInstance(ii);
-      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
-      printf("Model %s World %d has %d collision objects.\n", "m_LearningCarModel", ii, objarr.size());
-    }
+    // for(uint ii=0; ii<m_PlanCarModel.GetWorldCount(); ii++)
+    // {
+    //   BulletWorldInstance* pWorld = m_PlanCarModel.GetWorldInstance(ii);
+    // //   btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getNumCollisionObjects();
+    // //   printf("Model %s World %d has %d collision objects.\n", "m_PlanCarModel", ii, objarr.size());
+    //   printf("Model %s World %d has %d collision objects.\n", "m_PlanCarModel", ii, pWorld->m_pDynamicsWorld->getNumCollisionObjects());
+    // }
 
-    for(uint ii=0; ii<m_ControlCarModel.GetWorldCount(); ii++)
-    {
-      BulletWorldInstance* pWorld = m_ControlCarModel.GetWorldInstance(ii);
-      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
-      printf("Model %s World %d has %d collision objects.\n", "m_ControlCarModel", ii, objarr.size());
-    }
+    // for(uint ii=0; ii<m_LearningCarModel.GetWorldCount(); ii++)
+    // {
+    //   BulletWorldInstance* pWorld = m_LearningCarModel.GetWorldInstance(ii);
+    // //   btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+    // //   printf("Model %s World %d has %d collision objects.\n", "m_LearningCarModel", ii, objarr.size());
+    //   printf("Model %s World %d has %d collision objects.\n", "m_LearningCarModel", ii, pWorld->m_pDynamicsWorld->getNumCollisionObjects());
+    // }
 
-    for(uint ii=0; ii<m_DriveCarModel.GetWorldCount(); ii++)
-    {
-      BulletWorldInstance* pWorld = m_DriveCarModel.GetWorldInstance(ii);
-      btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
-      printf("Model %s World %d has %d collision objects.\n", "m_DriveCarModel", ii, objarr.size());
-    }
+    // for(uint ii=0; ii<m_ControlCarModel.GetWorldCount(); ii++)
+    // {
+    //   BulletWorldInstance* pWorld = m_ControlCarModel.GetWorldInstance(ii);
+    // //   btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+    // //   printf("Model %s World %d has %d collision objects.\n", "m_ControlCarModel", ii, objarr.size());
+    //   printf("Model %s World %d has %d collision objects.\n", "m_ControlCarModel", ii, pWorld->m_pDynamicsWorld->getNumCollisionObjects());
+    // }
+
+    // for(uint ii=0; ii<m_DriveCarModel.GetWorldCount(); ii++)
+    // {
+    //   BulletWorldInstance* pWorld = m_DriveCarModel.GetWorldInstance(ii);
+    // //   btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+    // //   printf("Model %s World %d has %d collision objects.\n", "m_DriveCarModel", ii, objarr.size());
+    //   printf("Model %s World %d has %d collision objects.\n", "m_DriveCarModel", ii, pWorld->m_pDynamicsWorld->getNumCollisionObjects());
+    // }
 
     printf("--------------------------------------------\n");
 
-    usleep(1000000);
+    usleep(1e6);
 
   }
 

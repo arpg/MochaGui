@@ -42,12 +42,13 @@ set(BOOST_LIBS regex thread date_time system timer  )
 find_package( Pangolin REQUIRED)
 find_package( GLog REQUIRED)
 find_package( carplanner REQUIRED )
+#find_package( CarPlanner REQUIRED )
 find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
 find_package( CVars REQUIRED )
 find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
 find_package( Protobuf REQUIRED )
-find_package( Bullet REQUIRED )
+#find_package( Bullet REQUIRED )
 find_package( CeresSolver REQUIRED )
 #find_package( SensorFusion REQUIRED )
 find_package( LibAO REQUIRED )
@@ -66,6 +67,7 @@ find_package(catkin REQUIRED
     carplanner_msgs
     pcl_ros
     pcl_conversions
+    nav_msgs
     )
 
 add_definitions(${EIGEN_DEFINITIONS})
@@ -93,8 +95,9 @@ set( _INCLUDE_DIRS
             ${LIBAO_INCLUDE_DIR}
             ${Pangolin_INCLUDE_DIRS}
             ${BOOST_INCLUDE_DIR}
-            ${carplanner_INCLUDE_DIRS}
-            ${CVars_INCLUDE_DIRS}
+	    ${carplanner_INCLUDE_DIRS}
+	    #${CarPlanner_INCLUDE_DIRS}
+	    ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
             ${PROTOBUF_INCLUDE_DIRS}
             ${SceneGraph_INCLUDE_DIRS}
@@ -115,8 +118,9 @@ set( LIBRARIES
                ${Pangolin_LIBRARIES}
                ${LIBAO_LIBRARY}
                ${SceneGraph_LIBRARIES}
-               ${carplanner_LIBRARIES}
-               ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
+	       ${carplanner_LIBRARIES}
+	       #${CarPlanner_LIBRARIES}
+	       ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
                ${CVars_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
@@ -137,7 +141,8 @@ set( SHARED_HDRS PlannerGui.h
                  EventLogger.h
                  SensorFusionCeres.h
                  #Vicon.h
-		 conversion_tools.h
+		            mesh_conversion_tools.hpp
+		            tf_conversion_tools.hpp
                  )
 
 set( SHARED_SRC PlannerGui.cpp

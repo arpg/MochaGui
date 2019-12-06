@@ -1,5 +1,5 @@
-#ifndef _CONVERSION_TOOLS
-#define	_CONVERSION_TOOLS
+#ifndef _MESH_CONVERSION_TOOLS
+#define	_MESH_CONVERSION_TOOLS
 
 #include <ros/ros.h>
 #include <geometry_msgs/TransformStamped.h>
@@ -12,14 +12,17 @@
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
 
-#include <bullet/btBulletCollisionCommon.h>
+#include "btBulletCollisionCommon.h"
 #include "BulletCollision/CollisionShapes/btShapeHull.h"
 #include "BulletCollision/CollisionShapes/btConvexPolyhedron.h"
+
+#include "tf/tfMessage.h"
+#include "tf/tf.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const btTransform& parentTransform, btAlignedObjectArray<btVector3>& vertexPositions, btAlignedObjectArray<btVector3>& vertexNormals, btAlignedObjectArray<int>& indicesOut)
+inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const btTransform& parentTransform, btAlignedObjectArray<btVector3>* vertexPositions, btAlignedObjectArray<btVector3>* vertexNormals, btAlignedObjectArray<int>* indicesOut)
 {
 // CollisionShape2TriangleMesh(mesh, parentTransform, vertexPositions, vertexNormals, indicesOut);
   switch (collisionShape->getShapeType())
@@ -48,13 +51,13 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
       verts[2] = planeOrigin - vec0 * vecLen - vec1 * vecLen;
       verts[3] = planeOrigin + vec0 * vecLen - vec1 * vecLen;
 
-      int startIndex = vertexPositions.size();
-      indicesOut.push_back(startIndex + 0);
-      indicesOut.push_back(startIndex + 1);
-      indicesOut.push_back(startIndex + 2);
-      indicesOut.push_back(startIndex + 0);
-      indicesOut.push_back(startIndex + 2);
-      indicesOut.push_back(startIndex + 3);
+      int startIndex = vertexPositions->size();
+      indicesOut->push_back(startIndex + 0);
+      indicesOut->push_back(startIndex + 1);
+      indicesOut->push_back(startIndex + 2);
+      indicesOut->push_back(startIndex + 0);
+      indicesOut->push_back(startIndex + 2);
+      indicesOut->push_back(startIndex + 3);
 
       btVector3 triNormal = parentTransform.getBasis() * planeNormal;
 
@@ -62,8 +65,8 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
       {
         btVector3 vtxPos;
         btVector3 pos = parentTransform * verts[i];
-        vertexPositions.push_back(pos);
-        vertexNormals.push_back(triNormal);
+        vertexPositions->push_back(pos);
+        vertexNormals->push_back(triNormal);
       }
       break;
     }
@@ -89,7 +92,7 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
         //PHY_ScalarType indexType=0;
 
         btVector3 triangleVerts[3];
-        meshInterface->getLockedReadOnlyVertexIndexBase(&vertexbase, numverts, type, stride, &indexbase, indexstride, numfaces, indicestype, partId);
+        meshInterface->getLockedReadOnlyVertexIndexBase(&vertexbase, numverts, type, stride, &indexbase, indexstride, numfaces, indicestype, partId); // *vertexbase is all zeros in gpu mode
         btVector3 aabbMin, aabbMax;
 
         // printf("%s %d faces\n", "[CollisionShape2TriangleMesh]", numfaces);
@@ -117,6 +120,7 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
                              btScalar(graphicsbase[2] * trimeshScaling.getZ()));
             }
           }
+          usleep(10);
           indices.push_back(vertices.size());
           vertices.push_back(triangleVerts[0]);
           indices.push_back(vertices.size());
@@ -136,16 +140,17 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
             for (int v = 0; v < 3; v++)
             {
               btVector3 pos = parentTransform * triangleVerts[v];
-              indicesOut.push_back(vertexPositions.size());
-              vertexPositions.push_back(pos);
-              vertexNormals.push_back(triNormal);
+              indicesOut->push_back(vertexPositions->size());
+              vertexPositions->push_back(pos);
+              vertexNormals->push_back(triNormal);
             }
           }
 
           // printf("%d indices after cull\n", indicesOut->size());
         }
       }
-
+      // uint num_ind = indicesOut->size(); 
+      // printf("%d indices after convert\n", num_ind);
       break;
     }
     default:
@@ -166,18 +171,18 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
           {
             for (int v = 0; v < pol->m_vertices.size(); v++)
             {
-              vertexPositions.push_back(pol->m_vertices[v]);
+              vertexPositions->push_back(pol->m_vertices[v]);
               btVector3 norm = pol->m_vertices[v];
               norm.safeNormalize();
-              vertexNormals.push_back(norm);
+              vertexNormals->push_back(norm);
             }
             for (int f = 0; f < pol->m_faces.size(); f++)
             {
               for (int ii = 2; ii < pol->m_faces[f].m_indices.size(); ii++)
               {
-                indicesOut.push_back(pol->m_faces[f].m_indices[0]);
-                indicesOut.push_back(pol->m_faces[f].m_indices[ii - 1]);
-                indicesOut.push_back(pol->m_faces[f].m_indices[ii]);
+                indicesOut->push_back(pol->m_faces[f].m_indices[0]);
+                indicesOut->push_back(pol->m_faces[f].m_indices[ii - 1]);
+                indicesOut->push_back(pol->m_faces[f].m_indices[ii]);
               }
             }
           }
@@ -208,9 +213,9 @@ inline void CollisionShape2TriangleMesh(btCollisionShape* collisionShape, const 
                 {
                   int index = hull->getIndexPointer()[t * 3 + v];
                   btVector3 pos = parentTransform * hull->getVertexPointer()[index];
-                  indicesOut.push_back(vertexPositions.size());
-                  vertexPositions.push_back(pos);
-                  vertexNormals.push_back(triNormal);
+                  indicesOut->push_back(vertexPositions->size());
+                  vertexPositions->push_back(pos);
+                  vertexNormals->push_back(triNormal);
                 }
               }
             }
@@ -256,7 +261,7 @@ inline void convertCollisionShape2MeshMsg(btCollisionShape* collisionShape, cons
 
   // printf("%s about to pub mesh with %d faces\n", "[convertCollisionShape2MeshMsg]", dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(collisionShape)->getMeshInterface())->getNumTriangles());
 
-  CollisionShape2TriangleMesh(collisionShape, *parentTransform, vertexPositions, vertexNormals, indicesOut);
+  CollisionShape2TriangleMesh(collisionShape, *parentTransform, &vertexPositions, &vertexNormals, &indicesOut);
 
   // printf("%s %d indices, %d vertices\n", "[convertCollisionShape2MeshMsg]", indicesOut.size(), vertexPositions.size());
 
@@ -430,5 +435,14 @@ inline void convertRPY2Quat(const Eigen::Vector3d& rpy, Eigen::Vector4d* quat_xy
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
+
+// inline std::string print_tf_rpy(const tf::Transform& t)
+// { 
+//   tf::Quaternion q = t.getRotation();
+//   double r, p, y;
+//   tf::Matrix3x3(q).getRPY(r,p,y);
+//   return sprintf("%.2f %.2f %.2f %.2f %.2f %.2f", 
+//     t.getOrigin().getX(), t.getOrigin().getY(), t.getOrigin().getZ(), r, p, y);
+// }
 
 #endif
