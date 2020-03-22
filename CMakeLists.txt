@@ -190,7 +190,7 @@ target_link_libraries( learning ${LIBRARIES} )
 #add_executable(  opt applications/opt.cpp ${SHARED_HDRS} ${SHARED_SRC} )
 #target_link_libraries( opt ${LIBRARIES} )
 
-add_executable(  gui applications/gui.cpp ${SHARED_HDRS} ${GUI_HDRS} ${SHARED_SRC} ${GUI_SRC} )
+add_executable(  gui mochaplanner_node.cpp ${SHARED_HDRS} ${GUI_HDRS} ${SHARED_SRC} ${GUI_SRC} )
 target_link_libraries( gui ${LIBRARIES} )
 
 add_executable(  control-daemon applications/control-daemon.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
