@@ -1041,9 +1041,9 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
     currentState.m_dW[0] = currentState.m_dW[1] = 0;
 
     Eigen::Vector3d dIntersect;
-    // if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*0.2,dIntersect,true)){
-    //    currentState.m_dTwv.translation() = dIntersect;
-    // }
+    if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*0.2,dIntersect,true)){
+       currentState.m_dTwv.translation() = dIntersect;
+    }
 
     //update the wheels
     if(g_bProcessModelActive == false){
@@ -1075,9 +1075,9 @@ void MochaGui::_GetVehicleStateFromROS(VehicleState& currentState)
 
 
     Eigen::Vector3d dIntersect;
-    // if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*0.2,dIntersect,true)){
-    //    currentState.m_dTwv.translation() = dIntersect;
-    // }
+    if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*0.2,dIntersect,true)){
+       currentState.m_dTwv.translation() = dIntersect;
+    }
 
     currentState.UpdateWheels(m_DriveCarModel.GetWheelTransforms(0));
 
@@ -1876,11 +1876,6 @@ void MochaGui::_PlannerFunc()
             t0 = clock();
         }
 
-        {
-        BulletWorldInstance* pWorld = m_PlanCarModel.GetWorldInstance(0);
-        ROS_INFO_THROTTLE(1,'\n'+pWorld->m_pVehicle->vehicle2str().c_str());
-        }
-        
         //if the user has changed the openloop setting, dirty all
         //the waypoints
         // 6/8/16 this will not run because of line above while(1) "bool previousOpenLoopSetting = m_bPlannerOn"
@@ -1928,19 +1923,19 @@ void MochaGui::_PlannerFunc()
                     if( a->GetDirty() )
                     {
                         Sophus::SE3d pose( a->GetPose4x4_po() );
-                        // if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
-                        //     pose.translation() = dIntersect;
-                        //     a->SetPose( pose.matrix() );
-                        // }
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
+                            pose.translation() = dIntersect;
+                            a->SetPose( pose.matrix() );
+                        }
                         *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
                     }
                     if( b->GetDirty() )
                     {
                         Sophus::SE3d pose( b->GetPose4x4_po() );
-                        // if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
-                        //     pose.translation() = dIntersect;
-                        //     b->SetPose( pose.matrix() );
-                        // }
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
+                            pose.translation() = dIntersect;
+                            b->SetPose( pose.matrix() );
+                        }
                         *m_vWayPoints[iMotionEnd] << b->GetPose(), b->GetVelocity(), a->GetAerial();
                     }
                 }
