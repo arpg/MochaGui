@@ -178,14 +178,14 @@ set( LEARNING_SRC
 #add_executable( command2cmdvel Command2CmdVel.cpp ${SHARED_HDRS} ${SHARED_SRC} ${catkin_INCLUDE_DIRS} )
 #target_link_libraries( command2cmdvel ${LIBRARIES} ${catkin_LIBRARIES} )
 
-add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
-target_link_libraries( logger ${LIBRARIES} )
+#add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
+#target_link_libraries( logger ${LIBRARIES} )
 
-add_executable(  refplane applications/refplane.cpp ${SHARED_HDRS} ${SHARED_SRC} )
-target_link_libraries( refplane ${LIBRARIES} )
+#add_executable(  refplane applications/refplane.cpp ${SHARED_HDRS} ${SHARED_SRC} )
+#target_link_libraries( refplane ${LIBRARIES} )
 
-add_executable(  learning applications/learning.cpp ${SHARED_HDRS} ${LEARNING_HDRS} ${SHARED_SRC} ${LEARNING_SRC} )
-target_link_libraries( learning ${LIBRARIES} )
+#add_executable(  learning applications/learning.cpp ${SHARED_HDRS} ${LEARNING_HDRS} ${SHARED_SRC} ${LEARNING_SRC} )
+#target_link_libraries( learning ${LIBRARIES} )
 
 #add_executable(  opt applications/opt.cpp ${SHARED_HDRS} ${SHARED_SRC} )
 #target_link_libraries( opt ${LIBRARIES} )
@@ -193,11 +193,11 @@ target_link_libraries( learning ${LIBRARIES} )
 add_executable(  gui mochaplanner_node.cpp ${SHARED_HDRS} ${GUI_HDRS} ${SHARED_SRC} ${GUI_SRC} )
 target_link_libraries( gui ${LIBRARIES} )
 
-add_executable(  control-daemon applications/control-daemon.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
-target_link_libraries( control-daemon ${LIBRARIES} )
+#add_executable(  control-daemon applications/control-daemon.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
+#target_link_libraries( control-daemon ${LIBRARIES} )
 
-add_executable( fusion applications/fusion.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
-target_link_libraries( fusion ${LIBRARIES} )
+#add_executable( fusion applications/fusion.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
+#target_link_libraries( fusion ${LIBRARIES} )
 
 
 
