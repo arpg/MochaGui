@@ -911,21 +911,45 @@ bool MochaGui::_IteratePlanner(
 
     //m_Planner.StressTest(problem);
 
-    if(only2d == false) {
+    // if(only2d == false) {
+    //     if( m_bPlannerOn == true && m_bSimulate3dPath == false ) // planner on && sim off
+    //     {
+    //         res = m_Planner.Iterate(problem);
+    //         m_Planner.SimulateTrajectory(sample,problem,0,true);
+    //     }
+    //     else
+    //     {
+    //         res = true;
+    //         m_Planner.SimulateTrajectory(sample,problem,0,true);
+    //         if(problem.m_bInertialControlActive)
+    //         {
+    //             m_Planner.CalculateTorqueCoefficients(problem,&sample);
+    //             m_Planner.SimulateTrajectory(sample,problem,0,true);
+    //         }
+    //     }
+
+    //     //calculate the actual trajectory
+    //     for(const VehicleState& state : sample.m_vStates) {
+    //         vActualTrajectory.push_back(state.m_dTwv.translation());
+    //     }
+    // }
+    
+    if(only2d == false) 
+    {
         if( m_bPlannerOn == true && m_bSimulate3dPath == false ) // planner on && sim off
         {
             res = m_Planner.Iterate(problem);
-            m_Planner.SimulateTrajectory(sample,problem,0,true);
         }
         else
         {
             res = true;
+        }
+
+        m_Planner.SimulateTrajectory(sample,problem,0,true);
+        if(problem.m_bInertialControlActive)
+        {
+            m_Planner.CalculateTorqueCoefficients(problem,&sample);
             m_Planner.SimulateTrajectory(sample,problem,0,true);
-            if(problem.m_bInertialControlActive)
-            {
-                m_Planner.CalculateTorqueCoefficients(problem,&sample);
-                m_Planner.SimulateTrajectory(sample,problem,0,true);
-            }
         }
 
         //calculate the actual trajectory
