@@ -1762,10 +1762,10 @@ void MochaGui::_PlannerFunc()
             t0 = clock();
         }
 
-        {
-        BulletWorldInstance* pWorld = m_PlanCarModel.GetWorldInstance(0);
-        ROS_INFO_THROTTLE(1,'\n'+pWorld->m_pVehicle->vehicle2str().c_str());
-        }
+        // {
+        // BulletWorldInstance* pWorld = m_PlanCarModel.GetWorldInstance(0);
+        // ROS_INFO_THROTTLE(1,'\n'+pWorld->m_pVehicle->vehicle2str().c_str());
+        // }
         
         //if the user has changed the openloop setting, dirty all
         //the waypoints
@@ -1814,36 +1814,20 @@ void MochaGui::_PlannerFunc()
                     if( a->GetDirty() )
                     {
                         Sophus::SE3d pose( a->GetPose4x4_po() );
-<<<<<<< HEAD
-                        // if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
-                        //     pose.translation() = dIntersect;
-                        //     a->SetPose( pose.matrix() );
-                        // }
-                        *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
-=======
                         if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
                             pose.translation() = dIntersect;
                             a->SetPose( pose.matrix() );
                         }
                         *m_vWayPoints[nStartIdx] << a->GetPose(), a->GetVelocity(), a->GetAerial();
->>>>>>> parent of ce6e4fb... switched to rosparams for gui arguments, switch to pub paths as markerarray, removed enableROS param, fixed loops ignoring ctrl+c, renamed vars for clarity
                     }
                     if( b->GetDirty() )
                     {
                         Sophus::SE3d pose( b->GetPose4x4_po() );
-<<<<<<< HEAD
-                        // if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
-                        //     pose.translation() = dIntersect;
-                        //     b->SetPose( pose.matrix() );
-                        // }
-                        *m_vWayPoints[iMotionEnd] << b->GetPose(), b->GetVelocity(), a->GetAerial();
-=======
                         if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
                             pose.translation() = dIntersect;
                             b->SetPose( pose.matrix() );
                         }
                         *m_vWayPoints[nEndIdx] << b->GetPose(), b->GetVelocity(), a->GetAerial();
->>>>>>> parent of ce6e4fb... switched to rosparams for gui arguments, switch to pub paths as markerarray, removed enableROS param, fixed loops ignoring ctrl+c, renamed vars for clarity
                     }
                 }
 
