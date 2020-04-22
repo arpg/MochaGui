@@ -18,6 +18,7 @@
 #include <carplanner_msgs/Command.h>
 #include <carplanner_msgs/VehicleState.h>
 #include <carplanner_msgs/PathArray.h>
+#include <carplanner_msgs/mocha_conversions.hpp>
 #include <tf/transform_broadcaster.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -67,14 +68,20 @@ extern float g_fSpeed;
 
 class MochaGui {
 public:
+    struct MochaGuiConfig{
+        std::string params_file, 
+            terrain_mesh_file, 
+            mode, 
+            refplane_file, 
+            log_file, 
+            car_mesh_file, 
+            wheel_mesh_file;
+        bool localizer;
+    } m_config;
     ////////////////////////////////////////////////////////////////
 
     void Run();
-    void Init(const std::string& sRefPlane, const std::string& sMesh, bool bLocalizer,
-              const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
-              const std::string& sCarMesh, const std::string& sWheelMesh, bool enableROS=false);
-
-
+    void Init();
 
     static MochaGui *GetInstance();
     ~MochaGui();
@@ -138,7 +145,7 @@ protected:
     // aiScene *scene;
 
     // ROS variable
-    bool m_bEnableROS;
+    // bool m_bEnableROS;
     ros::NodeHandle* m_nh;
     tf::TransformBroadcaster m_tfcaster;
     tf::TransformListener m_tflistener;
@@ -171,10 +178,15 @@ protected:
     ros::Subscriber m_terrainMeshSub;
     void _meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
 
-    ros::Publisher m_pathPub;
+    // ros::Publisher m_pathPub;
+    ros::Publisher m_simPathPub;
+    ros::Publisher m_ctrlPathPub;
     void _pubPath();
-    void _pubPath(list<std::vector<VehicleState> *>&);
-    void _pubPath(Eigen::Vector3dAlignedVec&);
+    void _pubPath(ros::Publisher*, std::list<std::vector<VehicleState> *>&);
+    void _pubPathArr(ros::Publisher*, std::list<std::vector<VehicleState> *>&);
+    void _pubPath(ros::Publisher*, Eigen::Vector3dAlignedVec&);
+    void _pubPath(ros::Publisher*, std::vector<MotionSample>&);
+    void _pubPathArr(ros::Publisher*, std::vector<MotionSample>&);
 
     ros::Publisher m_waypointPub;
     void _pubWaypoints();
@@ -220,6 +232,7 @@ protected:
     GLCachedPrimitives* m_pControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
     Eigen::Vector3dAlignedVec m_vActualTrajectory;
+    Eigen::Vector3dAlignedVec m_vControlTrajectory;
 
     LocalPlanner m_Planner; // Car planner for trajectory plotting
     CarController m_Controller;
