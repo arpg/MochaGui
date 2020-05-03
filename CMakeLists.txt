@@ -26,7 +26,7 @@ ENDIF()
 
 # TODO fix all these warnings instead of suppressing them!!
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual -fPIC" )
 add_definitions(-DBT_USE_DOUBLE_PRECISION)
 add_definitions(-DBT_NO_PROFILE)
 
@@ -47,7 +47,7 @@ find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
 find_package( CVars REQUIRED )
 find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
-find_package( Protobuf REQUIRED )
+#find_package( Protobuf REQUIRED )
 #find_package( Bullet REQUIRED )
 find_package( CeresSolver REQUIRED )
 #find_package( SensorFusion REQUIRED )
@@ -68,6 +68,7 @@ find_package(catkin REQUIRED
     pcl_ros
     pcl_conversions
     nav_msgs
+    nodelet
     )
 
 add_definitions(${EIGEN_DEFINITIONS})
@@ -85,7 +86,7 @@ add_subdirectory( NvWidgets )
 add_subdirectory( Gamepad )
 
 include_directories( ${CMAKE_BINARY_DIR} )
-PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS CarMessages.proto )
+#PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS CarMessages.proto )
 
 
 set( _INCLUDE_DIRS
@@ -99,7 +100,7 @@ set( _INCLUDE_DIRS
 	    #${CarPlanner_INCLUDE_DIRS}
 	    ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
-            ${PROTOBUF_INCLUDE_DIRS}
+            #${PROTOBUF_INCLUDE_DIRS}
             ${SceneGraph_INCLUDE_DIRS}
             ${BULLET_INCLUDE_DIR}
             ${CeresSolver_INCLUDE_DIRS}
@@ -120,7 +121,8 @@ set( LIBRARIES
                ${SceneGraph_LIBRARIES}
 	       ${carplanner_LIBRARIES}
 	       #${CarPlanner_LIBRARIES}
-	       ${ZeroMQ_LIBRARIES} ${PROTOBUF_LIBRARIES}
+	       ${ZeroMQ_LIBRARIES} 
+         #${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
                ${CVars_LIBRARIES}
                nvwidgets #this is built with MochaGui. No finding is required
@@ -138,7 +140,7 @@ set( SHARED_HDRS PlannerGui.h
                  UiCommon.h
                  ProcessModelFusion.h
                  GLCar.h
-                 EventLogger.h
+                 #EventLogger.h
                  SensorFusionCeres.h
                  #Vicon.h
 		            mesh_conversion_tools.hpp
@@ -149,8 +151,8 @@ set( SHARED_SRC PlannerGui.cpp
                 GLBulletDebugDrawer.cpp
                 ProcessModelFusion.cpp
                 JoystickHandler.cpp
-                EventLogger.cpp
-                CarMessages.pb.cc
+                #EventLogger.cpp
+                #CarMessages.pb.cc
                 SensorFusionCeres.cpp
                 #Vicon.cpp
                 )
@@ -190,14 +192,33 @@ set( LEARNING_SRC
 #add_executable(  opt applications/opt.cpp ${SHARED_HDRS} ${SHARED_SRC} )
 #target_link_libraries( opt ${LIBRARIES} )
 
-add_executable(  gui mochaplanner_node.cpp ${SHARED_HDRS} ${GUI_HDRS} ${SHARED_SRC} ${GUI_SRC} )
-target_link_libraries( gui ${LIBRARIES} )
-
 #add_executable(  control-daemon applications/control-daemon.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
 #target_link_libraries( control-daemon ${LIBRARIES} )
 
 #add_executable( fusion applications/fusion.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
 #target_link_libraries( fusion ${LIBRARIES} )
+
+#add_executable(  gui mochagui_node.cpp ${SHARED_HDRS} ${GUI_HDRS} ${SHARED_SRC} ${GUI_SRC} )
+#target_link_libraries( gui ${LIBRARIES} )
+
+### planner libraries ###
+add_library( planner ${SHARED_HDRS} MochaPlanner.h ${SHARED_SRC} MochaPlanner.cpp)
+target_link_libraries(planner ${LIBRARIES})
+#add_dependencies(planner planner_gencfg)
+
+add_library( planner_nodelet MochaPlannerNodelet.cpp)
+target_link_libraries( planner_nodelet planner ${LIBRARIES} )
+
+add_executable(  planner_standalone_nodelet mochaplanner_nodelet.cpp )
+target_link_libraries( planner_standalone_nodelet planner_nodelet )
+
+### vehicle libraries ###
+add_library( vehicle ${SHARED_HDRS} MochaVehicle.h ${SHARED_SRC} MochaVehicle.cpp)
+target_link_libraries(vehicle ${LIBRARIES})
+#add_dependencies(vehicle vehicle_gencfg)
+
+add_library( vehicle_nodelet MochaVehicleNodelet.cpp)
+target_link_libraries( vehicle_nodelet vehicle ${LIBRARIES} )
 
 
 
@@ -206,3 +227,7 @@ CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
   "${CMAKE_CURRENT_BINARY_DIR}/config.h"
 )
+
+
+install(FILES nodelet_plugins.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

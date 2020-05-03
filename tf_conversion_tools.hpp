@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/TransformStamped.h>
 #include "tf/tf.h"
+#include <sophus/se3.hpp>
 
 // tf::Transform rot_270_x(tf::Quaternion(-0.707,0,0,0.707),tf::Vector3(0,0,0));
 // tf::Transform rot_90_y(tf::Quaternion(0,0.707,0,0.707),tf::Vector3(0,0,0));
@@ -13,6 +14,17 @@
 // tf::Transform rot_180_z(tf::Quaternion(0,0,1,0),tf::Vector3(0,0,0));
 // tf::Transform rot_270_z(tf::Quaternion(0,0,-0.707,0.707),tf::Vector3(0,0,0));
 // tf::Transform link_to_optical(tf::Quaternion(-0.5,0.5,-0.5,0.5),tf::Vector3(0,0,0));
+
+// inline Sophus::SE3d& GLWaypoint2SE3d(GLWaypoint pt) {
+// 	return Sophus::SE3d( pt->GetPose4x4_po() );
+// }
+
+inline Sophus::SE3d& PoseMsg2SE3d(geometry_msgs::PoseStamped waypoint) {
+	Sophus::SE3d pose;
+	pose.translation() = *(new Eigen::Vector3d(waypoint.pose.position.x, waypoint.pose.position.y, waypoint.pose.position.z));
+	pose.setQuaternion(Eigen::Quaterniond(waypoint.pose.orientation.w, waypoint.pose.orientation.x, waypoint.pose.orientation.y, waypoint.pose.orientation.z));
+	return pose;
+}
 
 inline Eigen::Matrix4d XYZRPY2TMatrix(
 		double x,
