@@ -5,18 +5,28 @@
 #include "nodelet/nodelet.h"
 
 #include <CarPlanner/CarPlannerCommon.h>
-#include <CarPlanner/BulletCarModel.h>
+// #include <CarPlanner/BulletCarModel.h>
 #include <CarPlanner/BoundarySolver.h>
-#include <CarPlanner/ApplyVelocitiesFunctor.h>
+#include "MochaVehicle.h"
+// #include "ApplyVelocitiesFunctor.h"
 #include <CarPlanner/BezierBoundarySolver.h>
 #include <sophus/se3.hpp>
 #include <sophus/se2.hpp>
+#include <CarPlanner/CVarHelpers.h>
+#include "cvars/CVar.h"
+
+#include <nodelet/nodelet.h>
 
 #include <nav_msgs/Path.h>
 #include <nav_msgs/Odometry.h>
 // #include <tf/TransformListener.h>
 
 // #include "tf_conversion_tools.hpp"
+
+#include <actionlib/client/simple_action_client.h>
+#include <carplanner_msgs/GetControlDelayAction.h>
+#include <carplanner_msgs/GetInertiaTensorAction.h>
+#include <carplanner_msgs/SetNoDelayAction.h>
 
 #define XYZ_WEIGHT 2
 #define THETA_WEIGHT 0.5
@@ -43,7 +53,16 @@ struct Waypoint
     VehicleState state;
     bool isDirty;
 
-    static Waypoint& OdomMsg2Waypoint(nav_msgs::OdometryConstPtr odom_msg, double steer=0, double curv=0)
+    Waypoint() { 
+        isDirty = true;
+    }
+
+    Waypoint(VehicleState& state_) { 
+        state = state_; 
+        isDirty = true;
+    }
+
+    inline static Waypoint OdomMsg2Waypoint(const nav_msgs::OdometryConstPtr& odom_msg, double steer=0, double curv=0)
     {
         Waypoint wp;
         wp.state = VehicleState::OdomMsg2VehicleState(odom_msg, steer, curv);
@@ -51,7 +70,7 @@ struct Waypoint
         return wp;
     }
 
-    static Waypoint& tf2Waypoint(tf::StampedTransform tf, double steer=0, double curv=0)
+    inline static Waypoint tf2Waypoint(tf::StampedTransform tf, double steer=0, double curv=0)
     {
         Waypoint wp;
         wp.state = VehicleState::tf2VehicleState(tf, steer, curv);
@@ -138,11 +157,11 @@ struct Problem
         Reset();
     }
 
-    Problem(ApplyVelocitesFunctor5d* m_pf, const VehicleState& startState, const VehicleState& goalState, const double& dt) :
+    Problem(const VehicleState& startState, const VehicleState& goalState, const double& dt) :
         m_dSegmentTime(-1), 
         m_dStartTime(-1.0),
-        m_dT(dt),
-        m_pFunctor(m_pf)
+        m_dT(dt)//,
+        // m_pFunctor(m_pf)
     {
         Reset();
         m_StartState = startState;
@@ -174,7 +193,7 @@ struct Problem
     Eigen::Vector6d m_dTransformedGoal;
     double m_dT;                                //< The dt used in the functor to push the simulation forward
 
-    ApplyVelocitesFunctor5d* m_pFunctor;        //< The functor which is responsible for simulating the car dynamics
+    // ApplyVelocitiesFunctor5d* m_pFunctor;        //< The functor which is responsible for simulating the car dynamics
 
     //optimization related properties
     BezierBoundaryProblem m_BoundaryProblem;           //< The boundary problem structure, describing the 2D boundary problem
@@ -217,9 +236,9 @@ class MochaPlanner
 {
 public:
     struct Config{
-        std::string params_file, 
-            terrain_mesh_file, 
-            mode;
+        std::string params_file="/home/mike/code/mochagui/learning_params.csv", 
+            terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply";
+        enum Mode{ Simulation=0, Experiment=1 } mode=Mode::Simulation;
     } m_config;
 
     MochaPlanner(ros::NodeHandle&,ros::NodeHandle&);
@@ -232,9 +251,26 @@ private:
     ros::Publisher m_pubPlan;
     bool m_bSubToVehicleWp;
 
+    bool m_bServersInitialized = false;
+
+    VehicleState ApplyVelocities(const VehicleState& startState,
+                                                      MotionSample& sample,
+                                                      int nWorldId=0,
+                                                      bool noCompensation=false);
+    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_client;
+
+    double GetControlDelay(int worldId);
+    actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_client;
+
+    const Eigen::Vector3d GetInertiaTensor(int worldId);
+    actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction>* m_actionGetInertiaTensor_client;
+
+    void SetNoDelay(bool);    
+    actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;
+
     // virtual void onInit();
 
-    void vehicleWpCb(const nav_msgs::OdometryConstPtr);
+    void vehicleWpCb(const nav_msgs::OdometryConstPtr&);
     void goalWpCb(const nav_msgs::OdometryConstPtr);
     // void wpPathCb(const nav_msgs::OdometryConstPtr);
     // void publishPath();
@@ -251,9 +287,10 @@ private:
     double& m_dTimeInterval;
     bool m_bPlannerOn;
     bool m_bSimulate3dPath;
-    BulletCarModel m_PlanCarModel;
+    // MochaVehicle m_PlanCarModel;
     // bool& m_bControl3dPath;
     bool m_bPlanning;
+    boost::mutex m_mutexWaypoints;
     std::vector<Waypoint*> m_vWaypoints;
     std::vector<MotionSample> m_vSegmentSamples;
     Eigen::Vector3dAlignedVec m_vActualTrajectory;
@@ -295,6 +332,7 @@ public:
         Eigen::Vector3dAlignedVec& vActualTrajectory,
         Eigen::Vector3dAlignedVec& vControlTrajectory,
         bool only2d=false);
+
 
 private:
     /// Calculates the jacobian of the trajectory at the current point in the trajectory

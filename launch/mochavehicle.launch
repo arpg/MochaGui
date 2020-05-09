@@ -1,0 +1,20 @@
+<launch>
+
+  <!-- <arg name="input_mesh" default="/infinitam/mesh"/> -->
+  <arg name="params_file" default="/home/mike/code/mochagui/learning_params.csv"/>
+  <arg name="mode" default="0"/>
+  <arg name="terrain_mesh_file" default="/home/mike/code/mochagui/labLoop.ply"/>
+  <arg name="car_mesh_file" default="/home/mike/code/mochagui/herbie/herbie.blend"/>
+  <arg name="wheel_mesh_file" default="/home/mike/code/mochagui/herbie/wheel.blend"/>
+
+  <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager"/>
+  <node pkg="nodelet" type="nodelet" name="mocha_vehicle" args="load mochagui/MochaVehicleNodelet mocha_manager">
+    <!-- <remap from="input_mesh" to="$(arg input_mesh)"/> -->
+    <param name="params_file" value="$(arg params_file)"/>
+    <param name="mode" value="$(arg mode)"/>
+    <param name="terrain_mesh_file" value="$(arg terrain_mesh_file)"/>
+    <param name="car_mesh_file" value="$(arg car_mesh_file)"/>
+    <param name="wheel_mesh_file" value="$(arg wheel_mesh_file)"/>
+  </node>
+
+</launch>

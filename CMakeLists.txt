@@ -69,13 +69,20 @@ find_package(catkin REQUIRED
     pcl_conversions
     nav_msgs
     nodelet
+    actionlib
     )
 
 add_definitions(${EIGEN_DEFINITIONS})
 
+#generate_messages(
+#  DEPENDENCIES
+#    carplanner_msgs
+#    std_msgs
+#)
+
 catkin_package(
   INCLUDE_DIRS .
-  CATKIN_DEPENDS roscpp std_msgs tf carplanner_msgs
+  CATKIN_DEPENDS roscpp std_msgs tf carplanner_msgs 
   )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
@@ -147,7 +154,8 @@ set( SHARED_HDRS PlannerGui.h
 		            tf_conversion_tools.hpp
                  )
 
-set( SHARED_SRC PlannerGui.cpp
+set( SHARED_SRC 
+               PlannerGui.cpp
                 GLBulletDebugDrawer.cpp
                 ProcessModelFusion.cpp
                 JoystickHandler.cpp
@@ -202,7 +210,11 @@ set( LEARNING_SRC
 #target_link_libraries( gui ${LIBRARIES} )
 
 ### planner libraries ###
-add_library( planner ${SHARED_HDRS} MochaPlanner.h ${SHARED_SRC} MochaPlanner.cpp)
+add_library( planner 
+                ${SHARED_HDRS} 
+                MochaPlanner.h 
+                #${SHARED_SRC} 
+                MochaPlanner.cpp)
 target_link_libraries(planner ${LIBRARIES})
 #add_dependencies(planner planner_gencfg)
 
@@ -213,14 +225,19 @@ add_executable(  planner_standalone_nodelet mochaplanner_nodelet.cpp )
 target_link_libraries( planner_standalone_nodelet planner_nodelet )
 
 ### vehicle libraries ###
-add_library( vehicle ${SHARED_HDRS} MochaVehicle.h ${SHARED_SRC} MochaVehicle.cpp)
+add_library( vehicle 
+                ${SHARED_HDRS} 
+                MochaVehicle.h 
+                #${SHARED_SRC} 
+                MochaVehicle.cpp)
 target_link_libraries(vehicle ${LIBRARIES})
 #add_dependencies(vehicle vehicle_gencfg)
 
 add_library( vehicle_nodelet MochaVehicleNodelet.cpp)
 target_link_libraries( vehicle_nodelet vehicle ${LIBRARIES} )
 
-
+add_executable(  vehicle_standalone_nodelet mochavehicle_nodelet.cpp )
+target_link_libraries( vehicle_standalone_nodelet vehicle_nodelet )
 
 # Generate config file for use in headers
 CONFIGURE_FILE(

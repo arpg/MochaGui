@@ -1,0 +1,25 @@
+<launch>
+
+  <arg name="input_mesh" default="/infinitam/mesh"/>
+  <arg name="params_file" default="/home/mike/code/mochagui/learning_params.csv"/>
+  <arg name="terrain_mesh_file" default="/home/mike/code/mochagui/labLoop.ply"/>
+  <arg name="mode" default="Simulation"/>
+  <arg name="refplane_file" default=""/>
+  <arg name="log_file" default="/home/mike/code/mochagui/mocha.log"/>
+  <arg name="car_mesh_file" default="/home/mike/code/mochagui/herbie/herbie.blend"/>
+  <arg name="wheel_mesh_file" default="/home/mike/code/mochagui/herbie/wheel.blend"/>
+  <arg name="localizer" default="false"/>
+
+  <node pkg="mochagui" type="gui" name="mochagui" output="screen">
+    <remap from="input_mesh" to="$(arg input_mesh)"/>
+    <param name="params_file" value="$(arg params_file)"/>
+    <param name="terrain_mesh_file" value="$(arg terrain_mesh_file)"/>
+    <param name="mode" value="$(arg mode)"/>
+    <param name="refplane_file" value="$(arg refplane_file)"/>
+    <param name="log_file" value="$(arg log_file)"/>
+    <param name="car_mesh_file" value="$(arg car_mesh_file)"/>
+    <param name="wheel_mesh_file" value="$(arg wheel_mesh_file)"/>
+    <param name="localizer" value="$(arg localizer)"/>
+  </node>
+
+</launch>

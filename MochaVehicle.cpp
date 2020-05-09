@@ -2,51 +2,16 @@
 #include "MochaVehicle.h"
 #include "cvars/CVar.h"
 
+static bool& g_bSkidCompensationActive(CVarUtils::CreateCVar("debug.SkidCompensationActive", false, ""));
+
 MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_private_nh(&private_nh),
-    m_nh(&nh)
+    m_nh(&nh),
+    m_actionApplyVelocities_server(*m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionSetNoDelay_server(*m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1), false)
 {
     m_dGravity << 0,0,BULLET_MODEL_GRAVITY;
-
-    std::cout << "Initing scene" << std::endl;
-    const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-    std::cout << "Assigning target";
-    if(m_config.mode == MochaVehicle::Config::Mode::Simulation){
-        std::cout << " to Simulation";
-        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-                                                          0, 1, 0, 0,
-                                                          0, 0,-1, 0,
-                                                          0, 0, 0, 1 );
-    }else{
-        std::cout << " to Experiment";
-        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-                                                          0, 1, 0, 0,
-                                                          0, 0,-1, 0,
-                                                          0, 0, 0, 1 );
-    }
-    std::cout << std::endl;
-
-    btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
-    btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
-
-    btTriangleMesh *pTriangleMesh = new btTriangleMesh();
-    /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
-    std::cout << "Generating static hull" << std::endl;
-    MochaVehicle::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
-    /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
-    std::cout << "Initing CollisionShape" << std::endl;
-    btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
-
-    /// Initialize the car parameters.
-    CarParameterMap defaultParams;
-    CarParameters::LoadFromFile(m_config.params_file,defaultParams);
-
-    /// As well as the car that we're actually driving.
-    if ( m_config.mode == MochaVehicle::Config::Mode::Simulation )
-        Init( pCollisionShape,dMin,dMax, defaultParams,1, false);
-    else
-        Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
-
+    Init();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -140,9 +105,11 @@ void MochaVehicle::Init(btCollisionShape* pCollisionShape, const btVector3 &dMin
         BulletWorldInstance *pWorld = new BulletWorldInstance();
         pWorld->m_nIndex = ii;
 
+        DLOG(INFO) << "Initing world " << std::to_string(ii);
         _InitWorld(pWorld,pCollisionShape,dMin,dMax,false);
 
         //initialize the car
+        DLOG(INFO) << "Initing vehicle " << std::to_string(ii);
         _InitVehicle(pWorld,parameters);
 
         m_vWorlds.push_back(pWorld);
@@ -163,16 +130,101 @@ void MochaVehicle::Init(const struct aiScene *pAIScene, CarParameterMap &paramet
   //    m_commandThreadSub = m_nh.subscribe<carplanner_msgs::Command>("command", 1, boost::bind(&MochaVehicle::_CommandThreadFunc, this, _1));
   //  }
 
-    aiNode *pAINode = pAIScene->mRootNode;
+    // std::cout << "Initing scene" << std::endl;
+    // const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
+    // std::cout << "Assigning target";
+    // if(m_config.mode == MochaVehicle::Config::Mode::Simulation){
+    //     std::cout << " to Simulation";
+    //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+    //                                                       0, 1, 0, 0,
+    //                                                       0, 0,-1, 0,
+    //                                                       0, 0, 0, 1 );
+    // }else{
+    //     std::cout << " to Experiment";
+    //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+    //                                                       0, 1, 0, 0,
+    //                                                       0, 0,-1, 0,
+    //                                                       0, 0, 0, 1 );
+    // }
+    // std::cout << std::endl;
+    // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
+    // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
+    // btTriangleMesh *pTriangleMesh = new btTriangleMesh();
+    // /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
+    // std::cout << "Generating static hull" << std::endl;
+    // MochaVehicle::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+    // /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
+    // std::cout << "Initing CollisionShape" << std::endl;
+    // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+    // /// Initialize the car parameters.
+    // CarParameterMap defaultParams;
+    // CarParameters::LoadFromFile(m_config.params_file,defaultParams);
+    // /// As well as the car that we're actually driving.
+    // if ( m_config.mode == MochaVehicle::Config::Mode::Simulation )
+    //     Init( pCollisionShape,dMin,dMax, defaultParams,1, false);
+    // else
+    //     Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
 
-    //generate the triangle mesh
+    // //generate the triangle mesh
+    // aiNode *pAINode = pAIScene->mRootNode;
+    // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
+    // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
+    // btTriangleMesh *pTriangleMesh = new btTriangleMesh();
+    // GenerateStaticHull(pAIScene,pAINode,pAINode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+    // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+    // Init(pCollisionShape, dMin, dMax, parameters, numWorlds, real);
+}
+
+void MochaVehicle::Init()
+{
+  //  if ( real ) {
+  //    m_poseThreadPub = m_nh.advertise<nav_msgs::Odometry>("pose",1);
+  //    m_commandThreadSub = m_nh.subscribe<carplanner_msgs::Command>("command", 1, boost::bind(&MochaVehicle::_CommandThreadFunc, this, _1));
+  //  }
+
+    DLOG(INFO) << "Initing scene";
+    const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
+    DLOG(INFO) << "Assigning target";
+    if(m_config.mode == MochaVehicle::Config::Mode::Simulation){
+        DLOG(INFO) << " to Simulation";
+        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+                                                          0, 1, 0, 0,
+                                                          0, 0,-1, 0,
+                                                          0, 0, 0, 1 );
+    }else{
+        DLOG(INFO) << " to Experiment";
+        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+                                                          0, 1, 0, 0,
+                                                          0, 0,-1, 0,
+                                                          0, 0, 0, 1 );
+    }
+    // std::cout << std::endl;
     btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
     btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
     btTriangleMesh *pTriangleMesh = new btTriangleMesh();
-    GenerateStaticHull(pAIScene,pAINode,pAINode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+    /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
+    DLOG(INFO) << "Generating static hull" << std::endl;
+    MochaVehicle::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+    /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
+    DLOG(INFO) << "Initing CollisionShape" << std::endl;
     btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+    /// Initialize the car parameters.
+    CarParameterMap defaultParams;
+    CarParameters::LoadFromFile(m_config.params_file,defaultParams);
+    /// As well as the car that we're actually driving.
+    if ( m_config.mode == MochaVehicle::Config::Mode::Simulation )
+        Init( pCollisionShape,dMin,dMax, defaultParams,1, false);
+    else
+        Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
 
-    Init(pCollisionShape, dMin, dMax, parameters, numWorlds, real);
+    // //generate the triangle mesh
+    // aiNode *pAINode = pAIScene->mRootNode;
+    // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
+    // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
+    // btTriangleMesh *pTriangleMesh = new btTriangleMesh();
+    // GenerateStaticHull(pAIScene,pAINode,pAINode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+    // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+    // Init(pCollisionShape, dMin, dMax, parameters, numWorlds, real);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -193,8 +245,8 @@ void MochaVehicle::_InitWorld(BulletWorldInstance* pWorld, btCollisionShape *pGr
     pWorld->m_pOverlappingPairCache = new btAxisSweep3(dMin,dMax);
     pWorld->m_pConstraintSolver = new btSequentialImpulseConstraintSolver();
     pWorld->m_pDynamicsWorld = new btDiscreteDynamicsWorld(pWorld->m_pDispatcher,pWorld->m_pOverlappingPairCache,pWorld->m_pConstraintSolver,pWorld->m_pCollisionConfiguration);
-    pWorld->m_pDynamicsWorld->setDebugDrawer(&pWorld->m_DebugDrawer);
-    pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_DrawWireframe || btIDebugDraw::DBG_FastWireframe);
+    // pWorld->m_pDynamicsWorld->setDebugDrawer(&pWorld->m_DebugDrawer);
+    // pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_DrawWireframe || btIDebugDraw::DBG_FastWireframe);
     //pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_DrawAabb);
     //pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_NoDebug);
 
@@ -349,6 +401,7 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
 ////////////////////////////////////////////////////////////////////////////////////////////
 void MochaVehicle::InitROS()
 {
+    DLOG(INFO) << "Initing ROS";
     m_nh = new ros::NodeHandle("~");
 
     m_private_nh->param("params_file", m_config.params_file, m_config.params_file);
@@ -372,6 +425,248 @@ void MochaVehicle::InitROS()
     // m_pStatePublisherThread = new boost::thread( std::bind( &MochaVehicle::_StatePublisherFunc, this ));
     // m_pTerrainMeshPublisherThread = new boost::thread( std::bind( &MochaVehicle::_TerrainMeshPublisherFunc, this ));
 
+    DLOG(INFO) << "Starting services";
+    // m_actionApplyVelocities_server = new actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>(*m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1));
+    m_actionApplyVelocities_server.start();
+
+    // m_actionUpdateState_server = new actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>(*m_nh, "plan_car/update_state", boost::bind(&MochaVehicle::UpdateStateService, this, _1));
+    // m_actionUpdateState_server->start();
+
+    // m_actionGetGravityCompensation_server = new actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>(*m_nh, "plan_car/get_gravity_compensation", boost::bind(&MochaVehicle::GetGravityCompensationService, this, _1));
+    // m_actionGetGravityCompensation_server->start();
+
+    // m_actionGetControlDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>(*m_nh, "plan_car/get_control_delay", boost::bind(&MochaVehicle::GetControlDelayService, this, _1));
+    // m_actionGetControlDelay_server->start();
+
+    // m_actionGetInertiaTensor_server = new actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction>(*m_nh, "plan_car/get_inertia_tensor", boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1));
+    // m_actionGetInertiaTensor_server->start();
+
+    // m_actionSetNoDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction>(*m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1));
+    m_actionSetNoDelay_server.start();
+    
+}
+
+// void MochaVehicle::UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr &goal)
+// {
+//     // m_updatestate_af.sequence.clear();
+//     // m_updatestate_af.sequence.push_back(0);
+//     // as_->publishFeedback(m_updatestate_af);
+//     // as_result_.sequence = feedback_.sequence;
+//     // as_->setSucceeded(as_result_);
+
+//     carplanner_msgs::UpdateStateFeedback actionUpdateState_feedback;
+//     carplanner_msgs::UpdateStateResult actionUpdateState_result;
+
+//     DLOG(INFO) << "UpdateState service called.";
+    
+//     UpdateState(
+//         goal->worldId, 
+//         ControlCommand(
+//             goal->command.force, 
+//             goal->command.curvature, 
+//             Eigen::Vector3d(
+//                 goal->command.torques[0],
+//                 goal->command.torques[1],
+//                 goal->command.torques[2]), 
+//             goal->command.dt, 
+//             goal->command.dphi), 
+//         goal->command.dt, 
+//         goal->noDelay);
+//     VehicleState stateOut;
+//     GetVehicleState(goal->worldId, stateOut);
+//     actionUpdateState_result.state = stateOut.toROS();
+//     m_actionUpdateState_server->setSucceeded(actionUpdateState_result);
+// }
+
+// void MochaVehicle::GetGravityCompensationService(const carplanner_msgs::GetGravityCompensationGoalConstPtr &goal)
+// {
+//     carplanner_msgs::GetGravityCompensationResult actionGetGravityCompensation_result;
+
+//     DLOG(INFO) << "GetGravityCompensation service called.";
+    
+//     double val = -(GetTotalGravityForce(GetWorldInstance(goal->worldId))/GetWorldInstance(goal->worldId)->m_Parameters[CarParameters::Mass])*1.1/*CAR_GRAVITY_COMPENSATION_COEFFICIENT*/;
+
+//     actionGetGravityCompensation_result.val = val;
+//     m_actionGetGravityCompensation_server->setSucceeded(actionGetGravityCompensation_result);
+// }
+
+void MochaVehicle::GetControlDelayService(const carplanner_msgs::GetControlDelayGoalConstPtr &goal)
+{
+    carplanner_msgs::GetControlDelayResult actionGetControlDelay_result;
+
+    DLOG(INFO) << "GetControlDelay service called.";
+    
+    double val = GetParameters(goal->worldId)[CarParameters::ControlDelay];
+
+    actionGetControlDelay_result.val = val;
+    m_actionGetControlDelay_server->setSucceeded(actionGetControlDelay_result);
+}
+
+void MochaVehicle::GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr &goal)
+{
+    carplanner_msgs::GetInertiaTensorResult actionGetInertiaTensor_result;
+
+    DLOG(INFO) << "GetInertiaTensor service called.";
+
+    Eigen::Vector3d vals = GetVehicleInertiaTensor(goal->worldId);
+    actionGetInertiaTensor_result.vals[0] = vals[0];
+    actionGetInertiaTensor_result.vals[1] = vals[1];
+    actionGetInertiaTensor_result.vals[2] = vals[2];
+
+    m_actionGetInertiaTensor_server->setSucceeded(actionGetInertiaTensor_result);
+}
+
+void MochaVehicle::SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr &goal)
+{
+    carplanner_msgs::SetNoDelayResult actionSetNoDelay_result;
+
+    DLOG(INFO) << "SetNoDelay service called.";
+
+    SetNoDelay(goal->no_delay);
+
+    m_actionSetNoDelay_server.setSucceeded(actionSetNoDelay_result);
+}
+
+void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+{
+    carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+    carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+
+    DLOG(INFO) << "ApplyVelocities service called.";
+
+    VehicleState state;
+    state.fromROS(goal->initial_state);
+    MotionSample sample;
+    sample.fromROS(goal->initial_motion_sample);
+    ApplyVelocities(
+        state,
+        sample,
+        goal->world_id,
+        goal->no_compensation);
+        
+    actionApplyVelocities_result.motion_sample = sample.toROS();
+    // actionApplyVelocities_result.last_state = sample.m_vStates.back().toROS();
+    m_actionApplyVelocities_server.setSucceeded(actionApplyVelocities_result);
+}
+
+void MochaVehicle::ApplyVelocities(const VehicleState& startingState,
+                                              std::vector<ControlCommand>& vCommands,
+                                              std::vector<VehicleState>& vStatesOut,
+                                              const int iMotionStart,
+                                              const int iMotionEnd,
+                                              const int nWorldId,
+                                              const bool bNoCompensation /*= false (bUsingBestSolution)*/,
+                                              const CommandList *pPreviousCommands /*= NULL*/) {
+    Eigen::Vector3d torques;
+    Eigen::Vector4dAlignedVec vCoefs;
+    BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
+
+    vStatesOut.clear();
+
+    double dTime = 0;
+
+    VehicleState currentState;
+    SetState(nWorldId,startingState);
+    GetVehicleState(nWorldId,currentState);
+    // VehicleState* pCurrentState = &currentState; //this is necessary as we need to get a pointer to the current state for compensations
+    //clear all the previous commands but chose between the member list or the one passed to the function
+    SetCommandHistory(nWorldId, pPreviousCommands == NULL ? m_lPreviousCommands : *pPreviousCommands);
+    //m_pCarModel->ResetCommandHistory(nWorldId);
+
+    vStatesOut.resize(iMotionEnd-iMotionStart);
+
+    ControlCommand command;
+    for (int iMotion = iMotionStart; iMotion < iMotionEnd; iMotion++) {
+        //update the vehicle state
+        //approximation for this dt
+        command = vCommands[iMotion];
+        if(bNoCompensation == false ){
+            //HACK: SampleAcceleration actually returns this as acceleration and
+            //not force, so we have to change that here
+            double totalAccel = command.m_dForce;
+
+
+
+            //compensate for gravity/slope
+            double aExtra = 0;
+            double dCorrectedCurvature;
+            command.m_dPhi = GetSteeringAngle(command.m_dCurvature,
+                                                dCorrectedCurvature,nWorldId,1.0);
+
+            //if(dRatio < 1.0){
+            if(g_bSkidCompensationActive){
+                //get the steering compensation
+                std::pair<double,double> leftWheel = GetSteeringRequiredAndMaxForce(nWorldId,0,command.m_dPhi,command.m_dT);
+                std::pair<double,double> rightWheel = GetSteeringRequiredAndMaxForce(nWorldId,1,command.m_dPhi,command.m_dT);
+                double dRatio = std::max(fabs(leftWheel.second/leftWheel.first),fabs(rightWheel.second/rightWheel.first));
+
+                for(int ii = 0 ; ii < 5 && dRatio < 1.0 ; ii++){
+                    command.m_dCurvature *=1.5;///= (dRatio);
+                    command.m_dPhi = GetSteeringAngle(command.m_dCurvature,
+                                                        dCorrectedCurvature,nWorldId,1.0);
+                    std::pair<double,double> newLeftWheel = GetSteeringRequiredAndMaxForce(nWorldId,0,command.m_dPhi,command.m_dT);
+                    std::pair<double,double> newRightWheel = GetSteeringRequiredAndMaxForce(nWorldId,1,command.m_dPhi,command.m_dT);
+                    dRatio = std::max(fabs(newLeftWheel.second/leftWheel.first),fabs(newRightWheel.second/rightWheel.first));
+                }
+            }
+
+
+
+            aExtra += -(GetTotalGravityForce(GetWorldInstance(nWorldId))/GetWorldInstance(nWorldId)->m_Parameters[CarParameters::Mass])*1.1/*CAR_GRAVITY_COMPENSATION_COEFFICIENT*/;
+            //aExtra += GetSteeringCompensation(*pCurrentState,command.m_dPhi,command.m_dCurvature,nWorldId);
+            aExtra += -GetTotalWheelFriction(nWorldId,command.m_dT)/GetWorldInstance(nWorldId)->m_Parameters[CarParameters::Mass];
+
+
+            totalAccel += aExtra;
+
+//            if(dRatio < 1.0){
+//                totalAccel = 0;//(dRatio*dRatio*dRatio);
+//            }
+
+            //actually convert the accel (up to this point) to a force to be applied to the car
+            command.m_dForce = totalAccel*GetWorldInstance(nWorldId)->m_Parameters[CarParameters::Mass];
+            //here Pwm = (torque+slope*V)/Ts
+            command.m_dForce = sgn(command.m_dForce)* (fabs(command.m_dForce) + pWorld->m_Parameters[CarParameters::TorqueSpeedSlope]*pWorld->m_state.m_dV.norm())/pWorld->m_Parameters[CarParameters::StallTorqueCoef];
+            command.m_dForce += pWorld->m_Parameters[CarParameters::AccelOffset]*SERVO_RANGE;
+
+            //offset and coef are in 0-1 range, so multiplying by SERVO_RANGE is necessary
+            command.m_dPhi = SERVO_RANGE*(command.m_dPhi*pWorld->m_Parameters[CarParameters::SteeringCoef] +
+                                          pWorld->m_Parameters[CarParameters::SteeringOffset]);
+
+            //save the command changes to the command array -- this is so we can apply
+            //the commands to the vehicle WITH compensation
+            vCommands[iMotion] = command;
+        }
+
+        //set the timestamp for this command
+        vCommands[iMotion].m_dTime = dTime;
+        dTime += command.m_dT;
+
+        UpdateState(nWorldId,command,command.m_dT,m_bNoDelay);
+        GetVehicleState(nWorldId,vStatesOut[iMotion-iMotionStart]);
+
+        // vStatesOut[iMotion-iMotionStart] = UpdateState(nWorldId,command,command.m_dT,m_bNoDelay);
+        
+        vStatesOut[iMotion-iMotionStart].m_dCurvature = command.m_dCurvature;
+        vStatesOut[iMotion-iMotionStart].m_dTime = dTime;
+        // pCurrentState = &vStatesOut[iMotion-iMotionStart];
+        // pCurrentState->m_dTime = dTime;
+    }
+}
+
+VehicleState MochaVehicle::ApplyVelocities(const VehicleState& startState,
+                                                      MotionSample& sample,
+                                                      int nWorldId /*= 0*/,
+                                                      bool noCompensation /*= false*/) {
+    ApplyVelocities(startState,
+                    sample.m_vCommands,
+                    sample.m_vStates,
+                    0,
+                    sample.m_vCommands.size(),
+                    nWorldId,
+                    noCompensation,
+                    NULL);
+    return sample.m_vStates.back();
 }
 
 /////////////////////////////////////////////////////////////////

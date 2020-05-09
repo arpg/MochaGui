@@ -1,0 +1,14 @@
+<launch>
+
+  <!-- <arg name="input_mesh" default="/infinitam/mesh"/> -->
+  <arg name="params_file" default="/home/mike/code/mochagui/learning_params.csv"/>
+  <arg name="terrain_mesh_file" default="/home/mike/code/mochagui/labLoop.ply"/>
+
+  <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager"/>
+  <node pkg="nodelet" type="nodelet" name="mocha_planner" args="load mochagui/MochaPlannerNodelet mocha_manager">
+    <!-- <remap from="input_mesh" to="$(arg input_mesh)"/> -->
+    <param name="params_file" value="$(arg params_file)"/>
+    <param name="terrain_mesh_file" value="$(arg terrain_mesh_file)"/>
+  </node>
+
+</launch>
