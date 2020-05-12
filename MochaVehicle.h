@@ -126,7 +126,7 @@ public:
         m_dPhi = dPhi;
     }
 
-    carplanner_msgs::Command& toROS()
+    carplanner_msgs::Command toROS()
     {
         carplanner_msgs::Command msg;
 
@@ -453,30 +453,30 @@ struct VehicleState
        return m_dSteering;
     }
 
-    inline static VehicleState OdomMsg2VehicleState(const nav_msgs::OdometryConstPtr& odom_msg, double steer=0, double curv=0) 
+    inline static VehicleState OdomMsg2VehicleState(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0) 
     {
         VehicleState state;
-        state.m_dTime                       = odom_msg->header.stamp.sec + (double)odom_msg->header.stamp.nsec*(double)1e-9;
+        state.m_dTime                       = odom_msg.header.stamp.sec + (double)odom_msg.header.stamp.nsec*(double)1e-9;
 
-        state.m_dTwv.translation()[0]       = odom_msg->pose.pose.position.x;
-        state.m_dTwv.translation()[1]       = odom_msg->pose.pose.position.y;
-        state.m_dTwv.translation()[2]       = odom_msg->pose.pose.position.z;
+        state.m_dTwv.translation()[0]       = odom_msg.pose.pose.position.x;
+        state.m_dTwv.translation()[1]       = odom_msg.pose.pose.position.y;
+        state.m_dTwv.translation()[2]       = odom_msg.pose.pose.position.z;
         
-        state.m_dTwv.setQuaternion(Sophus::Quaterniond(odom_msg->pose.pose.orientation.w,
-                                                       odom_msg->pose.pose.orientation.x,
-                                                       odom_msg->pose.pose.orientation.y,
-                                                       odom_msg->pose.pose.orientation.z));
-        // state.m_dTwv.unit_quaternion().x() = odom_msg->pose.pose.orientation.x;
-        // state.m_dTwv.unit_quaternion().y() = odom_msg->pose.pose.orientation.y;
-        // state.m_dTwv.unit_quaternion().z() = odom_msg->pose.pose.orientation.z;
-        // state.m_dTwv.unit_quaternion().w() = odom_msg->pose.pose.orientation.w;
+        state.m_dTwv.setQuaternion(Sophus::Quaterniond(odom_msg.pose.pose.orientation.w,
+                                                       odom_msg.pose.pose.orientation.x,
+                                                       odom_msg.pose.pose.orientation.y,
+                                                       odom_msg.pose.pose.orientation.z));
+        // state.m_dTwv.unit_quaternion().x() = odom_msg.pose.pose.orientation.x;
+        // state.m_dTwv.unit_quaternion().y() = odom_msg.pose.pose.orientation.y;
+        // state.m_dTwv.unit_quaternion().z() = odom_msg.pose.pose.orientation.z;
+        // state.m_dTwv.unit_quaternion().w() = odom_msg.pose.pose.orientation.w;
 
-        state.m_dV[0]                       = odom_msg->twist.twist.linear.x;
-        state.m_dV[1]                       = odom_msg->twist.twist.linear.y;
-        state.m_dV[2]                       = odom_msg->twist.twist.linear.z;
-        state.m_dW[0]                       = odom_msg->twist.twist.linear.x;
-        state.m_dW[1]                       = odom_msg->twist.twist.linear.y;
-        state.m_dW[2]                       = odom_msg->twist.twist.linear.z;
+        state.m_dV[0]                       = odom_msg.twist.twist.linear.x;
+        state.m_dV[1]                       = odom_msg.twist.twist.linear.y;
+        state.m_dV[2]                       = odom_msg.twist.twist.linear.z;
+        state.m_dW[0]                       = odom_msg.twist.twist.linear.x;
+        state.m_dW[1]                       = odom_msg.twist.twist.linear.y;
+        state.m_dW[2]                       = odom_msg.twist.twist.linear.z;
 
         state.m_dCurvature = curv;
         state.m_dSteering = steer;
@@ -538,7 +538,7 @@ struct VehicleState
         return state;
     }
 
-    carplanner_msgs::VehicleState& toROS() const
+    carplanner_msgs::VehicleState toROS() const
     {
     //   Sophus::SE3d rot_180_y(Eigen::Quaterniond(0,0,1,0),Eigen::Vector3d(0,0,0)); // Quat(w,x,y,z) , Vec(x,y,z)
     //   Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
@@ -634,9 +634,9 @@ struct VehicleState
         (*this).m_dV[0] = msg.lin_vel.x;
         (*this).m_dV[1] = msg.lin_vel.y;
         (*this).m_dV[2] = msg.lin_vel.z;
-        (*this).m_dV[3] = msg.ang_vel.x;
-        (*this).m_dV[4] = msg.ang_vel.y;
-        (*this).m_dV[5] = msg.ang_vel.z;
+        (*this).m_dW[0] = msg.ang_vel.x;
+        (*this).m_dW[1] = msg.ang_vel.y;
+        (*this).m_dW[2] = msg.ang_vel.z;
 
         (*this).m_dCurvature = msg.curvature;
 
@@ -768,7 +768,7 @@ struct MotionSample
     std::vector<VehicleState> m_vStates;
     std::vector<ControlCommand> m_vCommands;
 
-    carplanner_msgs::MotionSample& toROS()
+    carplanner_msgs::MotionSample toROS()
     {
         carplanner_msgs::MotionSample sample_msg;
         for(uint i=0; i<m_vStates.size(); i++) {
@@ -1122,6 +1122,8 @@ protected:
 
     Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;
+
+    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2; }
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

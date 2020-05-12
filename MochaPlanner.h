@@ -28,6 +28,13 @@
 #include <carplanner_msgs/GetInertiaTensorAction.h>
 #include <carplanner_msgs/SetNoDelayAction.h>
 
+#include <carplanner_msgs/EnablePlanning.h>
+
+#include <carplanner_msgs/OdometryArray.h>
+#include <geometry_msgs/PoseArray.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <carplanner_msgs/mocha_conversions.hpp>
+
 #define XYZ_WEIGHT 2
 #define THETA_WEIGHT 0.5
 #define VEL_WEIGHT_TRAJ 0.5
@@ -62,7 +69,7 @@ struct Waypoint
         isDirty = true;
     }
 
-    inline static Waypoint OdomMsg2Waypoint(const nav_msgs::OdometryConstPtr& odom_msg, double steer=0, double curv=0)
+    inline static Waypoint OdomMsg2Waypoint(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0)
     {
         Waypoint wp;
         wp.state = VehicleState::OdomMsg2VehicleState(odom_msg, steer, curv);
@@ -248,12 +255,16 @@ private:
     ros::NodeHandle *m_private_nh, *m_nh;
     ros::Subscriber m_subVehicleWp;
     ros::Subscriber m_subGoalWp;
-    ros::Publisher m_pubPlan;
+    ros::Subscriber m_subWaypoints;
+    ros::Publisher m_pubWaypoints;
+    ros::Publisher m_pubSimPath;
+    // ros::Publisher m_pubPlan;
+    ros::Publisher m_pubControlTraj;
     bool m_bSubToVehicleWp;
 
     bool m_bServersInitialized = false;
 
-    VehicleState ApplyVelocities(const VehicleState& startState,
+    void ApplyVelocities(const VehicleState& startState,
                                                       MotionSample& sample,
                                                       int nWorldId=0,
                                                       bool noCompensation=false);
@@ -268,12 +279,25 @@ private:
     void SetNoDelay(bool);    
     actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;
 
+    inline void EnablePlanning(bool do_plan) { m_bPlannerOn = do_plan; }
+    bool EnablePlanningSvcCb(carplanner_msgs::EnablePlanning::Request &req, carplanner_msgs::EnablePlanning::Response &res);
+    ros::ServiceServer m_srvEnablePlanning_server;
+
     // virtual void onInit();
 
-    void vehicleWpCb(const nav_msgs::OdometryConstPtr&);
-    void goalWpCb(const nav_msgs::OdometryConstPtr);
+    void vehicleWpCb(const nav_msgs::Odometry&);
+    void goalWpCb(const nav_msgs::Odometry&);
     // void wpPathCb(const nav_msgs::OdometryConstPtr);
     // void publishPath();
+
+
+    void waypointsCb(const carplanner_msgs::OdometryArray&);
+
+    ros::Timer m_timerPubLoop;
+    void PubLoopFunc(const ros::TimerEvent& event);
+    void _pubWaypoints(std::vector<Waypoint*>& );
+    void _pubSimPath(std::vector<MotionSample>& );
+    void _pubControlTraj(Eigen::Vector3dAlignedVec& );
 
     ros::Timer m_timerWpLookup;
     float m_dWpLookupDuration;

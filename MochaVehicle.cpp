@@ -211,11 +211,15 @@ void MochaVehicle::Init()
     /// Initialize the car parameters.
     CarParameterMap defaultParams;
     CarParameters::LoadFromFile(m_config.params_file,defaultParams);
+    
     /// As well as the car that we're actually driving.
-    if ( m_config.mode == MochaVehicle::Config::Mode::Simulation )
-        Init( pCollisionShape,dMin,dMax, defaultParams,1, false);
-    else
-        Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
+    // if ( m_config.mode == MochaVehicle::Config::Mode::Simulation )
+    //     Init( pCollisionShape,dMin,dMax, defaultParams,1, false);
+    // else
+    //     Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
+
+    #define OPT_DIM 4
+    Init( pCollisionShape,dMin,dMax, defaultParams, GetNumWorldsRequired(OPT_DIM), false);
 
     // //generate the triangle mesh
     // aiNode *pAINode = pAIScene->mRootNode;
@@ -532,7 +536,7 @@ void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocities
     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
 
-    DLOG(INFO) << "ApplyVelocities service called.";
+    DLOG(INFO) << "ApplyVelocities action called.";
 
     VehicleState state;
     state.fromROS(goal->initial_state);
@@ -644,6 +648,17 @@ void MochaVehicle::ApplyVelocities(const VehicleState& startingState,
 
         UpdateState(nWorldId,command,command.m_dT,m_bNoDelay);
         GetVehicleState(nWorldId,vStatesOut[iMotion-iMotionStart]);
+
+        /*
+        UpdateState(nWorldId,command,command.m_dT,m_bNoDelay);
+        // VehicleState last_state;
+        // GetVehicleState(nWorldId, last_state);
+        // // last_state.UpdateWheels(GetWheelTransforms(0));
+        // // GetVehicleState(nWorldId, last_state);
+        // vStatesOut[iMotion-iMotionStart] = last_state;
+
+        GetVehicleState(nWorldId, vStatesOut[iMotion-iMotionStart]);
+        */
 
         // vStatesOut[iMotion-iMotionStart] = UpdateState(nWorldId,command,command.m_dT,m_bNoDelay);
         
