@@ -427,7 +427,7 @@ void MochaVehicle::InitROS()
 
     m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
     // m_pStatePublisherThread = new boost::thread( std::bind( &MochaVehicle::_StatePublisherFunc, this ));
-    // m_pTerrainMeshPublisherThread = new boost::thread( std::bind( &MochaVehicle::_TerrainMeshPublisherFunc, this ));
+    m_pTerrainMeshPublisherThread = new boost::thread( std::bind( &MochaVehicle::_TerrainMeshPublisherFunc, this ));
 
     DLOG(INFO) << "Starting services";
     // m_actionApplyVelocities_server = new actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>(*m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1));
@@ -1418,3 +1418,205 @@ bool MochaVehicle::RayCast(const Eigen::Vector3d& dSource,const Eigen::Vector3d&
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////
+/*
+
+void BulletCarModel::_TerrainMeshPublisherFunc()
+{
+  while( ros::ok() )
+  {
+    BulletWorldInstance* pWorld = GetWorldInstance(0);
+    time_t t0 = clock();
+
+    _pubMesh(pWorld->m_pTerrainBody->getCollisionShape(), &(pWorld->m_pTerrainBody->getWorldTransform()), &m_terrainMeshPub);
+    
+    time_t t1 = clock();
+    uint num_tri = dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainBody->getCollisionShape())->getMeshInterface())->getNumTriangles();
+    ROS_INFO("pubbing mesh, %d triangles, %.2f sec", num_tri, std::difftime(t1,t0)/CLOCKS_PER_SEC); 
+     
+    // btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
+    // for(uint i=0; i<objarr.size(); i++)
+    // {
+    //   if(objarr[i] != pWorld->m_pCarChassis)
+    //   {
+    //     time_t t0 = clock();
+
+    //     _pubMesh(objarr[i]->getCollisionShape(), &(objarr[i]->getWorldTransform()), &m_terrainMeshPub);
+    //     
+    //     time_t t1 = clock();
+    //     uint num_tri = dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(objarr[i]->getCollisionShape())->getMeshInterface())->getNumTriangles();
+    //     ROS_INFO("pubbing mesh, %d triangles, %.2f sec", num_tri, std::difftime(t1,t0)/CLOCKS_PER_SEC); 
+    //   }
+    // }
+    
+    ros::Rate(100).sleep();
+  }
+}
+
+void BulletCarModel::_pubMesh(btCollisionShape* collisionShape, ros::Publisher* pub)
+{
+  btTransform* parentTransform = new btTransform(btQuaternion(0,0,0,1),btVector3(0,0,0));
+  _pubMesh(collisionShape, parentTransform, pub);
+}
+
+void BulletCarModel::_pubMesh(btCollisionShape* collisionShape, btTransform* parentTransform, ros::Publisher* pub)
+{
+    // ROS_INFO("about to pub mesh with %d faces", dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(collisionShape)->getMeshInterface())->getNumTriangles());
+
+    time_t t0 = std::clock();
+
+    mesh_msgs::TriangleMesh* mesh = new mesh_msgs::TriangleMesh();
+    btTransform* transformedToRosParent = new btTransform(btQuaternion(1,0,0,0),btVector3(0,0,0)); // rot 180 x
+    (*transformedToRosParent) *= (*parentTransform);
+    convertCollisionShape2MeshMsg(collisionShape, transformedToRosParent, &mesh);
+
+    mesh_msgs::TriangleMeshStamped* mesh_stamped = new mesh_msgs::TriangleMeshStamped();
+    mesh_stamped->mesh = *mesh;
+    mesh_stamped->header.frame_id = "world";
+    mesh_stamped->header.stamp = ros::Time::now();
+
+    time_t t1 = std::clock();
+
+    // ROS_INFO("pubbing mesh, %d faces, %d vertices, %.2f sec", mesh->triangles.size(), mesh->vertices.size(), std::difftime(t1,t0)/CLOCKS_PER_SEC); 
+    pub->publish(*mesh_stamped);
+    ros::spinOnce();
+    // ros::Rate(10).sleep();
+}
+
+#define CIMM_REPLACE 1
+#define CIMM_APPEND 2
+#define CARPLANNER_INPUT_MESH_MODE CIMM_REPLACE // CIMM_REPLACE, CIMM_APPEND
+void BulletCarModel::_meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
+{
+  static tf::StampedTransform Twm;
+  // static tf2_ros::TransformListener tflistener(m_tfbuffer);
+
+  try
+  {
+    m_tflistener.waitForTransform("world", "infinitam", ros::Time::now(), ros::Duration(1.0));
+    m_tflistener.lookupTransform("world", "infinitam", ros::Time(0), Twm);
+    // geometry_msgs::TransformStamped Twm_gm = m_tfbuffer.lookupTransform("world", "infinitam", ros::Time(0));
+    // geometry_msg2tf(Twm_gm,&Twm);
+  }
+  catch (tf::TransformException ex)
+  {
+    ROS_ERROR("%s",ex.what());
+    usleep(10000);
+    return;
+  }
+
+  tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+  Twm.setData(rot_180_x*Twm);
+
+  time_t t0 = std::time(0);
+
+  btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+  convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape);
+  // uint new_num_tri = dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(meshShape)->getMeshInterface())->getNumTriangles();
+
+  // BulletWorldInstance* pWorld = GetWorldInstance(0);
+  // boost::mutex::scoped_lock lock(*pWorld);
+
+
+  for (uint i=0; i<m_nNumWorlds; i++)
+  {
+    BulletWorldInstance* pWorld = GetWorldInstance(i);
+    boost::mutex::scoped_lock lock(*pWorld);
+
+  // #if CARPLANNER_INPUT_MESH_MODE==CIMM_REPLACE
+  //   if(pWorld->m_pTerrainBody != NULL)
+  //   {
+  //     pWorld->m_pDynamicsWorld->removeRigidBody(pWorld->m_pTerrainBody);
+  //   }
+  //   pWorld->m_pTerrainShape = meshShape;
+  //   pWorld->m_pTerrainBody->setCollisionShape(pWorld->m_pTerrainShape);
+  //   pWorld->m_pTerrainBody->setWorldTransform(btTransform(
+  //     btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
+  //     btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
+  //   pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
+
+  // #elif CARPLANNER_INPUT_MESH_MODE==CIMM_APPEND
+    if( pWorld->m_pDynamicsWorld->getCollisionWorld()->getNumCollisionObjects() !< 2 )
+      continue;
+    btTransform tr;
+    tr.setIdentity();
+    btAssert((!meshShape || meshShape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
+    btDefaultMotionState* myMotionState = new btDefaultMotionState(tr);
+    btRigidBody::btRigidBodyConstructionInfo cInfo(0.0,myMotionState,meshShape,btVector3(0,0,0));
+    btRigidBody* body = new btRigidBody(cInfo);
+    body->setContactProcessingThreshold(BT_LARGE_FLOAT);
+    body->setWorldTransform(btTransform(
+      btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
+      btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
+    pWorld->m_pDynamicsWorld->addRigidBody(body);
+
+  // #else
+  //   //error
+  // #endif
+
+  }
+
+  time_t t1 = std::time(0);
+  ROS_INFO("got mesh, %d faces, %d vertices, %.2f sec", mesh_msg->mesh.triangles.size(), mesh_msg->mesh.vertices.size(), difftime(t1,t0));
+
+}
+
+void BulletCarModel::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm)
+{
+  // btAssert((!meshShape || meshShape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
+
+  BulletWorldInstance* pWorld = GetWorldInstance(worldId);
+  // boost::unique_lock<boost::mutex> lock(*pWorld);
+  pWorld->lock();
+
+  if(pWorld->m_pTerrainBody != NULL)
+  {
+    pWorld->m_pDynamicsWorld->removeRigidBody(pWorld->m_pTerrainBody);
+  }
+
+  pWorld->m_pTerrainShape = meshShape;
+  pWorld->m_pTerrainBody->setCollisionShape(pWorld->m_pTerrainShape);
+  pWorld->m_pTerrainBody->setWorldTransform(btTransform(
+    btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
+    btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
+  pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
+  
+  // boost::unique_lock<boost::mutex> unlock(*pWorld);
+  pWorld->unlock();
+}
+
+void BulletCarModel::appendMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm)
+{
+  btAssert((!meshShape || meshShape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
+
+  BulletWorldInstance* pWorld = GetWorldInstance(worldId);
+  // boost::unique_lock<boost::mutex> lock(*pWorld);
+  pWorld->lock();
+  
+  uint max_num_coll_objs = 3;
+  if( pWorld->m_pDynamicsWorld->getCollisionWorld()->getNumCollisionObjects() >= max_num_coll_objs )
+  {
+    // boost::unique_lock<boost::mutex> unlock(*pWorld);
+    pWorld->unlock();
+    replaceMesh(worldId, meshShape, Twm);
+    return;
+  }
+
+  btTransform tr;
+  tr.setIdentity();
+  btDefaultMotionState* myMotionState = new btDefaultMotionState(tr);
+  
+  btRigidBody::btRigidBodyConstructionInfo cInfo(0.0,myMotionState,meshShape,btVector3(0,0,0));
+  btRigidBody* body = new btRigidBody(cInfo);
+  body->setContactProcessingThreshold(BT_LARGE_FLOAT);
+  body->setWorldTransform(btTransform(
+    btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
+    btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
+  pWorld->m_pTerrainBody = body;
+  pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
+
+  // boost::unique_lock<boost::mutex> unlock(*pWorld);
+  pWorld->unlock();
+}
+
+*/

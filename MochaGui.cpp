@@ -1349,7 +1349,7 @@ void MochaGui::_pubCommand(ControlCommand& cmd)
     cmd_msg.force       = cmd.m_dForce;
     cmd_msg.curvature   = cmd.m_dCurvature;
     cmd_msg.dt          = cmd.m_dTime;
-    cmd_msg.phi         = cmd.m_dPhi;
+    cmd_msg.dphi         = cmd.m_dPhi;
     for(unsigned int i=0; i<3; i++)
     {
         cmd_msg.torques.push_back(cmd.m_dTorque[i]);

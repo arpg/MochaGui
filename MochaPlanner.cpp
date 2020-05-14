@@ -146,6 +146,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
 
     m_pubWaypoints = m_nh->advertise<geometry_msgs::PoseArray>("/plan_car/waypoints",1);
     m_pubSimPath = m_private_nh->advertise<visualization_msgs::MarkerArray>("/plan_car/opt_plan", 1);
+    m_pubActualTraj = m_private_nh->advertise<nav_msgs::Path>("/plan_car/actual_traj", 1);
     m_pubControlTraj = m_private_nh->advertise<nav_msgs::Path>("/plan_car/control_traj", 1);
 
     // m_actionApplyVelocities_client.waitForServer();
@@ -1555,6 +1556,7 @@ void MochaPlanner::PubLoopFunc(const ros::TimerEvent& event)
     _pubWaypoints(m_vWaypoints);
     _pubSimPath(m_vSegmentSamples);
     // _pubPlan(m_vSegmentSamples);
+    _pubActualTraj(m_vActualTrajectory);
     _pubControlTraj(m_vControlTrajectory);
 }
 
@@ -1828,6 +1830,16 @@ void MochaPlanner::_pubSimPath(std::vector<MotionSample>& path_in)
     carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("",0.01,0,0,0.0,1.0,0.0,1.0);
     convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg, markarr_config);
     m_pubSimPath.publish(markarr_msg);
+    ros::spinOnce();
+}
+
+void MochaPlanner::_pubActualTraj(Eigen::Vector3dAlignedVec& path_in)
+{   
+    if (path_in.empty()) { return; }
+    Eigen::Vector3dAlignedVec some_path = path_in;
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(some_path, &path_msg);
+    m_pubActualTraj.publish(path_msg);
     ros::spinOnce();
 }
 

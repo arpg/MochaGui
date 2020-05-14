@@ -259,6 +259,7 @@ private:
     ros::Publisher m_pubWaypoints;
     ros::Publisher m_pubSimPath;
     // ros::Publisher m_pubPlan;
+    ros::Publisher m_pubActualTraj;
     ros::Publisher m_pubControlTraj;
     bool m_bSubToVehicleWp;
 
@@ -297,6 +298,7 @@ private:
     void PubLoopFunc(const ros::TimerEvent& event);
     void _pubWaypoints(std::vector<Waypoint*>& );
     void _pubSimPath(std::vector<MotionSample>& );
+    void _pubActualTraj(Eigen::Vector3dAlignedVec& );
     void _pubControlTraj(Eigen::Vector3dAlignedVec& );
 
     ros::Timer m_timerWpLookup;
