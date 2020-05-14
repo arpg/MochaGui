@@ -93,6 +93,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_nPlanCounter(0),
     m_dTimeInterval(CVarUtils::CreateCVar("planner.TimeInterval", 0.01, "") ),
     m_actionApplyVelocities_client("plan_car/apply_velocities",true),
+    m_actionGetInertiaTensor_client("plan_car/get_inertia_tensor",true),
     m_actionSetNoDelay_client("plan_car/set_no_delay",true),
     m_bServersInitialized(false),
     m_bSubToVehicleWp(true), 
@@ -155,7 +156,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     // m_actionGetControlDelay_client->waitForServer();
 
     // m_actionGetInertiaTensor_client = new actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction>("plan_car/get_inertia_tensor",true);
-    // m_actionGetInertiaTensor_client->waitForServer();
+    // m_actionGetInertiaTensor_client.waitForServer();
 
     // // m_actionSetNoDelay_client = new actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction>("plan_car/set_no_delay",true);
     
@@ -185,7 +186,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     {
         m_bServersInitialized = m_actionApplyVelocities_client.isServerConnected()
         // && m_actionGetControlDelay_client->isServerConnected()  
-        // && m_actionGetInertiaTensor_client->isServerConnected() 
+        && m_actionGetInertiaTensor_client.isServerConnected() 
         && m_actionSetNoDelay_client.isServerConnected(); 
 
         if (!m_actionApplyVelocities_client.isServerConnected()) 
@@ -196,10 +197,10 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
         // {
         //     DLOG(INFO) << "Waiting for GetControlDelay Server";
         // }
-        // if (!m_actionGetInertiaTensor_client.isServerConnected()) 
-        // {
-        //     DLOG(INFO) << "Waiting for GetInertiaTensor Server";
-        // }
+        if (!m_actionGetInertiaTensor_client.isServerConnected()) 
+        {
+            DLOG(INFO) << "Waiting for GetInertiaTensor Server";
+        }
         if (!m_actionSetNoDelay_client.isServerConnected()) 
         {
             DLOG(INFO) << "Waiting for SetNoDelay Server";
@@ -844,16 +845,16 @@ const Eigen::Vector3d MochaPlanner::GetInertiaTensor(int nWorldId)
     carplanner_msgs::GetInertiaTensorGoal goal;
     carplanner_msgs::GetInertiaTensorResultConstPtr result;
 
-    goal.worldId = nWorldId;
-    m_actionGetInertiaTensor_client->sendGoal(goal);
+    goal.world_id = nWorldId;
+    m_actionGetInertiaTensor_client.sendGoal(goal);
 
-    bool finished_before_timeout = m_actionGetInertiaTensor_client->waitForResult(ros::Duration(0.5));
+    bool finished_before_timeout = m_actionGetInertiaTensor_client.waitForResult(ros::Duration(0.5));
     if (finished_before_timeout)
     {
-        actionlib::SimpleClientGoalState state = m_actionGetInertiaTensor_client->getState();
+        actionlib::SimpleClientGoalState state = m_actionGetInertiaTensor_client.getState();
         ROS_INFO("GetInertiaTensor Action finished: %s", state.toString().c_str());
 
-        result = m_actionGetInertiaTensor_client->getResult();
+        result = m_actionGetInertiaTensor_client.getResult();
     }
     else
     {
@@ -1669,7 +1670,7 @@ bool MochaPlanner::replan()
         SetNoDelay(true);
         Problem problem(startState,goalState,m_dTimeInterval);
         InitializeProblem(problem,0,NULL,eCostPoint);
-        // problem.m_bInertialControlActive = g_bInertialControl;
+        problem.m_bInertialControlActive = true;//g_bInertialControl;
         //problem.m_lPreviousCommands = previousCommands;
         
         bool success = false;
@@ -1684,6 +1685,8 @@ bool MochaPlanner::replan()
             else
             {
                 // get plan for current motion sample under consideration
+                // m_vActualTrajectory.clear();
+                // m_vControlTrajectory.clear();
                 success = _IteratePlanner(problem,m_vSegmentSamples[dirtySegmentId],m_vActualTrajectory,m_vControlTrajectory);
             }
 
@@ -1721,7 +1724,7 @@ bool MochaPlanner::_IteratePlanner(
     //StressTest(problem);
 
     if(only2d == false) {
-        if( m_bPlannerOn == true && m_bSimulate3dPath == false ) // planner on && sim off
+        if( m_bPlannerOn == true ) // planner on && sim off
         {
             // run full Gauss-Newton minimization and calc best solution
             printf("Running full sim.\n");
@@ -1745,7 +1748,7 @@ bool MochaPlanner::_IteratePlanner(
         }
 
         // copy actual trajectory
-        // vActualTrajectory.clear();
+        vActualTrajectory.clear();
         for(const VehicleState& state : sample.m_vStates) {
             vActualTrajectory.push_back(state.m_dTwv.translation());
         }

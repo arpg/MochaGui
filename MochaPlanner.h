@@ -275,7 +275,7 @@ private:
     actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_client;
 
     const Eigen::Vector3d GetInertiaTensor(int worldId);
-    actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction>* m_actionGetInertiaTensor_client;
+    actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_client;
 
     void SetNoDelay(bool);    
     actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;

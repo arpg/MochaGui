@@ -1030,7 +1030,7 @@ public:
     actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_server; 
 
     void GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction>* m_actionGetInertiaTensor_server; 
+    actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_server; 
 
     void SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server; 

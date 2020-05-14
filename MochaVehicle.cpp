@@ -8,6 +8,7 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_private_nh(&private_nh),
     m_nh(&nh),
     m_actionApplyVelocities_server(*m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionGetInertiaTensor_server(*m_nh, "plan_car/get_inertia_tensor", boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1), false),
     m_actionSetNoDelay_server(*m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1), false)
 {
     m_dGravity << 0,0,BULLET_MODEL_GRAVITY;
@@ -443,7 +444,7 @@ void MochaVehicle::InitROS()
     // m_actionGetControlDelay_server->start();
 
     // m_actionGetInertiaTensor_server = new actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction>(*m_nh, "plan_car/get_inertia_tensor", boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1));
-    // m_actionGetInertiaTensor_server->start();
+    m_actionGetInertiaTensor_server.start();
 
     // m_actionSetNoDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction>(*m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1));
     m_actionSetNoDelay_server.start();
@@ -512,12 +513,15 @@ void MochaVehicle::GetInertiaTensorService(const carplanner_msgs::GetInertiaTens
 
     DLOG(INFO) << "GetInertiaTensor service called.";
 
-    Eigen::Vector3d vals = GetVehicleInertiaTensor(goal->worldId);
-    actionGetInertiaTensor_result.vals[0] = vals[0];
-    actionGetInertiaTensor_result.vals[1] = vals[1];
-    actionGetInertiaTensor_result.vals[2] = vals[2];
+    Eigen::Vector3d vals = GetVehicleInertiaTensor(goal->world_id);
+    // actionGetInertiaTensor_result.vals[0] = vals[0];
+    // actionGetInertiaTensor_result.vals[1] = vals[1];
+    // actionGetInertiaTensor_result.vals[2] = vals[2];
+    actionGetInertiaTensor_result.vals.push_back(vals[0]);
+    actionGetInertiaTensor_result.vals.push_back(vals[1]);
+    actionGetInertiaTensor_result.vals.push_back(vals[2]);
 
-    m_actionGetInertiaTensor_server->setSucceeded(actionGetInertiaTensor_result);
+    m_actionGetInertiaTensor_server.setSucceeded(actionGetInertiaTensor_result);
 }
 
 void MochaVehicle::SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr &goal)
