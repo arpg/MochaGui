@@ -21,6 +21,9 @@
 #include <nav_msgs/Odometry.h>
 // #include <tf/TransformListener.h>
 
+// #include <std_srvs/Bool.h>
+// #include <std_srvs/Empty.h>
+
 // #include "tf_conversion_tools.hpp"
 
 #include <actionlib/client/simple_action_client.h>
@@ -28,27 +31,29 @@
 #include <carplanner_msgs/GetInertiaTensorAction.h>
 #include <carplanner_msgs/SetNoDelayAction.h>
 
-#include <carplanner_msgs/EnablePlanning.h>
+#include <carplanner_msgs/EnableTerrainPlanning.h>
+#include <carplanner_msgs/EnableContinuousPlanning.h>
 
 #include <carplanner_msgs/OdometryArray.h>
 #include <geometry_msgs/PoseArray.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <carplanner_msgs/mocha_conversions.hpp>
 
-#define XYZ_WEIGHT 2
-#define THETA_WEIGHT 0.5
+#define XY_WEIGHT 1.5
+#define Z_WEIGHT 1.5
+#define THETA_WEIGHT 0.2
 #define VEL_WEIGHT_TRAJ 0.5
-#define VEL_WEIGHT_POINT 1.0
+#define VEL_WEIGHT_POINT 0.75
 #define TIME_WEIGHT 0.05
 #define CURV_WEIGHT 0.001
-#define TILT_WEIGHT 0.5 // dRoll*dPitch
+#define TILT_WEIGHT 0.75 // dRoll
 #define BADNESS_WEIGHT 5e-8;
 #define DAMPING_STEPS 8
 #define DAMPING_DIVISOR 1.3
 
 #define POINT_COST_ERROR_TERMS 6
 #define TRAJ_EXTRA_ERROR_TERMS 2
-#define TRAJ_UNIT_ERROR_TERMS 5
+#define TRAJ_UNIT_ERROR_TERMS 6
 
 #define OPT_ACCEL_DIM 3
 #define OPT_AGGR_DIM 4
@@ -69,12 +74,13 @@ struct Waypoint
         isDirty = true;
     }
 
-    inline static Waypoint OdomMsg2Waypoint(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0)
+    inline static Waypoint& OdomMsg2Waypoint(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0)
     {
-        Waypoint wp;
-        wp.state = VehicleState::OdomMsg2VehicleState(odom_msg, steer, curv);
-        wp.isDirty = true;
-        return wp;
+        Waypoint* wp = new Waypoint();
+        wp->state = VehicleState::OdomMsg2VehicleState(odom_msg, steer, curv);
+        // wp.state.fromOdomMsg(odom_msg, steer, curv);
+        wp->isDirty = true;
+        return (*wp);
     }
 
     inline static Waypoint tf2Waypoint(tf::StampedTransform tf, double steer=0, double curv=0)
@@ -239,6 +245,8 @@ struct Problem
 
 inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1, const Eigen::Vector6d& line2, const Eigen::Vector6d& point, double &dInterpolationFactor);
 
+void spinThread() { ros::spin(); }   
+
 class MochaPlanner
 {
 public:
@@ -249,7 +257,8 @@ public:
     } m_config;
 
     MochaPlanner(ros::NodeHandle&,ros::NodeHandle&);
-    ~MochaPlanner();      
+    ~MochaPlanner(); 
+  
 
 private:
     ros::NodeHandle *m_private_nh, *m_nh;
@@ -270,6 +279,7 @@ private:
                                                       int nWorldId=0,
                                                       bool noCompensation=false);
     actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_client;
+    // void ApplyVelocitiesDoneCb(const actionlib::SimpleClientGoalState&, const carplanner_msgs::ApplyVelocitiesResultConstPtr&);
 
     double GetControlDelay(int worldId);
     actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_client;
@@ -280,9 +290,16 @@ private:
     void SetNoDelay(bool);    
     actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;
 
-    inline void EnablePlanning(bool do_plan) { m_bPlannerOn = do_plan; }
-    bool EnablePlanningSvcCb(carplanner_msgs::EnablePlanning::Request &req, carplanner_msgs::EnablePlanning::Response &res);
-    ros::ServiceServer m_srvEnablePlanning_server;
+    inline void EnableTerrainPlanning(bool do_plan) { m_bPlanForTerrain = do_plan; }
+    bool EnableTerrainPlanningSvcCb(carplanner_msgs::EnableTerrainPlanning::Request &req, carplanner_msgs::EnableTerrainPlanning::Response &res);
+    ros::ServiceServer m_srvEnableTerrainPlanning_server;
+
+    inline void EnableContinuousPlanning(bool do_plan_continuously) { m_bPlanContinuously = do_plan_continuously; }
+    bool EnableContinuousPlanningSvcCb(carplanner_msgs::EnableContinuousPlanning::Request &req, carplanner_msgs::EnableContinuousPlanning::Response &res);
+    ros::ServiceServer m_srvEnableContinuousPlanning_server;
+
+    bool Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool& biDirectional, int index=0);
+    actionlib::SimpleActionClient<carplanner_msgs::RaycastAction> m_actionRaycast_client;
 
     // virtual void onInit();
 
@@ -311,7 +328,8 @@ private:
     bool replan();
 
     double& m_dTimeInterval;
-    bool m_bPlannerOn;
+    bool m_bPlanForTerrain;
+    bool m_bPlanContinuously;
     bool m_bSimulate3dPath;
     // MochaVehicle m_PlanCarModel;
     // bool& m_bControl3dPath;
@@ -321,6 +339,11 @@ private:
     std::vector<MotionSample> m_vSegmentSamples;
     Eigen::Vector3dAlignedVec m_vActualTrajectory;
     Eigen::Vector3dAlignedVec m_vControlTrajectory;
+
+    // boost::mutex m_mutexApplyVelocitiesInfo;
+    // std::vector<actionlib::GoalID> m_vApplyVelocitiesGoalIds;
+    // std::vector<MotionSample*> m_vApplyVelocitiesMotionSamples;
+    
 
 public:
     /// Initializes the Problem structu which is passed in using the given parameters
@@ -359,6 +382,8 @@ public:
         Eigen::Vector3dAlignedVec& vControlTrajectory,
         bool only2d=false);
 
+    void SetWaypoint(int idx, Waypoint& wp);
+    void AddWaypoint(Waypoint& wp);
 
 private:
     /// Calculates the jacobian of the trajectory at the current point in the trajectory

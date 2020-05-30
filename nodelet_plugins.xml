@@ -1,15 +1,17 @@
+<class_libraries>
 <library path="lib/libplanner_nodelet">
-  <class name="mochagui/MochaPlannerNodelet" type="mochagui::MochaPlannerNodelet" base_class_type="nodelet::Nodelet">
+  <class name="mochapc/MochaPlannerNodelet" type="mochapc::MochaPlannerNodelet" base_class_type="nodelet::Nodelet">
     <description>
       Nodelet for running the MochaPlanner
     </description>
   </class>
 </library>
 <library path="lib/libvehicle_nodelet">
-  <class name="mochagui/MochaVehicleNodelet" type="mochagui::MochaVehicleNodelet" base_class_type="nodelet::Nodelet">
+  <class name="mochapc/MochaVehicleNodelet" type="mochapc::MochaVehicleNodelet" base_class_type="nodelet::Nodelet">
     <description>
       Nodelet for running the MochaVehicle
     </description>
   </class>
 </library>
+</class_libraries>
 

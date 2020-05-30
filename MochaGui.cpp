@@ -2450,6 +2450,7 @@ void MochaGui::_PopulateSceneGraph()
   _RefreshWaypoints();
 
     // black lines representing plan projected to flat plane
+    // control trajectory
   m_vGLLineSegments.resize(m_Path.size() - 1);
   for (size_t ii = 0; ii < m_vGLLineSegments.size(); ii++) {
     m_vGLLineSegments[ii].SetColor(GLColor(0.0f,0.0f,0.0f));
@@ -2459,6 +2460,7 @@ void MochaGui::_PopulateSceneGraph()
 
     // red lines representing plan projected to terrain
   // also add segments for curve that takes terrain into account
+  // actual trajectory
   m_vTerrainLineSegments.resize(m_Path.size() - 1);
   for (size_t ii = 0; ii < m_vTerrainLineSegments.size(); ii++) {
     m_Gui.AddGLObject(&m_vTerrainLineSegments[ii]);

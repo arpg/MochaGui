@@ -36,6 +36,7 @@
 #include <carplanner_msgs/GetControlDelayAction.h>
 #include <carplanner_msgs/GetInertiaTensorAction.h>
 #include <carplanner_msgs/SetNoDelayAction.h>
+#include <carplanner_msgs/RaycastAction.h>
 
 // #include "btBulletDynamicsCommon.h"
 #include "BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h"
@@ -185,7 +186,7 @@ struct VehicleState
         m_dTime = 0;
     }
 
-    VehicleState(const Sophus::SE3d& dTwv, const double dV, double dCurvature = 0)
+    VehicleState(const Sophus::SE3d& dTwv, const double dV = 1, double dCurvature = 0)
     {
         m_dCurvature = dCurvature;
         m_dTwv = dTwv;
@@ -195,6 +196,30 @@ struct VehicleState
         m_dW << 0,0,0;
         m_dSteering = 0;
     }
+
+    // VehicleState& operator= (const VehicleState& other) 
+    // {
+    //     m_dTwv = other.m_dTwv;
+    //     m_dV = other.m_dV;
+    //     m_dW = other.m_dW;
+    //     m_dSteering = other.m_dSteering;
+    //     m_dCurvature = other.m_dCurvature;
+    //     m_dTime = other.m_dTime;
+
+    //     m_vWheelStates.resize(other.m_vWheelStates.size());
+    //     for (uint i=0; i<m_vWheelStates.size(); i++)
+    //     {
+    //         m_vWheelStates[i] = other.m_vWheelStates[i];
+    //     }
+
+    //     m_vWheelContacts.resize(other.m_vWheelContacts.size());
+    //     for (uint i=0; i<m_vWheelContacts.size(); i++)
+    //     {
+    //         m_vWheelContacts[i] = other.m_vWheelContacts[i];
+    //     }
+
+    //     return *this;
+    // }
 
     static VehicleState GetInterpolatedState(const std::vector<VehicleState>& vStates,
                                              const int nStartIndex,
@@ -302,8 +327,8 @@ struct VehicleState
     static Eigen::Vector6d VehicleStateToXYZRPY(const VehicleState& state)
     {
         // Eigen::Vector7d poseTmp = VehicleStateToXYZQuat(state);
-        // Eigen::Quaterniond quatTmp(poseTmp[3],poseTmp[4],poseTmp[5],poseTmp[6]);
         Eigen::Quaterniond quatTmp = state.m_dTwv.unit_quaternion();
+        // Eigen::Quaterniond quatTmp(state.m_dTwv.unit_quaternion());
         // Eigen::Vector3d yprTmp = quatTmp.toYawPitchRoll();
         auto rpyTmp = quatTmp.toRotationMatrix().eulerAngles(0, 1, 2);
         Eigen::Vector6d poseOut;
@@ -352,11 +377,15 @@ struct VehicleState
         return VehicleStateToSE3d(*this);
     }
 
-    // This is used to flip between the coord convention between gl/viz and physical/ros
+    // This is used to flip between the coord convention between gl/viz/bullet and physical/ros
     VehicleState FlipCoordFrame()
     {
         Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));    
         m_dTwv = rot_180_x * (*this).m_dTwv * rot_180_x;
+
+        // (*this).m_dV = (*this).m_dTwv.so3() * (*this).m_dV;
+        m_dV = (rot_180_x * Sophus::SE3d(Eigen::Quaterniond(1,0,0,0), (*this).m_dV) * rot_180_x).translation();
+
         return *this;    
     }
 
@@ -453,35 +482,56 @@ struct VehicleState
        return m_dSteering;
     }
 
-    inline static VehicleState OdomMsg2VehicleState(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0) 
-    {
-        VehicleState state;
-        state.m_dTime                       = odom_msg.header.stamp.sec + (double)odom_msg.header.stamp.nsec*(double)1e-9;
+    // void fromROS(nav_msgs::Odometry& msg)
+    // {
+    //     m_dForce = msg.force;
+    //     m_dCurvature = msg.curvature;
+    //     m_dT = msg.dt;
+    //     m_dPhi = msg.dphi;
+    //     m_dTorque[0] = msg.torques[0];
+    //     m_dTorque[1] = msg.torques[1];
+    //     m_dTorque[2] = msg.torques[2];
+    //     m_dTime = msg.time;
 
-        state.m_dTwv.translation()[0]       = odom_msg.pose.pose.position.x;
-        state.m_dTwv.translation()[1]       = odom_msg.pose.pose.position.y;
-        state.m_dTwv.translation()[2]       = odom_msg.pose.pose.position.z;
+    //     return;
+    // }
+
+    inline static VehicleState& OdomMsg2VehicleState(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0) 
+    {
+        VehicleState* state = new VehicleState();
+        state->m_dTime                       = odom_msg.header.stamp.sec + (double)odom_msg.header.stamp.nsec*(double)1e-9;
+
+        state->m_dTwv.translation()[0]       = odom_msg.pose.pose.position.x;
+        state->m_dTwv.translation()[1]       = odom_msg.pose.pose.position.y;
+        state->m_dTwv.translation()[2]       = odom_msg.pose.pose.position.z;
         
-        state.m_dTwv.setQuaternion(Sophus::Quaterniond(odom_msg.pose.pose.orientation.w,
+        state->m_dTwv.setQuaternion(Sophus::Quaterniond(odom_msg.pose.pose.orientation.w,
                                                        odom_msg.pose.pose.orientation.x,
                                                        odom_msg.pose.pose.orientation.y,
                                                        odom_msg.pose.pose.orientation.z));
-        // state.m_dTwv.unit_quaternion().x() = odom_msg.pose.pose.orientation.x;
-        // state.m_dTwv.unit_quaternion().y() = odom_msg.pose.pose.orientation.y;
-        // state.m_dTwv.unit_quaternion().z() = odom_msg.pose.pose.orientation.z;
-        // state.m_dTwv.unit_quaternion().w() = odom_msg.pose.pose.orientation.w;
+        // state->m_dTwv.unit_quaternion().x() = odom_msg.pose.pose.orientation.x;
+        // state->m_dTwv.unit_quaternion().y() = odom_msg.pose.pose.orientation.y;
+        // state->m_dTwv.unit_quaternion().z() = odom_msg.pose.pose.orientation.z;
+        // state->m_dTwv.unit_quaternion().w() = odom_msg.pose.pose.orientation.w;
 
-        state.m_dV[0]                       = odom_msg.twist.twist.linear.x;
-        state.m_dV[1]                       = odom_msg.twist.twist.linear.y;
-        state.m_dV[2]                       = odom_msg.twist.twist.linear.z;
-        state.m_dW[0]                       = odom_msg.twist.twist.linear.x;
-        state.m_dW[1]                       = odom_msg.twist.twist.linear.y;
-        state.m_dW[2]                       = odom_msg.twist.twist.linear.z;
+        state->m_dV[0]                       = odom_msg.twist.twist.linear.x;
+        state->m_dV[1]                       = odom_msg.twist.twist.linear.y;
+        state->m_dV[2]                       = odom_msg.twist.twist.linear.z;
 
-        state.m_dCurvature = curv;
-        state.m_dSteering = steer;
+        state->m_dV = state->m_dTwv.so3() * state->m_dV;
 
-        return state;
+        // Eigen::Vector3d linvel_cs(odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.linear.z);
+        // Eigen::Vector3d linvel_ws = state->m_dTwv.so3() * linvel_cs;
+        // state->m_dV = linvel_ws;
+
+        state->m_dW[0]                       = odom_msg.twist.twist.angular.x;
+        state->m_dW[1]                       = odom_msg.twist.twist.angular.y;
+        state->m_dW[2]                       = odom_msg.twist.twist.angular.z;
+
+        state->m_dCurvature = curv;
+        state->m_dSteering = steer;
+
+        return (*state);
     }
 
     static VehicleState tf2VehicleState(tf::StampedTransform tf, double steer=0, double curv=0)
@@ -850,7 +900,8 @@ struct MotionSample
         
         for(size_t ii = 1; ii < m_vStates.size() ; ii++){
             const VehicleState& state = m_vStates[ii];
-            cost += fabs(state.m_dW[0]*state.m_dW[1]);
+            // cost += fabs(state.m_dW[0]*state.m_dW[1]);
+            cost += fabs(state.m_dW[0]);
         }
         cost /= GetDistance();
 
@@ -1016,9 +1067,28 @@ public:
                                                         MotionSample& sample,
                                                         int nWorldId /*= 0*/,
                                                         bool noCompensation /*= false*/);
-  
+
+    void RaycastService(const carplanner_msgs::RaycastGoalConstPtr&);
+    actionlib::SimpleActionServer<carplanner_msgs::RaycastAction> m_actionRaycast_server;
+
+    // void CreateServerService(const carplanner_msgs::CreateServerGoalConstPtr&);
+    // actionlib::SimpleActionServer<carplanner_msgs::CreateServerAction> m_actionCreateSimpleServer_server;
+
+    // std::vector<actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>> servers_;
+
+    // void ApplyVelocities(carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server; 
+    // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server2; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server3; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server4; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server5; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server6; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server7; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8; 
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9; 
     
     // void UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>* m_actionUpdateState_server; 

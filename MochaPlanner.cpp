@@ -12,7 +12,7 @@ static bool& g_bTrajectoryCost(CVarUtils::CreateGetUnsavedCVar("debug.Trajectory
 static int& g_nTrajectoryCostSegments(CVarUtils::CreateGetUnsavedCVar("debug.TrajectoryCostSegments", 10,""));
 static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.IterationLimit", 10, "");
 
-
+namespace mochapc {
 struct ApplyCommandsThreadFunctor {
     ApplyCommandsThreadFunctor(MochaPlanner *pPlanner, Problem& problem,const int index , Eigen::Vector6d& poseOut,Eigen::VectorXd& errorOut,
                                MotionSample& sample, const bool bSolveBoundary = false) :
@@ -29,11 +29,22 @@ struct ApplyCommandsThreadFunctor {
     void operator()()
     {
         SetThreadName((boost::format("Bullet Simulation Thread #%d") % m_index).str().c_str());
+
         if(m_bSolveBoundary){
             m_Problem.m_pBoundarySovler->Solve(&m_Problem.m_BoundaryProblem);
         }
-        m_poseOut = m_pPlanner->SimulateTrajectory(m_Sample,m_Problem, m_index);
-        m_dErrorOut = m_pPlanner->_CalculateSampleError(m_Sample,m_Problem,m_Problem.m_CurrentSolution.m_dMinTrajectoryTime);
+        m_poseOut = m_pPlanner->SimulateTrajectory(m_Sample, m_Problem, m_index);
+        m_dErrorOut = m_pPlanner->_CalculateSampleError(m_Sample, m_Problem, m_Problem.m_CurrentSolution.m_dMinTrajectoryTime);
+
+        DLOG(INFO) << "Ran ACF." 
+            << " Index " << m_index << "."
+        //     // << "|  SolveBoundary " << (m_bSolveBoundary ? "true" : "false") << ".\n"
+        //     // << "|  Problem OptParams " << m_Problem.m_CurrentSolution.m_dOptParams.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << ".\n"
+            << "\n PoseOut (of " << std::to_string(m_Sample.m_vStates.size()) << ") " << m_poseOut.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << "."
+            << "\n ErrorsOut " << m_dErrorOut.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << "."
+            ;
+
+        return;
     }
 
     MochaPlanner *m_pPlanner;
@@ -48,6 +59,7 @@ struct ApplyCommandsThreadFunctor {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
+}
 
 inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1,const Eigen::Vector6d& line2, const Eigen::Vector6d& point, double& dInterpolationFactor)
 {
@@ -87,7 +99,7 @@ inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1,const Eige
 MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_private_nh(&private_nh),
     m_nh(&nh),
-    m_dEps(CVarUtils::CreateUnsavedCVar("planner.Epsilon", 1e-6, "Epsilon value used in finite differences.")),
+    m_dEps(CVarUtils::CreateUnsavedCVar("planner.Epsilon", 0.1, "Epsilon value used in finite differences.")),
     m_dPointWeight(CVarUtils::CreateUnsavedCVar("planner.PointCostWeights",Eigen::MatrixXd(1,1))),
     m_dTrajWeight(CVarUtils::CreateUnsavedCVar("planner.TrajCostWeights",Eigen::MatrixXd(1,1))),
     m_nPlanCounter(0),
@@ -95,6 +107,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_actionApplyVelocities_client("plan_car/apply_velocities",true),
     m_actionGetInertiaTensor_client("plan_car/get_inertia_tensor",true),
     m_actionSetNoDelay_client("plan_car/set_no_delay",true),
+    m_actionRaycast_client("plan_car/raycast",true),
     m_bServersInitialized(false),
     m_bSubToVehicleWp(true), 
     m_dWpLookupDuration(5.0)
@@ -102,7 +115,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_private_nh->param("params_file", m_config.params_file, m_config.params_file);
     m_private_nh->param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
 
-    m_ThreadPool.size_controller().resize(8);
+    m_ThreadPool.size_controller().resize(OPT_DIM*2+1);
 
     //weight matrix
     m_dPointWeight = Eigen::MatrixXd(POINT_COST_ERROR_TERMS,1);
@@ -110,17 +123,17 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_dPointWeight.setIdentity();
     m_dTrajWeight.setIdentity();
 
-    m_dPointWeight(0) = XYZ_WEIGHT;
-    m_dPointWeight(1) = XYZ_WEIGHT;
-    m_dPointWeight(2) = XYZ_WEIGHT;
+    m_dPointWeight(0) = XY_WEIGHT;
+    m_dPointWeight(1) = XY_WEIGHT;
+    m_dPointWeight(2) = Z_WEIGHT;
     m_dPointWeight(3) = THETA_WEIGHT;
     m_dPointWeight(4) = VEL_WEIGHT_POINT;
     // m_dPointWeight(5) = CURV_WEIGHT;
     m_dPointWeight(5) = TILT_WEIGHT;
 
-    m_dTrajWeight(0) = XYZ_WEIGHT;
-    m_dTrajWeight(1) = XYZ_WEIGHT;
-    m_dTrajWeight(2) = XYZ_WEIGHT;
+    m_dTrajWeight(0) = XY_WEIGHT;
+    m_dTrajWeight(1) = XY_WEIGHT;
+    m_dTrajWeight(2) = Z_WEIGHT;
     m_dTrajWeight(3) = THETA_WEIGHT;
     m_dTrajWeight(4) = VEL_WEIGHT_TRAJ;
     m_dTrajWeight(5) = TIME_WEIGHT;
@@ -129,7 +142,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
 
     m_timerPubLoop = m_private_nh->createTimer(ros::Duration(0.1), &MochaPlanner::PubLoopFunc, this);
     
-    // m_timerPlanningLoop = m_private_nh->createTimer(ros::Duration(1.0), &MochaPlanner::PlanningLoopFunc, this);
+    m_timerPlanningLoop = m_private_nh->createTimer(ros::Duration(1.0), &MochaPlanner::PlanningLoopFunc, this);
 
     if (m_bSubToVehicleWp) {
         // m_subVehicleWp = m_nh->subscribe("vehicle_waypoint", 10, boost::bind(&MochaPlanner::vehicleWpCb, this, _1));
@@ -146,7 +159,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     // m_pubPlan = m_private_nh->advertise<nav_msgs::Path>("opt_plan", 10);
 
     m_pubWaypoints = m_nh->advertise<geometry_msgs::PoseArray>("/plan_car/waypoints",1);
-    m_pubSimPath = m_private_nh->advertise<visualization_msgs::MarkerArray>("/plan_car/opt_plan", 1);
+    m_pubSimPath = m_private_nh->advertise<nav_msgs::Path>("/plan_car/sim_traj", 1);
     m_pubActualTraj = m_private_nh->advertise<nav_msgs::Path>("/plan_car/actual_traj", 1);
     m_pubControlTraj = m_private_nh->advertise<nav_msgs::Path>("/plan_car/control_traj", 1);
 
@@ -162,37 +175,22 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     
     // m_actionSetNoDelay_client.waitForServer();
 
-    m_srvEnablePlanning_server = m_nh->advertiseService("plan_car/enable_planning", &MochaPlanner::EnablePlanningSvcCb, this);
+    m_srvEnableTerrainPlanning_server = m_nh->advertiseService("plan_car/enable_terrain_planning", &MochaPlanner::EnableTerrainPlanningSvcCb, this);
+    m_srvEnableContinuousPlanning_server = m_nh->advertiseService("plan_car/enable_continuous_planning", &MochaPlanner::EnableContinuousPlanningSvcCb, this);
 
+    while( !m_bServersInitialized && ros::ok()) 
     {
-    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-    m_vWaypoints.clear();
-    for(uint i=0; i<2; i++) {
-        Sophus::SE3d pose;
-        pose.translation() = *(new Eigen::Vector3d(2+i, 1, 0));
-        pose.setQuaternion(Eigen::Quaterniond(1, 0, 0, 0));
-	
-        double vel = 1;
-        double curv = 0;
-
-        VehicleState state(pose, vel, curv);
-        Waypoint* wp = new Waypoint(state);
-        m_vWaypoints.push_back(wp);
-
-    }
-    }
-
-    while( !m_bServersInitialized ) 
-    {
-        m_bServersInitialized = m_actionApplyVelocities_client.isServerConnected()
+        m_bServersInitialized = 
+        // m_actionApplyVelocities_client.isServerConnected()
         // && m_actionGetControlDelay_client->isServerConnected()  
-        && m_actionGetInertiaTensor_client.isServerConnected() 
+        m_actionGetInertiaTensor_client.isServerConnected() 
+        && m_actionRaycast_client.isServerConnected()
         && m_actionSetNoDelay_client.isServerConnected(); 
 
-        if (!m_actionApplyVelocities_client.isServerConnected()) 
-        {
-            DLOG(INFO) << "Waiting for ApplyVelocities Server";
-        }
+        // if (!m_actionApplyVelocities_client.isServerConnected()) 
+        // {
+        //     DLOG(INFO) << "Waiting for ApplyVelocities Server";
+        // }
         // if (!m_actionGetControlDelay_client.isServerConnected()) 
         // {
         //     DLOG(INFO) << "Waiting for GetControlDelay Server";
@@ -200,6 +198,10 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
         if (!m_actionGetInertiaTensor_client.isServerConnected()) 
         {
             DLOG(INFO) << "Waiting for GetInertiaTensor Server";
+        }
+        if (!m_actionRaycast_client.isServerConnected()) 
+        {
+            DLOG(INFO) << "Waiting for Raycast Server";
         }
         if (!m_actionSetNoDelay_client.isServerConnected()) 
         {
@@ -209,9 +211,58 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
         ros::Duration(1).sleep();
     }
 
+    {
+        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+        m_vWaypoints.clear();
+        // for(uint i=0; i<2; i++) {
+        //     Sophus::SE3d pose;
+        //     pose.translation() = *(new Eigen::Vector3d(2+i, 1, 0));
+        //     pose.setQuaternion(Eigen::Quaterniond(1, 0, 0, 0));
+        
+        //     double vel = 1;
+        //     double curv = 0;
+
+        //     VehicleState state(pose, vel, curv);
+        //     Waypoint* wp = new Waypoint(state);
+        //     m_vWaypoints.push_back(wp);
+
+        // }
+        // m_vWaypoints.resize(2);
+    
+        {
+            Sophus::SE3d pose;
+            pose.translation()[0] = 0.75;
+            pose.translation()[1] = -1.25;
+            pose.translation()[2] = 0;
+            pose.setQuaternion(Eigen::Quaterniond(0.707, 0, 0, 0.707));
+        
+            double vel = 1;
+            double curv = 0;
+
+            VehicleState state(pose, vel, curv);
+            Waypoint wp(state);
+            AddWaypoint(wp);
+        }
+        {
+            Sophus::SE3d pose;
+            pose.translation()[0] = 1.25;
+            pose.translation()[1] = 0;
+            pose.translation()[2] = 0;
+            pose.setQuaternion(Eigen::Quaterniond(0.707, 0, 0, 0.707));
+        
+            double vel = 1;
+            double curv = 0;
+
+            VehicleState state(pose, vel, curv);
+            Waypoint wp(state);
+            AddWaypoint(wp);
+        }
+    }
+
     DLOG(INFO) << "Initialized.";    
 
-    replan();
+    if (!m_bPlanContinuously)
+        replan();
 }
 
 MochaPlanner::~MochaPlanner()
@@ -222,6 +273,7 @@ MochaPlanner::~MochaPlanner()
     // delete m_pPlannerThread;
     // m_pPlannerThread = 0 ;
 }
+
 
 // virtual void MochaPlanner::onInit()
 // {
@@ -515,22 +567,24 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
     Eigen::IOFormat CleanFmt(8, 0, ", ", "\n", "[", "]");
     Eigen::VectorXd errors[OPT_DIM*2],dCurrentError;
     std::vector<std::shared_ptr<Problem > > vCubicProblems;
-    std::vector<std::shared_ptr<ApplyCommandsThreadFunctor > > vFunctors;
+    std::vector<std::shared_ptr<mochapc::ApplyCommandsThreadFunctor > > vFunctors;
     vCubicProblems.resize(OPT_DIM*2);
     vFunctors.resize(OPT_DIM*2);
     Eigen::Vector6d pPoses[OPT_DIM*2],dCurrentPose;
 
     const double dEps = m_dEps;// * problem.m_CurrentSolution.m_dNorm;
+    DLOG(INFO) << "Calcing Jacobian";
 
     //g_bUseCentralDifferences = false;
-    for( int ii = 0; ii < OPT_DIM; ii++ ){
+    for( int ii = 0; ii < OPT_DIM; ii++ )
+    {
         int plusIdx = ii*2, minusIdx = ii*2+1;
         vCubicProblems[plusIdx] = std::make_shared<Problem>(problem);
         Eigen::VectorXd delta(OPT_DIM);
         delta.setZero();
         delta(ii) += dEps;
         vCubicProblems[plusIdx]->UpdateOptParams(vCubicProblems[plusIdx]->m_CurrentSolution.m_dOptParams.head(OPT_DIM)+delta);
-        vFunctors[plusIdx] = std::make_shared<ApplyCommandsThreadFunctor>(this,
+        vFunctors[plusIdx] = std::make_shared<mochapc::ApplyCommandsThreadFunctor>(this,
                                                                           *vCubicProblems[plusIdx],
                                                                           plusIdx,
                                                                           pPoses[plusIdx],
@@ -545,7 +599,7 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
             delta.setZero();
             delta(ii) -= dEps;
             vCubicProblems[minusIdx]->UpdateOptParams(vCubicProblems[minusIdx]->m_CurrentSolution.m_dOptParams.head(OPT_DIM)+delta);
-            vFunctors[minusIdx] = std::make_shared<ApplyCommandsThreadFunctor>(this,
+            vFunctors[minusIdx] = std::make_shared<mochapc::ApplyCommandsThreadFunctor>(this,
                                                                                *vCubicProblems[minusIdx],
                                                                                minusIdx,
                                                                                pPoses[minusIdx],
@@ -557,8 +611,8 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
     }
 
     std::shared_ptr<Problem >currentProblem = std::make_shared<Problem>(problem);
-    std::shared_ptr<ApplyCommandsThreadFunctor > currentFunctor =
-        std::make_shared<ApplyCommandsThreadFunctor>(this,
+    std::shared_ptr<mochapc::ApplyCommandsThreadFunctor > currentFunctor =
+        std::make_shared<mochapc::ApplyCommandsThreadFunctor>(this,
                                                      *currentProblem,
                                                      OPT_DIM*2+1,
                                                      dCurrentPose,
@@ -569,7 +623,12 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
 
 
     //wait for all simulations to finish
+    DLOG(INFO) << "Waiting for threads to finish...";
+    // boost::xtime t = boost::xtime::system_time();
+    // // t.system_time();
+    // t.sec += 1;
     m_ThreadPool.wait();
+    DLOG(INFO) << "Done waiting.";
 
     dCurrentErrorVec = dCurrentError;
 
@@ -598,12 +657,21 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
         }
 
         if(g_bVerbose){
-            DLOG(INFO) << "Dimension " << ii << " norm " << norm << " error-> [" << errors[plusIdx].transpose().format(CleanFmt) << "] vs. ["  << dCurrentErrorVec.transpose().format(CleanFmt);
+            // DLOG(INFO) << "Dimension " << ii << " norm " << norm << " error-> [" << errors[plusIdx].transpose().format(CleanFmt) << "] vs. ["  << dCurrentErrorVec.transpose().format(CleanFmt);
         }
 
         //now that we have all the error terms, we can set this column of the jacobians
 
         Eigen::VectorXd col = g_bUseCentralDifferences ? ((errors[plusIdx]) - (errors[minusIdx]))/(2.0*dEps) : ((errors[plusIdx]) - dCurrentErrorVec)/(dEps);
+
+        std::string str = "Col "+std::to_string(ii)+" ";
+        for(uint i=0; i<col.size(); i++){
+            str += std::to_string(col(ii)) + " ";
+        }
+        DLOG(INFO) << str;
+        (g_bUseCentralDifferences ? 
+            DLOG(INFO) << "with centraldiff. errors+ " << errors[plusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " errors- " << errors[minusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " dEps " << std::to_string(dEps) : 
+            DLOG(INFO) << "without centraldiff. errors+ " << errors[plusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " currerr " << dCurrentErrorVec.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " dEps " << std::to_string(dEps) );
 
         J.col(ii) = -col;
         //if this term is NAN, sound the alarm
@@ -734,7 +802,19 @@ Eigen::Vector6d MochaPlanner::SimulateTrajectory(MotionSample& sample,
         // augment sample.commands with compensation (gravity, steering, friction) for RaycastVehicle 
         // and use with BulletCarModel::UpdateState to populate sample.states
 
+        // DLOG(INFO) << "Commands(" << sample.m_vCommands.size() << "):";
+        // for(uint i=0; i<sample.m_vCommands.size(); i++) {
+        //     DLOG(INFO) << "  " << sample.m_vCommands[i].m_dForce << " " << sample.m_vCommands[i].m_dCurvature << " " << sample.m_vCommands[i].m_dT << " " << sample.m_vCommands[i].m_dPhi << " " << sample.m_vCommands[i].m_dTorque.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " " << sample.m_vCommands[i].m_dTime;
+        // }
+
         ApplyVelocities( problem.m_StartState, sample, iWorld, bUsingBestSolution);
+
+
+        // DLOG(INFO) << "States(" << sample.m_vStates.size() << "):";
+        // for(uint i=0; i<sample.m_vStates.size(); i++) {
+        //     DLOG(INFO) << "  " << sample.m_vStates[i].ToXYZTCV().format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]"));
+        // }
+
         if (sample.m_vStates.size()>0)
             vState = sample.m_vStates.back();
         else
@@ -775,6 +855,34 @@ void MochaPlanner::_GetAccelerationProfile(Problem& problem) const
     //problem.m_dMaxSegmentTime = DBL_MAX;
 }
 
+// void MochaPlanner::ApplyVelocitiesDoneCb(const actionlib::SimpleClientGoalState& state,
+//     const carplanner_msgs::ApplyVelocitiesResultConstPtr& result)
+// {
+//     DLOG(INFO) << "AV done:" 
+//             << " world " << std::to_string(result->world_id) 
+//             << " " << state.toString()
+//             // << " poseOut " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x) 
+//             //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x)  
+//             //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.y)
+//             //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.z) 
+//             ;
+
+//     if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
+//     {
+//         {
+//         boost::mutex::scoped_lock lock(m_mutexApplyVelocitiesInfo);
+//         for (uint i=0; i<m_vApplyVelocitiesGoalIds.size(); i++)
+//         {
+//             if (m_vApplyVelocitiesGoalIds[i]==state)
+//         }
+//         }
+//     }
+//     else
+//         DLOG(INFO) << "ApplyVelocities " << std::to_string(nWorldId) << ") did not finish before the time out.";
+
+//     ros::shutdown();
+// }
+
 void MochaPlanner::ApplyVelocities(const VehicleState& startState,
                                                       MotionSample& sample,
                                                       int nWorldId /*= 0*/,
@@ -789,6 +897,11 @@ void MochaPlanner::ApplyVelocities(const VehicleState& startState,
     //                 NULL);
     // return sample.m_vStates.back();
 
+    // boost::thread spin_thread(&spinThread);
+
+    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> actionApplyVelocities_client("plan_car/apply_velocities/"+std::to_string(nWorldId),true);
+    actionApplyVelocities_client.waitForServer();
+
     carplanner_msgs::ApplyVelocitiesGoal goal;
     carplanner_msgs::ApplyVelocitiesResultConstPtr result;
     
@@ -796,19 +909,57 @@ void MochaPlanner::ApplyVelocities(const VehicleState& startState,
     goal.initial_motion_sample = sample.toROS();
     goal.world_id = nWorldId;
     goal.no_compensation = noCompensation;
-    m_actionApplyVelocities_client.sendGoal(goal);
+    actionApplyVelocities_client.sendGoal(goal
+        // , boost::bind(&MochaPlanner::ApplyVelocitiesDoneCb, this, _1, _2)
+        // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleActiveCallback()
+        // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleFeedbackCallback()
+        );
 
-    bool finished_before_timeout = m_actionApplyVelocities_client.waitForResult(ros::Duration(0.5));
+    // {
+    // boost::mutex::scoped_lock lock(m_mutexApplyVelocitiesInfo);
+    // m_vApplyVelocitiesGoalIds.push_back(goal.goal_id);
+    // m_vApplyVelocitiesMotionSamples.push_back(&sample);
+    // }
+
+    DLOG(INFO) << "AV called:" 
+        << " world " << std::to_string(goal.world_id) 
+      // "\nstart " << std::to_string(VehicleState::fromROS(goal->initial_state))
+      ;
+
+    float timeout(5.0);
+    bool finished_before_timeout = actionApplyVelocities_client.waitForResult(ros::Duration(timeout));
     if (finished_before_timeout)
     {
-        actionlib::SimpleClientGoalState state = m_actionApplyVelocities_client.getState();
-        ROS_INFO("ApplyVelocities Action finished: %s", state.toString().c_str());
+        actionlib::SimpleClientGoalState state = actionApplyVelocities_client.getState();
+        // DLOG(INFO) << "ApplyVelocities finished: " << state.toString();
 
-        result = m_actionApplyVelocities_client.getResult();
+        result = actionApplyVelocities_client.getResult();
         sample.fromROS(result->motion_sample);
     }
     else
-        ROS_INFO("ApplyVelocities Action did not finish before the time out.");
+        DLOG(INFO) << "ApplyVelocities (" << std::to_string(nWorldId) << ") did not finish before the " << std::to_string(timeout) << "s time out.";
+
+    // spin_thread.join();
+
+    // while (actionApplyVelocities_client.getState() == actionlib::SimpleClientGoalState::PENDING
+    //     || actionApplyVelocities_client.getState() == actionlib::SimpleClientGoalState::ACTIVE
+    //     )
+    // {  
+    //     DLOG(INFO) << std::to_string(goal.world_id) << ": " << actionApplyVelocities_client.getState().toString();
+    //     ros::Rate(10).sleep();
+    // }
+
+    // result = actionApplyVelocities_client.getResult();
+    // sample.fromROS(result->motion_sample);
+
+    DLOG(INFO) << "AV done:" 
+        << " world " << std::to_string(goal.world_id) 
+        << " " << actionApplyVelocities_client.getState().toString()
+        // << " poseOut " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x) 
+        //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x)  
+        //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.y)
+        //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.z) 
+        ;
 
     return;
 }
@@ -827,7 +978,7 @@ double MochaPlanner::GetControlDelay(int nWorldId)
     if (finished_before_timeout)
     {
         actionlib::SimpleClientGoalState state = m_actionGetControlDelay_client->getState();
-        ROS_INFO("GetControlDelay Action finished: %s", state.toString().c_str());
+        // ROS_INFO("GetControlDelay Action finished: %s", state.toString().c_str());
 
         result = m_actionGetControlDelay_client->getResult();
         valOut = result->val;
@@ -852,7 +1003,7 @@ const Eigen::Vector3d MochaPlanner::GetInertiaTensor(int nWorldId)
     if (finished_before_timeout)
     {
         actionlib::SimpleClientGoalState state = m_actionGetInertiaTensor_client.getState();
-        ROS_INFO("GetInertiaTensor Action finished: %s", state.toString().c_str());
+        // ROS_INFO("GetInertiaTensor Action finished: %s", state.toString().c_str());
 
         result = m_actionGetInertiaTensor_client.getResult();
     }
@@ -878,7 +1029,7 @@ void MochaPlanner::SetNoDelay(bool no_delay)
     if (finished_before_timeout)
     {
         actionlib::SimpleClientGoalState state = m_actionSetNoDelay_client.getState();
-        ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
+        // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
 
     }
     else
@@ -888,9 +1039,9 @@ void MochaPlanner::SetNoDelay(bool no_delay)
     return;
 }
 
-bool MochaPlanner::EnablePlanningSvcCb(carplanner_msgs::EnablePlanning::Request &req, carplanner_msgs::EnablePlanning::Response &res)
+bool MochaPlanner::EnableTerrainPlanningSvcCb(carplanner_msgs::EnableTerrainPlanning::Request &req, carplanner_msgs::EnableTerrainPlanning::Response &res)
 {   
-    DLOG(INFO) << "EnablePlanning service called.";
+    DLOG(INFO) << "EnableTerrainPlanning service called.";
 
     {
     boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
@@ -898,14 +1049,64 @@ bool MochaPlanner::EnablePlanningSvcCb(carplanner_msgs::EnablePlanning::Request 
     {
         m_vWaypoints[i]->isDirty = true;
     }
-    for(uint i=0; i<m_vWaypoints.size(); i++)
-    {
-        DLOG(INFO) << "wp " <<  std::to_string(i) << " is dirty " << (m_vWaypoints[i]->isDirty ? "true" : "false");
-    }
     }
 
-    EnablePlanning(req.do_plan);
-    replan();
+    EnableTerrainPlanning(req.do_plan);
+
+    if (!m_bPlanContinuously)
+        replan();
+
+    return true;
+}
+
+bool MochaPlanner::EnableContinuousPlanningSvcCb(carplanner_msgs::EnableContinuousPlanning::Request &req, carplanner_msgs::EnableContinuousPlanning::Response &res)
+{   
+    DLOG(INFO) << "EnableContinuousPlanning service called.";
+
+    EnableContinuousPlanning(req.plan_continuously);
+
+    return true;
+}
+
+bool MochaPlanner::Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool& biDirectional, int index /*= 0*/)
+{
+    carplanner_msgs::RaycastGoal goal;
+    carplanner_msgs::RaycastResultConstPtr result;
+
+    goal.source.x = dSource[0];
+    goal.source.y = dSource[1];
+    goal.source.z = dSource[2];
+    goal.ray.x = dRayVector[0];
+    goal.ray.y = dRayVector[1];
+    goal.ray.z = dRayVector[2];
+    goal.bidirectional = biDirectional;
+    goal.index = index;
+
+    // while (m_actionRaycast_client.getState() == actionlib::SimpleClientGoalState::PENDING
+    //     ||  m_actionRaycast_client.getState() == actionlib::SimpleClientGoalState::ACTIVE
+    //     )
+    // {
+    //     ros::Duration(0.1).sleep();
+    // }
+    
+    m_actionRaycast_client.sendGoal(goal);
+
+    bool finished_before_timeout = m_actionRaycast_client.waitForResult(ros::Duration(1.0));
+    if (finished_before_timeout)
+    {
+        actionlib::SimpleClientGoalState state = m_actionRaycast_client.getState();
+        ROS_INFO("Raycast Action finished: %s", state.toString().c_str());
+
+        result = m_actionRaycast_client.getResult();
+        dIntersect = Eigen::Vector3d(result->intersect.x, result->intersect.y, result->intersect.z);
+
+        return true;
+    }
+    else
+    {
+        ROS_INFO("Raycast Action did not finish before the time out.");
+        return false;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -1075,12 +1276,13 @@ bool MochaPlanner::Iterate(Problem &problem )
         }
 
         if( m_dEps > 5 || problem.m_bInLocalMinimum == true) {
-            // DLOG(INFO) << "Failed to plan. Norm = " << problem.m_dCurrentNorm;
+            DLOG(INFO) << "Failed to plan. Norm = " << problem.m_CurrentSolution.m_dNorm;
             return false;
         }
 
         _IterateGaussNewton(problem);
-        return true;
+
+        return false;
     }catch(...){
         return false;
     }
@@ -1248,6 +1450,12 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
         return false;
     }
 
+    ROS_INFO("Errors:");
+    for (uint i=0; i<error.size(); i++)
+    {
+        ROS_INFO("%f",error[i]);
+    }
+
     problem.m_CurrentSolution.m_dNorm = _CalculateErrorNorm(problem,error);
     if(g_bVerbose){
         DLOG(INFO) << "Calculated jacobian with base norm: " << problem.m_CurrentSolution.m_dNorm;
@@ -1315,7 +1523,7 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
     Eigen::VectorXd pDampingErrors[DAMPING_STEPS];
     //Eigen::VectorOpt pHypePs[DAMPING_STEPS];
     std::vector<std::shared_ptr<Problem> > vCubicProblems;
-    std::vector<std::shared_ptr<ApplyCommandsThreadFunctor> >vFunctors;
+    std::vector<std::shared_ptr<mochapc::ApplyCommandsThreadFunctor> >vFunctors;
     vCubicProblems.resize(DAMPING_STEPS);
     vFunctors.resize(DAMPING_STEPS);
     double dampings[DAMPING_STEPS];
@@ -1331,7 +1539,7 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
             Eigen::VectorXd delta = dDeltaP *damping;
             vCubicProblems[ii] = std::make_shared<Problem>(problem);
             vCubicProblems[ii]->UpdateOptParams(vCubicProblems[ii]->m_CurrentSolution.m_dOptParams.head(OPT_DIM)+delta);
-            vFunctors[ii] = std::make_shared<ApplyCommandsThreadFunctor>(this,
+            vFunctors[ii] = std::make_shared<mochapc::ApplyCommandsThreadFunctor>(this,
                                                                          *vCubicProblems[ii],
                                                                          ii,
                                                                          pDampingStates[ii],
@@ -1433,8 +1641,8 @@ void MochaPlanner::vehicleWpLookupFunc(const ros::TimerEvent& event)
     tf::StampedTransform this_tf;
     try
     {
-        tflistener.waitForTransform("world", "base_link", ros::Time::now(), ros::Duration(1.0));
-        tflistener.lookupTransform("world", "base_link", ros::Time(0), this_tf);
+        tflistener.waitForTransform("map", "base_link", ros::Time::now(), ros::Duration(1.0));
+        tflistener.lookupTransform("map", "base_link", ros::Time(0), this_tf);
     }
     catch (tf2::TransformException ex)
     {
@@ -1445,16 +1653,26 @@ void MochaPlanner::vehicleWpLookupFunc(const ros::TimerEvent& event)
     
     Waypoint start_wp = Waypoint::tf2Waypoint(this_tf);
     {
-    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-    // while(m_vWaypoints.size()>2) m_vWaypoints.pop_back(); //erase(m_vWaypoints.back());
-    // delete m_vWaypoints[0];
-    m_vWaypoints.resize(2);
-    m_vWaypoints[0] = new Waypoint(start_wp);
+        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+        // while(m_vWaypoints.size()>2) m_vWaypoints.pop_back(); //erase(m_vWaypoints.back());
+        // delete m_vWaypoints[0];
+        m_vWaypoints.resize(2);
+        m_vWaypoints[0] = new Waypoint(start_wp);
+    }
+    {
+        Eigen::Vector3d dIntersect;
+        Sophus::SE3d pose( m_vWaypoints[0]->state.ToSE3d() );
+        if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
+        {
+            pose.translation() = dIntersect;
+            m_vWaypoints[0]->state = VehicleState(pose, 1, m_vWaypoints[0]->state.m_dCurvature);
+        }
     }
 
     m_vSegmentSamples.resize(m_vWaypoints.size()-1);
-
-    replan();
+    
+    if (!m_bPlanContinuously)
+        replan();
 }
 
 
@@ -1463,80 +1681,266 @@ void MochaPlanner::vehicleWpCb(const nav_msgs::Odometry& odom_msg)
 {
     if (!m_bServersInitialized) { DLOG(INFO) << "Aborting vehicle waypoint callback bc servers not initialized."; return; }
 
-    DLOG(INFO) << "vwpi t " << std::to_string(m_vWaypoints[1]->state.m_dTwv.translation().x())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.translation().y())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.translation().z());
-    DLOG(INFO) << "r " << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().w())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().x())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().y())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().z());
-
     DLOG(INFO) << "Got vehicle waypoint"; 
 
-    Waypoint start_wp = Waypoint::OdomMsg2Waypoint(odom_msg);
     {
-    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-    DLOG(INFO) << "Adding vehicle waypoint"; 
-
-    // while(m_vWaypoints.size()>2) m_vWaypoints.pop_back(); //.erase(m_vWaypoints.back());
-    // delete m_vWaypoints[0];
-    m_vWaypoints.resize(2);
-    m_vWaypoints[0] = new Waypoint(start_wp);
-
-    DLOG(INFO) << "vwpf t " << std::to_string(m_vWaypoints[1]->state.m_dTwv.translation().x())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.translation().y())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.translation().z());
-    DLOG(INFO) << "r " << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().w())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().x())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().y())
-               << " "  << std::to_string(m_vWaypoints[1]->state.m_dTwv.unit_quaternion().z());
+        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+        m_vWaypoints.resize(2);
+        SetWaypoint(0, Waypoint::OdomMsg2Waypoint(odom_msg));
     }
-
 
     m_vSegmentSamples.resize(m_vWaypoints.size()-1);
 
-    replan();
+    if (!m_bPlanContinuously)
+        replan();
 }
+
+///this used to work ithink
+/*
+// while(m_vWaypoints.size()>2) m_vWaypoints.pop_back(); //.erase(m_vWaypoints.back());
+// delete m_vWaypoints[0];
+m_vWaypoints.resize(2);
+m_vWaypoints[0] = new Waypoint(start_wp);
+
+{
+    Eigen::Vector3d dIntersect;
+    Sophus::SE3d pose( m_vWaypoints[0]->state.ToSE3d() );
+    if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
+    {
+        pose.translation() = dIntersect;
+        m_vWaypoints[0]->state = VehicleState(pose, 1, m_vWaypoints[0]->state.m_dCurvature);
+    }
+}
+*/
 
 void MochaPlanner::goalWpCb(const nav_msgs::Odometry& odom_msg)
 {
-    if (!m_bServersInitialized) { DLOG(INFO) << "Aborting goal waypoint callback bc servers not initialized."; return; }
+    if (!m_bServersInitialized) { DLOG(INFO) << "Aborting vehicle waypoint callback bc servers not initialized."; return; }
 
-    DLOG(INFO) << "Got goal waypoint.";
-    Waypoint goal_wp = Waypoint::OdomMsg2Waypoint(odom_msg);
+    DLOG(INFO) << "Got goal waypoint"; 
+
     {
-    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-    // while(m_vWaypoints.size()>2) m_vWaypoints.pop_back(); //erase(m_vWaypoints.back());
-    // delete m_vWaypoints[1];
-    m_vWaypoints.resize(2);
-    m_vWaypoints[1] = new Waypoint(goal_wp);
+        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+        m_vWaypoints.resize(2);
+        SetWaypoint(1, Waypoint::OdomMsg2Waypoint(odom_msg));
     }
 
     m_vSegmentSamples.resize(m_vWaypoints.size()-1);
 
-    replan();
+    if (!m_bPlanContinuously)
+        replan();
 }
 
 void MochaPlanner::waypointsCb(const carplanner_msgs::OdometryArray& odom_arr_msg)
 {
     if (!m_bServersInitialized) { DLOG(INFO) << "Aborting waypoints callback bc servers not initialized."; return; }
 
-    DLOG(INFO) << "Got waypoints.";
+    DLOG(INFO) << "Got " <<  std::to_string(odom_arr_msg.odoms.size()) << " waypoints.";
 
     {
-    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-    // m_vWaypoints.clear();
-    m_vWaypoints.resize(odom_arr_msg.odoms.size());
-    for(uint i=0; i<m_vWaypoints.size(); i++)
-    {
-        m_vWaypoints[i] = new Waypoint(Waypoint::OdomMsg2Waypoint(odom_arr_msg.odoms[i]));
-    }
+        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+        m_vWaypoints.clear();
+        for(uint i=0; i<odom_arr_msg.odoms.size(); i++)
+        {
+            AddWaypoint(Waypoint::OdomMsg2Waypoint(odom_arr_msg.odoms[i]));
+        }
     }
 
     m_vSegmentSamples.resize(m_vWaypoints.size()-1);
 
-    replan();
+    if (!m_bPlanContinuously)
+        replan();
 }
+
+void MochaPlanner::AddWaypoint(Waypoint& wp)
+{
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+    Eigen::Vector3d dIntersect;
+
+    Waypoint* wp_ptr = new Waypoint(wp); // in nwu
+    wp_ptr->state.FlipCoordFrame(); // now in ned
+
+    if (Raycast(wp_ptr->state.m_dTwv.translation(), GetBasisVector(wp_ptr->state.m_dTwv,2)*0.2, dIntersect, true))
+    {
+        wp_ptr->state.m_dTwv.translation() = dIntersect;// + Eigen::Vector3d(0,0,-0.1);
+
+        // m_vWaypoints.back() = new Waypoint(wp);
+
+        // m_vWaypoints.erase(m_vWaypoints.end());
+        // m_vWaypoints.push_back(new Waypoint(wp));
+    }
+
+    m_vWaypoints.push_back(wp_ptr);
+}
+
+void MochaPlanner::SetWaypoint(int idx, Waypoint& wp)
+{
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+    Eigen::Vector3d dIntersect;
+
+    Waypoint* wp_ptr = new Waypoint(wp);
+    wp_ptr->state.FlipCoordFrame();
+
+    if (Raycast(wp_ptr->state.m_dTwv.translation(), GetBasisVector(wp_ptr->state.m_dTwv,2)*0.2, dIntersect, true))
+    {
+        wp_ptr->state.m_dTwv.translation() = dIntersect;// + Eigen::Vector3d(0,0,-0.1);
+
+        // m_vWaypoints.back() = new Waypoint(wp);
+
+        // m_vWaypoints.erase(m_vWaypoints.end());
+        // m_vWaypoints.push_back(new Waypoint(wp));
+    }
+
+    // if (m_vWaypoints[idx])
+    // {
+        // delete m_vWaypoints[idx];
+    // }
+    m_vWaypoints[idx] = wp_ptr;
+}
+
+// m_vWaypoints.resize(2);
+// m_vWaypoints[0] = new Waypoint(start_wp);
+
+// {
+//     Eigen::Vector3d dIntersect;
+//     Sophus::SE3d pose( m_vWaypoints[0]->state.ToSE3d() );
+//     if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
+//     {
+//         pose.translation() = dIntersect;
+//         m_vWaypoints[0]->state = VehicleState(pose, 1, m_vWaypoints[0]->state.m_dCurvature);
+//     }
+// }
+
+// void MochaPlanner::waypointsCb(const carplanner_msgs::OdometryArray& odom_arr_msg)
+// {
+//     if (!m_bServersInitialized) { DLOG(INFO) << "Aborting waypoints callback bc servers not initialized."; return; }
+
+//     DLOG(INFO) << "Got " <<  std::to_string(odom_arr_msg.odoms.size()) << " waypoints.";
+
+//     Sophus::SE3d rot_180_x;
+// 	rot_180_x.translation().setZero();
+// 	rot_180_x.setQuaternion(Eigen::Quaterniond(0.0, 1.0, 0.0, 0.0));
+
+//     {
+//         boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+//         // m_vWaypoints.clear();
+//         m_vWaypoints.resize(odom_arr_msg.odoms.size());
+//         for(uint i=0; i<m_vWaypoints.size(); i++)
+//         {
+//             nav_msgs::Odometry odom_msg_nwu = odom_arr_msg.odoms[i];
+
+//             // DLOG(INFO) << " odom_nwu " << i << ": "
+//             //     << odom_msg_nwu.pose.pose.position.x << ", "
+//             //     << odom_msg_nwu.pose.pose.position.y << ", "
+//             //     << odom_msg_nwu.pose.pose.position.z << "; "
+//             //     << odom_msg_nwu.pose.pose.orientation.x << ", "
+//             //     << odom_msg_nwu.pose.pose.orientation.y << ", "
+//             //     << odom_msg_nwu.pose.pose.orientation.z << ", "
+//             //     << odom_msg_nwu.pose.pose.orientation.w << "; ";
+
+//             Sophus::SE3d pose_nwu;
+//             pose_nwu.translation()[0]                 = odom_msg_nwu.pose.pose.position.x;
+//             pose_nwu.translation()[1]                 = odom_msg_nwu.pose.pose.position.y;
+//             pose_nwu.translation()[2]                 = odom_msg_nwu.pose.pose.position.z;
+//             pose_nwu.setQuaternion(Sophus::Quaterniond( odom_msg_nwu.pose.pose.orientation.w,
+//                                                         odom_msg_nwu.pose.pose.orientation.x,
+//                                                         odom_msg_nwu.pose.pose.orientation.y,
+//                                                         odom_msg_nwu.pose.pose.orientation.z));
+            
+//             Sophus::SE3d pose_ned = rot_180_x*pose_nwu*rot_180_x;
+
+//             nav_msgs::Odometry odom_msg_ned;
+//             odom_msg_ned.pose.pose.position.x       = pose_ned.translation()[0];
+//             odom_msg_ned.pose.pose.position.y       = pose_ned.translation()[1];
+//             odom_msg_ned.pose.pose.position.z       = pose_ned.translation()[2];
+//             odom_msg_ned.pose.pose.orientation.w    = pose_ned.unit_quaternion().w();
+//             odom_msg_ned.pose.pose.orientation.x    = pose_ned.unit_quaternion().x();
+//             odom_msg_ned.pose.pose.orientation.y    = pose_ned.unit_quaternion().y();
+//             odom_msg_ned.pose.pose.orientation.z    = pose_ned.unit_quaternion().z();
+
+//             // DLOG(INFO) << " odom_ned " << i << ": "
+//             //     << odom_msg_ned.pose.pose.position.x << ", "
+//             //     << odom_msg_ned.pose.pose.position.y << ", "
+//             //     << odom_msg_ned.pose.pose.position.z << "; "
+//             //     << odom_msg_ned.pose.pose.orientation.x << ", "
+//             //     << odom_msg_ned.pose.pose.orientation.y << ", "
+//             //     << odom_msg_ned.pose.pose.orientation.z << ", "
+//             //     << odom_msg_ned.pose.pose.orientation.w << "; ";
+
+//             Waypoint wp_ned = Waypoint::OdomMsg2Waypoint(odom_msg_ned);
+//             m_vWaypoints[i] = new Waypoint(wp_ned);
+
+//             // DLOG(INFO) << " wp " << i << ": "
+//             //     << m_vWaypoints[i]->state.m_dTwv.translation()[0] << ", "
+//             //     << m_vWaypoints[i]->state.m_dTwv.translation()[1] << ", "
+//             //     << m_vWaypoints[i]->state.m_dTwv.translation()[2] << "; "
+//             //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().x() << ", "
+//             //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().y() << ", "
+//             //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().z() << ", "
+//             //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().w() << "; ";
+
+//             {
+//                 Eigen::Vector3d dIntersect;
+//                 if (Raycast(pose_ned.translation(), GetBasisVector(pose_ned,2)*0.1, dIntersect, true))
+//                 {
+//                     pose_ned.translation() = dIntersect;// + Eigen::Vector3d(0, 0, 0.1); // ned
+//                     m_vWaypoints[i]->state.m_dTwv = pose_ned;
+
+//                     // DLOG(INFO) << " raycast wp " << i << ": "
+//                     //     << m_vWaypoints[i]->state.m_dTwv.translation()[0] << ", "
+//                     //     << m_vWaypoints[i]->state.m_dTwv.translation()[1] << ", "
+//                     //     << m_vWaypoints[i]->state.m_dTwv.translation()[2] << "; "
+//                     //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().x() << ", "
+//                     //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().y() << ", "
+//                     //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().z() << ", "
+//                     //     << m_vWaypoints[i]->state.m_dTwv.unit_quaternion().w() << "; ";
+//                 }
+//             }
+//         }
+//     }
+
+//     m_vSegmentSamples.resize(m_vWaypoints.size()-1);
+
+//     replan();
+// }
+
+// void MochaPlanner::waypointsCb(const carplanner_msgs::OdometryArray& odom_arr_msg)
+// {
+//     if (!m_bServersInitialized) { DLOG(INFO) << "Aborting waypoints callback bc servers not initialized."; return; }
+
+//     DLOG(INFO) << "Got waypoints.";
+
+//     Sophus::SE3d rot_180_x;
+// 	rot_180_x.translation().setZero();
+// 	rot_180_x.setQuaternion(Eigen::Quaterniond(0.0, 1.0, 0.0, 0.0));
+
+//     {
+//         boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+//         // m_vWaypoints.clear();
+//         m_vWaypoints.resize(odom_arr_msg.odoms.size());
+//         for(uint i=0; i<m_vWaypoints.size(); i++)
+//         {
+//             Waypoint wp_in_nwu = Waypoint::OdomMsg2Waypoint(odom_arr_msg.odoms[i]);
+//             Waypoint wp_in_ned = wp_in_nwu;
+//             wp_in_ned.state.m_dTwv = rot_180_x*wp_in_nwu.state.m_dTwv*rot_180_x;
+//             m_vWaypoints[i] = new Waypoint(wp_in_ned);
+//             {
+//                 Eigen::Vector3d dIntersect;
+//                 Sophus::SE3d pose( wp_in_nwu.state.ToSE3d() );
+//                 if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, false))
+//                 {
+//                     pose.translation() = dIntersect;// + Eigen::Vector3d(0, 0, 0.1);
+//                     m_vWaypoints[i]->state.m_dTwv = rot_180_x*pose*rot_180_x;
+//                 }
+//             }
+//         }
+//     }
+
+//     m_vSegmentSamples.resize(m_vWaypoints.size()-1);
+
+//     replan();
+// }
+
 
 // void MochaPlanner::PathCb(const nav_msgs::OdometryConstPtr odom_msg)
 // {
@@ -1554,7 +1958,10 @@ void MochaPlanner::waypointsCb(const carplanner_msgs::OdometryArray& odom_arr_ms
 
 void MochaPlanner::PubLoopFunc(const ros::TimerEvent& event)
 {   
-    _pubWaypoints(m_vWaypoints);
+    {
+        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+        _pubWaypoints(m_vWaypoints);
+    }
     _pubSimPath(m_vSegmentSamples);
     // _pubPlan(m_vSegmentSamples);
     _pubActualTraj(m_vActualTrajectory);
@@ -1563,149 +1970,189 @@ void MochaPlanner::PubLoopFunc(const ros::TimerEvent& event)
 
 void MochaPlanner::PlanningLoopFunc(const ros::TimerEvent& event)
 {   
-    bool success = replan();
+    if (m_bPlanContinuously)
+    {
+        bool success = replan();
+    }
 }
 
 bool MochaPlanner::replan()
 {   
-    if (!m_bServersInitialized) { DLOG(INFO) << "Aborting replan bc servers not initialized."; return false; }
+    try
+    {
+        if (!m_bServersInitialized) { DLOG(INFO) << "Aborting replan bc servers not initialized."; return false; }
+        if (m_bPlanning) { DLOG(INFO) << "Aborting replan bc already replanning."; return false; }
 
-    std::vector<int> dirtyWaypointIds;
+        std::vector<int> dirtyWaypointIds;
 
-    {
-    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-    if (m_vWaypoints.empty())
-    {
-        DLOG(INFO) << "Aborting replan bc waypoints vector is empty.";
-        return false;
-    }
-    
-    for (uint i=0; i<m_vWaypoints.size()-1; i++) 
-    {
-        Eigen::Vector7d wp = m_vWaypoints[i]->state.ToXYZQuat();
-        if (!std::isfinite(wp.norm()))
         {
-            DLOG(INFO) << "Aborting replan bc waypoint " << std::to_string(i) << " is not finite:"
-                << " " << std::to_string(wp[0])
-                << " " << std::to_string(wp[1])
-                << " " << std::to_string(wp[2])
-                << " " << std::to_string(wp[3])
-                << " " << std::to_string(wp[4])
-                << " " << std::to_string(wp[5])
-                << " " << std::to_string(wp[6]);
+            boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+            if (m_vWaypoints.empty())
+            {
+                DLOG(INFO) << "Aborting replan bc waypoints vector is empty.";
+                return false;
+            }
+            
+            for (uint i=0; i<m_vWaypoints.size()-1; i++) 
+            {
+                Eigen::Vector7d wp = m_vWaypoints[i]->state.ToXYZQuat();
+                if (!std::isfinite(wp.norm()))
+                {
+                    DLOG(INFO) << "Aborting replan bc waypoint " << std::to_string(i) << " is not finite:"
+                        << " " << std::to_string(wp[0])
+                        << " " << std::to_string(wp[1])
+                        << " " << std::to_string(wp[2])
+                        << " " << std::to_string(wp[3])
+                        << " " << std::to_string(wp[4])
+                        << " " << std::to_string(wp[5])
+                        << " " << std::to_string(wp[6]);
+                    return false;
+                }
+
+                if (m_vWaypoints[i]->isDirty)
+                    dirtyWaypointIds.push_back(i);
+            }
+        }
+        if (dirtyWaypointIds.empty())
+        {
+            DLOG(INFO) << "Aborting replan bc all waypoints are clean.";
             return false;
         }
 
-        if (m_vWaypoints[i]->isDirty)
-            dirtyWaypointIds.push_back(i);
-    }
-    }
-    if (dirtyWaypointIds.empty())
-    {
-        DLOG(INFO) << "Aborting replan bc all waypoints are clean.";
-        return false;
-    }
+        m_vSegmentSamples.resize(m_vWaypoints.size()-1);
 
-    m_vSegmentSamples.resize(m_vWaypoints.size()-1);
+        DLOG(INFO) << "Replanning...";
 
-    DLOG(INFO) << "Replanning...";
+        m_bPlanning = true;
 
-    m_bPlanning = true;
+        // have dirty waypoints, need to replan the corresponding segments
+        VehicleState startState;
+        VehicleState goalState;
+        for (uint i=0; i<dirtyWaypointIds.size(); i++) {
+            uint dirtySegmentId = dirtyWaypointIds[i];
+            Waypoint* a;
+            Waypoint* b;
+            {
+            boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+            a = m_vWaypoints[dirtySegmentId];
+            b = m_vWaypoints[dirtySegmentId+1];
 
-    // have dirty waypoints, need to replan the corresponding segments
-    VehicleState startState;
-    VehicleState goalState;
-    for (uint i=0; i<dirtyWaypointIds.size(); i++) {
-        uint dirtySegmentId = dirtyWaypointIds[i];
-        Waypoint* a;
-        Waypoint* b;
-        {
-        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-        a = m_vWaypoints[dirtySegmentId];
-        b = m_vWaypoints[dirtySegmentId+1];
+            //make sure both waypoints have well defined poses (no nans)
+            if(std::isfinite(a->state.ToXYZTCV().norm()) == false || std::isfinite(b->state.ToXYZTCV().norm()) == false )
+            {
+                DLOG(INFO) << "Aborting replan bc poorly defined waypoint.";
+                return false;
+            }
 
-        //make sure both waypoints have well defined poses (no nans)
-        if(std::isfinite(a->state.ToXYZTCV().norm()) == false || std::isfinite(b->state.ToXYZTCV().norm()) == false )
-        {
-            DLOG(INFO) << "Aborting replan bc poorly defined waypoint.";
-            return false;
+            // clamp waypoints to ground
+            // Eigen::Vector3d dIntersect;
+            // Eigen::Vector6d newPose;
+            // ...
+
+            // project waypoints to terrain
+            // {
+            //     Eigen::Vector3d dIntersect;
+            //     Sophus::SE3d pose( a->state.ToSE3d() );
+            //     if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
+            //     {
+            //         pose.translation() = dIntersect;
+            //         a->state = VehicleState(pose, 1, a->state.m_dCurvature);
+            //     }
+            //     // *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
+            // }
+            // {
+            //     Eigen::Vector3d dIntersect;
+            //     Sophus::SE3d pose( b->state.ToSE3d() );
+            //     if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
+            //     {
+            //         pose.translation() = dIntersect;
+            //         b->state = VehicleState(pose, 1, b->state.m_dCurvature);
+            //     }
+            //     // *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
+            // }
+
+            //iterate the planner
+            startState = a->state;
+            goalState = b->state;
+            }
+
+    //                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
+    //                GLWayPoint* pPrevWaypoint = &m_Gui.GetWaypoint((iSegment ==  0) ? m_Path[m_Path.size()-2] : m_Path[iSegment-1])->m_Waypoint;
+    //                VehicleState prevState = VehicleState(Sophus::SE3d(pPrevWaypoint->GetPose4x4_po()),pPrevWaypoint->GetVelocity());
+    //                GLWayPoint* pNextWaypoint = &m_Gui.GetWaypoint((iSegment >=  m_Path.size()-1) ? m_Path[0] : m_Path[iSegment+2])->m_Waypoint;
+    //                VehicleState nextState = VehicleState(Sophus::SE3d(pNextWaypoint->GetPose4x4_po()),pNextWaypoint->GetVelocity());
+
+    //                //now calculate curvatures for each side
+    //                double startToGoalCurvature = rpg::AngleWrap(goalState.GetTheta()-startState.GetTheta())/(goalState.m_dTwv.translation().head(2) - startState.m_dTwv.translation().head(2)).norm() ;
+    //                startState.m_dCurvature = (rpg::AngleWrap(startState.GetTheta()-prevState.GetTheta())/(startState.m_dTwv.translation().head(2) - prevState.m_dTwv.translation().head(2)).norm() +
+    //                                          startToGoalCurvature)/2;
+    //                goalState.m_dCurvature = (startToGoalCurvature +
+    //                                         rpg::AngleWrap(nextState.GetTheta()-goalState.GetTheta())/(nextState.m_dTwv.translation().head(2) - goalState.m_dTwv.translation().head(2)).norm())/2;
+
+
+    //                startState.m_dCurvature = std::isfinite(startState.m_dCurvature) ? startState.m_dCurvature : 0;
+    //                goalState.m_dCurvature = std::isfinite(goalState.m_dCurvature) ? goalState.m_dCurvature : 0;
+
+            //do connected planning if possibles
+            // if(g_bContinuousPathPlanning == true){
+            //     if( !(iSegment == 0 || m_vSegmentSamples[iSegment-1].m_vStates.empty() == true /*|| m_bPlanForTerrain == false*/) ){
+            //         startState = m_vSegmentSamples[iSegment-1].m_vStates.back();
+            //         startState.m_dCurvature = m_vSegmentSamples[iSegment-1].m_vCommands.back().m_dCurvature;
+            //     }
+            // }
+
+            // ApplyVelocitiesFunctor5d f(Eigen::Vector3d::Zero(), NULL);
+            SetNoDelay(true);
+            Problem problem(startState,goalState,m_dTimeInterval);
+            InitializeProblem(problem,0,NULL,eCostPoint);
+            problem.m_bInertialControlActive = true;//g_bInertialControl;
+            //problem.m_lPreviousCommands = previousCommands;
+            
+            bool success = false;
+            uint numIterations = 0;
+            while(success == false && ros::ok())
+            {
+                DLOG(INFO) << "Iteration " << std::to_string(numIterations);
+
+                if(numIterations+1 > g_nIterationLimit)
+                {
+                    dout("Reached iteration limit. Skipping");
+                    success = true;
+                }
+                else
+                {
+                    // get plan for current motion sample under consideration
+                    m_vActualTrajectory.clear();
+                    m_vControlTrajectory.clear();
+                    success = _IteratePlanner(problem,m_vSegmentSamples[dirtySegmentId],m_vActualTrajectory,m_vControlTrajectory);
+                    DLOG(INFO) << "Planner iterated " << std::to_string(numIterations+1) << " times.";
+                }
+
+                if (success)
+                {
+                    DLOG(INFO) << "Success";
+                    numIterations = 0;
+                }
+                else
+                {
+                    numIterations++;
+                }
+            }
         }
-
-        // clamp waypoints to ground
-        // Eigen::Vector3d dIntersect;
-        // Eigen::Vector6d newPose;
-        // ...
-
-        //iterate the planner
-        startState = a->state;
-        goalState = b->state;
-        }
-
-//                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
-//                GLWayPoint* pPrevWaypoint = &m_Gui.GetWaypoint((iSegment ==  0) ? m_Path[m_Path.size()-2] : m_Path[iSegment-1])->m_Waypoint;
-//                VehicleState prevState = VehicleState(Sophus::SE3d(pPrevWaypoint->GetPose4x4_po()),pPrevWaypoint->GetVelocity());
-//                GLWayPoint* pNextWaypoint = &m_Gui.GetWaypoint((iSegment >=  m_Path.size()-1) ? m_Path[0] : m_Path[iSegment+2])->m_Waypoint;
-//                VehicleState nextState = VehicleState(Sophus::SE3d(pNextWaypoint->GetPose4x4_po()),pNextWaypoint->GetVelocity());
-
-//                //now calculate curvatures for each side
-//                double startToGoalCurvature = rpg::AngleWrap(goalState.GetTheta()-startState.GetTheta())/(goalState.m_dTwv.translation().head(2) - startState.m_dTwv.translation().head(2)).norm() ;
-//                startState.m_dCurvature = (rpg::AngleWrap(startState.GetTheta()-prevState.GetTheta())/(startState.m_dTwv.translation().head(2) - prevState.m_dTwv.translation().head(2)).norm() +
-//                                          startToGoalCurvature)/2;
-//                goalState.m_dCurvature = (startToGoalCurvature +
-//                                         rpg::AngleWrap(nextState.GetTheta()-goalState.GetTheta())/(nextState.m_dTwv.translation().head(2) - goalState.m_dTwv.translation().head(2)).norm())/2;
-
-
-//                startState.m_dCurvature = std::isfinite(startState.m_dCurvature) ? startState.m_dCurvature : 0;
-//                goalState.m_dCurvature = std::isfinite(goalState.m_dCurvature) ? goalState.m_dCurvature : 0;
-
-        //do connected planning if possibles
-        // if(g_bContinuousPathPlanning == true){
-        //     if( !(iSegment == 0 || m_vSegmentSamples[iSegment-1].m_vStates.empty() == true /*|| m_bPlannerOn == false*/) ){
-        //         startState = m_vSegmentSamples[iSegment-1].m_vStates.back();
-        //         startState.m_dCurvature = m_vSegmentSamples[iSegment-1].m_vCommands.back().m_dCurvature;
-        //     }
-        // }
-
-        // ApplyVelocitiesFunctor5d f(Eigen::Vector3d::Zero(), NULL);
-        SetNoDelay(true);
-        Problem problem(startState,goalState,m_dTimeInterval);
-        InitializeProblem(problem,0,NULL,eCostPoint);
-        problem.m_bInertialControlActive = true;//g_bInertialControl;
-        //problem.m_lPreviousCommands = previousCommands;
         
-        bool success = false;
-        uint numIterations = 0;
-        while(success == false && ros::ok())
-        {
-            if(numIterations+1 > g_nIterationLimit)
-            {
-                dout("Reached iteration limit. Skipping");
-                success = true;
-            }
-            else
-            {
-                // get plan for current motion sample under consideration
-                // m_vActualTrajectory.clear();
-                // m_vControlTrajectory.clear();
-                success = _IteratePlanner(problem,m_vSegmentSamples[dirtySegmentId],m_vActualTrajectory,m_vControlTrajectory);
-            }
+        m_bPlanning = false;
 
-            if (success)
-            {
-                numIterations = 0;
-            }
-            else
-            {
-                numIterations++;
-            }
-        }
+        // *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
+
+        return true;
     }
-    
-    m_bPlanning = false;
+    catch(const std::exception& e)
+    {
+        std::cerr << "Replan failed: " << e.what() << ".\n";
+        m_bPlanning = false;
+        return false;
+    }
 
-    // *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
-
-    return true;
 }
 
 bool MochaPlanner::_IteratePlanner(
@@ -1724,7 +2171,7 @@ bool MochaPlanner::_IteratePlanner(
     //StressTest(problem);
 
     if(only2d == false) {
-        if( m_bPlannerOn == true ) // planner on && sim off
+        if( m_bPlanForTerrain == true ) // planner on && sim off
         {
             // run full Gauss-Newton minimization and calc best solution
             printf("Running full sim.\n");
@@ -1786,16 +2233,13 @@ void MochaPlanner::_pubWaypoints(std::vector<Waypoint*>& pts)
     tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
 
     geometry_msgs::PoseArray pts_msg;
-    pts_msg.header.frame_id = "world";
+    pts_msg.header.frame_id = "map";
     pts_msg.header.stamp = ros::Time::now();
 
     for( uint ii=0; ii<pts.size(); ii++ )
     {
         Eigen::MatrixXd pt;
-        {
-        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
         pt = pts[ii]->state.ToXYZRPY();
-        }
         double roll =   (pt)(3);
         double pitch =  (pt)(4);
         double yaw =    (pt)(5);
@@ -1827,12 +2271,16 @@ void MochaPlanner::_pubSimPath(std::vector<MotionSample>& path_in)
 {   
     if (path_in.empty()) { return; }
     std::vector<MotionSample> some_path = path_in;
-    carplanner_msgs::PathArray patharr_msg;
-    convertSomePath2PathArrayMsg(some_path, &patharr_msg);
-    visualization_msgs::MarkerArray markarr_msg;
-    carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("",0.01,0,0,0.0,1.0,0.0,1.0);
-    convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg, markarr_config);
-    m_pubSimPath.publish(markarr_msg);
+
+    // carplanner_msgs::PathArray patharr_msg;
+    // convertSomePath2PathArrayMsg(some_path, &patharr_msg, "map");
+    // visualization_msgs::MarkerArray markarr_msg;
+    // carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("",0.01,0,0,0.0,1.0,0.0,1.0);
+    // convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg, markarr_config);
+
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(some_path, &path_msg, "map");
+    m_pubSimPath.publish(path_msg);
     ros::spinOnce();
 }
 
@@ -1841,7 +2289,8 @@ void MochaPlanner::_pubActualTraj(Eigen::Vector3dAlignedVec& path_in)
     if (path_in.empty()) { return; }
     Eigen::Vector3dAlignedVec some_path = path_in;
     nav_msgs::Path path_msg;
-    convertSomePath2PathMsg(some_path, &path_msg);
+    convertSomePath2PathMsg(some_path, &path_msg, "map");
+    // path_msg.header.frame_id = "map";
     m_pubActualTraj.publish(path_msg);
     ros::spinOnce();
 }
@@ -1851,7 +2300,8 @@ void MochaPlanner::_pubControlTraj(Eigen::Vector3dAlignedVec& path_in)
     if (path_in.empty()) { return; }
     Eigen::Vector3dAlignedVec some_path = path_in;
     nav_msgs::Path path_msg;
-    convertSomePath2PathMsg(some_path, &path_msg);
+    convertSomePath2PathMsg(some_path, &path_msg, "map");
+    // path_msg.header.frame_id = "map";
     m_pubControlTraj.publish(path_msg);
     ros::spinOnce();
 }

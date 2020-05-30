@@ -1,7 +1,7 @@
 <package>
-  <name>mochagui</name>
+  <name>mochapc</name>
   <version>0.0.0</version>
-  <description>The mochagui package</description>
+  <description>The mocha predictive control package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->

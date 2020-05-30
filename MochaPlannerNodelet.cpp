@@ -4,7 +4,7 @@
 #include "MochaPlanner.h"
 #include <pluginlib/class_list_macros.h>
 
-namespace mochagui{
+namespace mochapc{
 
 class MochaPlannerNodelet : public nodelet::Nodelet
 {
@@ -14,10 +14,12 @@ public:
 
     virtual void onInit()
     {
-        ros::NodeHandle& nh = this->getNodeHandle();
-        ros::NodeHandle& private_nh = this->getPrivateNodeHandle();
+        ros::NodeHandle& nh = this->getMTNodeHandle();
+        ros::NodeHandle& private_nh = this->getMTPrivateNodeHandle();
 
         planner_.reset(new MochaPlanner(private_nh, nh));
+
+        // ros::Duration(3.0).sleep();
     };
 private:
   boost::shared_ptr<MochaPlanner> planner_;
@@ -25,5 +27,5 @@ private:
 
 } // namespace @(namespace)
 
-PLUGINLIB_EXPORT_CLASS(mochagui::MochaPlannerNodelet, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(mochapc::MochaPlannerNodelet, nodelet::Nodelet);
 // PLUGINLIB_DECLARE_CLASS(mochagui, MochaPlannerNodelet, mochagui::MochaPlannerNodelet, nodelet::Nodelet)
