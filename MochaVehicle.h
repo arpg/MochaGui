@@ -22,8 +22,8 @@
 
 #include <nodelet/nodelet.h>
 
-#include "/home/mike/code/mochagui/mesh_conversion_tools.hpp"
-#include "/home/mike/code/mochagui/tf_conversion_tools.hpp"
+#include "mesh_conversion_tools.hpp"
+#include "tf_conversion_tools.hpp"
 //#include "/home/ohrad/code/mochagui/mesh_conversion_tools.hpp"
 //#include "/home/ohrad/code/mochagui/tf_conversion_tools.hpp"
 // #include <mochagui/conversion_tools.h>
@@ -67,9 +67,9 @@
 #include <thread>
 #include <string.h>
 #include <unistd.h>
-#include <HAL/Messages/Command.h>
-#include <HAL/Messages/Matrix.h>
-#include <HAL/Messages/Pose.h>
+// #include <HAL/Messages/Command.h>
+// #include <HAL/Messages/Matrix.h>
+// #include <HAL/Messages/Pose.h>
 #include <exception>
 #include <ctime>
 
@@ -197,7 +197,7 @@ struct VehicleState
         m_dSteering = 0;
     }
 
-    // VehicleState& operator= (const VehicleState& other) 
+    // VehicleState& operator= (const VehicleState& other)
     // {
     //     m_dTwv = other.m_dTwv;
     //     m_dV = other.m_dV;
@@ -380,13 +380,13 @@ struct VehicleState
     // This is used to flip between the coord convention between gl/viz/bullet and physical/ros
     VehicleState FlipCoordFrame()
     {
-        Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));    
+        Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
         m_dTwv = rot_180_x * (*this).m_dTwv * rot_180_x;
 
         // (*this).m_dV = (*this).m_dTwv.so3() * (*this).m_dV;
         m_dV = (rot_180_x * Sophus::SE3d(Eigen::Quaterniond(1,0,0,0), (*this).m_dV) * rot_180_x).translation();
 
-        return *this;    
+        return *this;
     }
 
     double GetNormalVelocity(const VehicleState& state)
@@ -496,7 +496,7 @@ struct VehicleState
     //     return;
     // }
 
-    inline static VehicleState& OdomMsg2VehicleState(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0) 
+    inline static VehicleState& OdomMsg2VehicleState(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0)
     {
         VehicleState* state = new VehicleState();
         state->m_dTime                       = odom_msg.header.stamp.sec + (double)odom_msg.header.stamp.nsec*(double)1e-9;
@@ -504,7 +504,7 @@ struct VehicleState
         state->m_dTwv.translation()[0]       = odom_msg.pose.pose.position.x;
         state->m_dTwv.translation()[1]       = odom_msg.pose.pose.position.y;
         state->m_dTwv.translation()[2]       = odom_msg.pose.pose.position.z;
-        
+
         state->m_dTwv.setQuaternion(Sophus::Quaterniond(odom_msg.pose.pose.orientation.w,
                                                        odom_msg.pose.pose.orientation.x,
                                                        odom_msg.pose.pose.orientation.y,
@@ -539,7 +539,7 @@ struct VehicleState
         static VehicleState last_state;
         VehicleState state;
         state.m_dTime                       = tf.stamp_.sec + (double)tf.stamp_.nsec*(double)1e-9;
-        
+
         state.m_dTwv.translation()[0]       = tf.getOrigin().getX();
         state.m_dTwv.translation()[1]       = tf.getOrigin().getY();
         state.m_dTwv.translation()[2]       = tf.getOrigin().getZ();
@@ -555,7 +555,7 @@ struct VehicleState
         state.m_dV[0]                       = (state.m_dTwv.translation()[0] - last_state.m_dTwv.translation()[0])/(state.m_dTime - last_state.m_dTime);
         state.m_dV[1]                       = (state.m_dTwv.translation()[1] - last_state.m_dTwv.translation()[1])/(state.m_dTime - last_state.m_dTime);
         state.m_dV[2]                       = (state.m_dTwv.translation()[2] - last_state.m_dTwv.translation()[2])/(state.m_dTime - last_state.m_dTime);
-        
+
         Eigen::Quaterniond dq((state.m_dTwv.unit_quaternion().w() - last_state.m_dTwv.unit_quaternion().w())/(state.m_dTime - last_state.m_dTime),
                               (state.m_dTwv.unit_quaternion().x() - last_state.m_dTwv.unit_quaternion().x())/(state.m_dTime - last_state.m_dTime),
                               (state.m_dTwv.unit_quaternion().y() - last_state.m_dTwv.unit_quaternion().y())/(state.m_dTime - last_state.m_dTime),
@@ -574,7 +574,7 @@ struct VehicleState
         // double siny_cosp = 2 * (q.w() * q.z() + q.x() * q.y());
         // double cosy_cosp = 1 - 2 * (q.y() * q.y() + q.z() * q.z());
         // state.m_dW[2] = std::atan2(siny_cosp, cosy_cosp);
-        
+
         // state.m_dW[0] = Eigen::Roll(q);
         // state.m_dW[1] = Eigen::Pitch(q);
         // state.m_dW[2] = Eigen::Yaw(q);
@@ -651,28 +651,28 @@ struct VehicleState
       return state_msg;
     }
 
-    void fromROS(carplanner_msgs::VehicleState msg) 
+    void fromROS(carplanner_msgs::VehicleState msg)
     {
         (*this).m_dTwv.translation() = Eigen::Vector3d(
-            msg.pose.transform.translation.x, 
-            msg.pose.transform.translation.y, 
+            msg.pose.transform.translation.x,
+            msg.pose.transform.translation.y,
             msg.pose.transform.translation.z);
         (*this).m_dTwv.setQuaternion(Eigen::Quaterniond(
-            msg.pose.transform.rotation.w, 
-            msg.pose.transform.rotation.x, 
-            msg.pose.transform.rotation.y, 
+            msg.pose.transform.rotation.w,
+            msg.pose.transform.rotation.x,
+            msg.pose.transform.rotation.y,
             msg.pose.transform.rotation.z));
 
         for( unsigned int i=0; i<(*this).m_vWheelStates.size(); i++ )
         {
             (*this).m_vWheelStates[i].translation() = Eigen::Vector3d(
-                msg.wheel_poses[i].transform.translation.x, 
-                msg.wheel_poses[i].transform.translation.y, 
-                msg.wheel_poses[i].transform.translation.z);            
+                msg.wheel_poses[i].transform.translation.x,
+                msg.wheel_poses[i].transform.translation.y,
+                msg.wheel_poses[i].transform.translation.z);
             (*this).m_vWheelStates[i].setQuaternion(Eigen::Quaterniond(
-                msg.wheel_poses[i].transform.rotation.w, 
-                msg.wheel_poses[i].transform.rotation.x, 
-                msg.wheel_poses[i].transform.rotation.y, 
+                msg.wheel_poses[i].transform.rotation.w,
+                msg.wheel_poses[i].transform.rotation.x,
+                msg.wheel_poses[i].transform.rotation.y,
                 msg.wheel_poses[i].transform.rotation.z));
         }
 
@@ -897,7 +897,7 @@ struct MotionSample
         //     }
         //     cost /= GetDistance();
         // }
-        
+
         for(size_t ii = 1; ii < m_vStates.size() ; ii++){
             const VehicleState& state = m_vStates[ii];
             // cost += fabs(state.m_dW[0]*state.m_dW[1]);
@@ -1010,9 +1010,9 @@ class MochaVehicle
 {
 public:
     struct Config{
-        std::string params_file="/home/mike/code/mochagui/learning_params.csv", 
-            terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply", 
-            car_mesh_file="/home/mike/code/mochagui/herbie/herbie.blend", 
+        std::string params_file="/home/mike/code/mochagui/learning_params.csv",
+            terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply",
+            car_mesh_file="/home/mike/code/mochagui/herbie/herbie.blend",
             wheel_mesh_file="/home/mike/code/mochagui/herbie/wheel.blend";
         enum Mode{ Simulation=0, Experiment=1 } mode=Mode::Simulation;
     } m_config;
@@ -1078,32 +1078,32 @@ public:
 
     // void ApplyVelocities(carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
-    // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server2; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server3; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server4; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server5; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server6; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server7; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8; 
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9; 
-    
+    // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server2;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server3;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server4;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server5;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server6;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server7;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8;
+    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9;
+
     // void UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr&);
-    // actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>* m_actionUpdateState_server; 
-    
+    // actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>* m_actionUpdateState_server;
+
     // void GetGravityCompensationService(const carplanner_msgs::GetGravityCompensationGoalConstPtr&);
-    // actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>* m_actionGetGravityCompensation_server; 
+    // actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>* m_actionGetGravityCompensation_server;
 
     void GetControlDelayService(const carplanner_msgs::GetControlDelayGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_server; 
+    actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_server;
 
     void GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_server; 
+    actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_server;
 
     void SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server; 
+    actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server;
 
     void meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
 
