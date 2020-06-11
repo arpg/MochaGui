@@ -23,8 +23,6 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_actionSetNoDelay_server(*m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1), false),
     m_actionRaycast_server(*m_nh, "plan_car/raycast", boost::bind(&MochaVehicle::RaycastService, this, _1), false)
 {
-
-
     m_dGravity << 0,0,BULLET_MODEL_GRAVITY;
     Init();
 }
@@ -197,8 +195,20 @@ void MochaVehicle::Init()
   //    m_commandThreadSub = m_nh.subscribe<carplanner_msgs::Command>("command", 1, boost::bind(&MochaVehicle::_CommandThreadFunc, this, _1));
   //  }
 
+    m_private_nh->param("params_file", m_config.params_file, m_config.params_file);
+    m_private_nh->param("mode", (int&)m_config.mode, (int&)m_config.mode);
+    m_private_nh->param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
+    m_private_nh->param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
+    m_private_nh->param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
+
     DLOG(INFO) << "Initing scene";
     const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
+    if(!pScene)
+    {
+        ROS_ERROR("Could not import mesh.");
+        return;
+    }
+    
     DLOG(INFO) << "Assigning target";
     if(m_config.mode == MochaVehicle::Config::Mode::Simulation){
         DLOG(INFO) << " to Simulation";
@@ -423,11 +433,11 @@ void MochaVehicle::InitROS()
     DLOG(INFO) << "Initing ROS";
     m_nh = new ros::NodeHandle("~");
 
-    m_private_nh->param("params_file", m_config.params_file, m_config.params_file);
-    m_private_nh->param("mode", (int&)m_config.mode, (int&)m_config.mode);
-    m_private_nh->param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
-    m_private_nh->param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
-    m_private_nh->param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
+    // m_private_nh->param("params_file", m_config.params_file, m_config.params_file);
+    // m_private_nh->param("mode", (int&)m_config.mode, (int&)m_config.mode);
+    // m_private_nh->param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
+    // m_private_nh->param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
+    // m_private_nh->param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
 
     // m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
     m_terrainMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("output_terrain_mesh",1);

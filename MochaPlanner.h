@@ -46,7 +46,7 @@
 #define VEL_WEIGHT_POINT 0.75
 #define TIME_WEIGHT 0.05
 #define CURV_WEIGHT 0.001
-#define TILT_WEIGHT 0.75 // dRoll
+#define TILT_WEIGHT 1.5 // dRoll
 #define BADNESS_WEIGHT 5e-8;
 #define DAMPING_STEPS 8
 #define DAMPING_DIVISOR 1.3
@@ -334,6 +334,7 @@ private:
     // MochaVehicle m_PlanCarModel;
     // bool& m_bControl3dPath;
     bool m_bPlanning;
+    boost::mutex m_mutexPlanning;
     boost::mutex m_mutexWaypoints;
     std::vector<Waypoint*> m_vWaypoints;
     std::vector<MotionSample> m_vSegmentSamples;

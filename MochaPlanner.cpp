@@ -1097,10 +1097,19 @@ bool MochaPlanner::Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d
         actionlib::SimpleClientGoalState state = m_actionRaycast_client.getState();
         ROS_INFO("Raycast Action finished: %s", state.toString().c_str());
 
-        result = m_actionRaycast_client.getResult();
-        dIntersect = Eigen::Vector3d(result->intersect.x, result->intersect.y, result->intersect.z);
+        if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
+            result = m_actionRaycast_client.getResult();
+            dIntersect = Eigen::Vector3d(result->intersect.x, result->intersect.y, result->intersect.z);
 
-        return true;
+            return true;
+        }
+        else
+        {
+            ROS_INFO("Raycast Action failed.");
+            return false;
+        }
+
     }
     else
     {
@@ -1116,6 +1125,7 @@ bool MochaPlanner::InitializeProblem(Problem& problem,
                                           CostMode eCostMode /*= eCostPoint */)
 {
     ROS_INFO("Initializing problem.");
+            boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
 
     problem.Reset();
     problem.m_nPlanId = m_nPlanCounter++;
@@ -1205,8 +1215,8 @@ bool MochaPlanner::InitializeProblem(Problem& problem,
     if(pVelProfile == NULL){
         problem.m_vVelProfile.clear();
         problem.m_vVelProfile.reserve(2);
-        problem.m_vVelProfile.push_back(VelocityProfileNode(0,problem.m_dStartPose[5]));
-        problem.m_vVelProfile.push_back(VelocityProfileNode(1,problem.m_dGoalPose[5]));
+        problem.m_vVelProfile.push_back(VelocityProfileNode(0, double(problem.m_dStartPose[5])));
+        problem.m_vVelProfile.push_back(VelocityProfileNode(1, double(problem.m_dGoalPose[5])));
     }else{
         problem.m_vVelProfile = *pVelProfile;
     }
@@ -1282,7 +1292,7 @@ bool MochaPlanner::Iterate(Problem &problem )
 
         _IterateGaussNewton(problem);
 
-        return false;
+        return true;
     }catch(...){
         return false;
     }
@@ -1958,10 +1968,10 @@ void MochaPlanner::SetWaypoint(int idx, Waypoint& wp)
 
 void MochaPlanner::PubLoopFunc(const ros::TimerEvent& event)
 {   
-    {
-        boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+    // {
+    //     boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
         _pubWaypoints(m_vWaypoints);
-    }
+    // }
     _pubSimPath(m_vSegmentSamples);
     // _pubPlan(m_vSegmentSamples);
     _pubActualTraj(m_vActualTrajectory);
@@ -1981,7 +1991,7 @@ bool MochaPlanner::replan()
     try
     {
         if (!m_bServersInitialized) { DLOG(INFO) << "Aborting replan bc servers not initialized."; return false; }
-        if (m_bPlanning) { DLOG(INFO) << "Aborting replan bc already replanning."; return false; }
+        // if (m_bPlanning) { DLOG(INFO) << "Aborting replan bc already replanning."; return false; }
 
         std::vector<int> dirtyWaypointIds;
 
@@ -2023,6 +2033,7 @@ bool MochaPlanner::replan()
 
         DLOG(INFO) << "Replanning...";
 
+        boost::mutex::scoped_lock planningMutex(m_mutexPlanning);
         m_bPlanning = true;
 
         // have dirty waypoints, need to replan the corresponding segments
@@ -2033,47 +2044,47 @@ bool MochaPlanner::replan()
             Waypoint* a;
             Waypoint* b;
             {
-            boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-            a = m_vWaypoints[dirtySegmentId];
-            b = m_vWaypoints[dirtySegmentId+1];
+                // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+                a = m_vWaypoints[dirtySegmentId];
+                b = m_vWaypoints[dirtySegmentId+1];
 
-            //make sure both waypoints have well defined poses (no nans)
-            if(std::isfinite(a->state.ToXYZTCV().norm()) == false || std::isfinite(b->state.ToXYZTCV().norm()) == false )
-            {
-                DLOG(INFO) << "Aborting replan bc poorly defined waypoint.";
-                return false;
-            }
+                //make sure both waypoints have well defined poses (no nans)
+                if(std::isfinite(a->state.ToXYZTCV().norm()) == false || std::isfinite(b->state.ToXYZTCV().norm()) == false )
+                {
+                    DLOG(INFO) << "Aborting replan bc poorly defined waypoint.";
+                    return false;
+                }
 
-            // clamp waypoints to ground
-            // Eigen::Vector3d dIntersect;
-            // Eigen::Vector6d newPose;
-            // ...
+                // clamp waypoints to ground
+                // Eigen::Vector3d dIntersect;
+                // Eigen::Vector6d newPose;
+                // ...
 
-            // project waypoints to terrain
-            // {
-            //     Eigen::Vector3d dIntersect;
-            //     Sophus::SE3d pose( a->state.ToSE3d() );
-            //     if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
-            //     {
-            //         pose.translation() = dIntersect;
-            //         a->state = VehicleState(pose, 1, a->state.m_dCurvature);
-            //     }
-            //     // *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
-            // }
-            // {
-            //     Eigen::Vector3d dIntersect;
-            //     Sophus::SE3d pose( b->state.ToSE3d() );
-            //     if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
-            //     {
-            //         pose.translation() = dIntersect;
-            //         b->state = VehicleState(pose, 1, b->state.m_dCurvature);
-            //     }
-            //     // *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
-            // }
+                // project waypoints to terrain
+                // {
+                //     Eigen::Vector3d dIntersect;
+                //     Sophus::SE3d pose( a->state.ToSE3d() );
+                //     if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
+                //     {
+                //         pose.translation() = dIntersect;
+                //         a->state = VehicleState(pose, 1, a->state.m_dCurvature);
+                //     }
+                //     // *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
+                // }
+                // {
+                //     Eigen::Vector3d dIntersect;
+                //     Sophus::SE3d pose( b->state.ToSE3d() );
+                //     if (Raycast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true))
+                //     {
+                //         pose.translation() = dIntersect;
+                //         b->state = VehicleState(pose, 1, b->state.m_dCurvature);
+                //     }
+                //     // *m_vWayPoints[iMotionStart] << a->GetPose(), a->GetVelocity(), a->GetAerial();
+                // }
 
-            //iterate the planner
-            startState = a->state;
-            goalState = b->state;
+                //iterate the planner
+                startState = a->state;
+                goalState = b->state;
             }
 
     //                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
@@ -2110,9 +2121,11 @@ bool MochaPlanner::replan()
             
             bool success = false;
             uint numIterations = 0;
-            while(success == false && ros::ok())
+            // float last_norm=INFINITY, this_norm=INFINITY;
+            // float norm_eps = 0.1;
+            while(success == false && /*(last_norm-this_norm < norm_eps) &&*/ ros::ok())
             {
-                DLOG(INFO) << "Iteration " << std::to_string(numIterations);
+                DLOG(INFO) << "Iteration " << std::to_string(numIterations+1);
 
                 if(numIterations+1 > g_nIterationLimit)
                 {
@@ -2124,7 +2137,7 @@ bool MochaPlanner::replan()
                     // get plan for current motion sample under consideration
                     m_vActualTrajectory.clear();
                     m_vControlTrajectory.clear();
-                    success = _IteratePlanner(problem,m_vSegmentSamples[dirtySegmentId],m_vActualTrajectory,m_vControlTrajectory);
+                    success = _IteratePlanner(problem, m_vSegmentSamples[dirtySegmentId],m_vActualTrajectory,m_vControlTrajectory);
                     DLOG(INFO) << "Planner iterated " << std::to_string(numIterations+1) << " times.";
                 }
 
@@ -2137,6 +2150,9 @@ bool MochaPlanner::replan()
                 {
                     numIterations++;
                 }
+
+                // float this_norm = problem.m_CurrentSolution.m_dNorm;
+                // last_norm = this_norm;
             }
         }
         

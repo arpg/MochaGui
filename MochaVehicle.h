@@ -900,8 +900,8 @@ struct MotionSample
 
         for(size_t ii = 1; ii < m_vStates.size() ; ii++){
             const VehicleState& state = m_vStates[ii];
-            // cost += fabs(state.m_dW[0]*state.m_dW[1]);
-            cost += fabs(state.m_dW[0]);
+            cost += fabs(state.m_dW[0]*state.m_dW[1]);
+            // cost += fabs(state.m_dW[0]);
         }
         cost /= GetDistance();
 
