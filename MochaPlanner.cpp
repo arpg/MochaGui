@@ -263,6 +263,14 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
 
     if (!m_bPlanContinuously)
         replan();
+
+    m_nh->param("xy_weight",        m_dPointWeight(0), m_dPointWeight(0));
+    m_nh->param("z_weight",         m_dPointWeight(2), m_dPointWeight(2));
+    m_nh->param("theta_weight",     m_dPointWeight(3), m_dPointWeight(3));
+    m_nh->param("vel_weight",       m_dPointWeight(4), m_dPointWeight(4));
+    m_nh->param("tilt_weight",      m_dPointWeight(5), m_dPointWeight(5));
+
+    m_dynReconfig_server.setCallback(boost::bind(&MochaPlanner::dynReconfigCb, this, _1, _2));
 }
 
 MochaPlanner::~MochaPlanner()
@@ -274,6 +282,18 @@ MochaPlanner::~MochaPlanner()
     // m_pPlannerThread = 0 ;
 }
 
+void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, uint32_t level)
+{
+    ROS_INFO("Reconfigure requested.");
+
+    m_dPointWeight(0) = config.xy_weight;
+    m_dPointWeight(1) = config.xy_weight;
+    m_dPointWeight(2) = config.z_weight;
+    m_dPointWeight(3) = config.theta_weight;
+    m_dPointWeight(4) = config.vel_weight;
+    m_dPointWeight(5) = config.tilt_weight;
+    
+}
 
 // virtual void MochaPlanner::onInit()
 // {

@@ -439,6 +439,9 @@ void MochaVehicle::InitROS()
     // m_private_nh->param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
     // m_private_nh->param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
 
+    std::string terrain_mesh_topic;
+    m_private_nh->param("terrain_mesh_topic", terrain_mesh_topic, std::string("input_terrain_mesh"));
+
     // m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
     m_terrainMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("output_terrain_mesh",1);
     m_chassisMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("output_chassis_mesh",1);
@@ -448,7 +451,7 @@ void MochaVehicle::InitROS()
 
     // m_resetmeshSrv = m_nh->advertiseService("reset_mesh", &MochaVehicle::ResetMesh, this);
 
-    m_terrainMeshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
+    m_terrainMeshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>(terrain_mesh_topic, 1, &MochaVehicle::meshCb, this);
 
     m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
     // m_pStatePublisherThread = new boost::thread( std::bind( &MochaVehicle::_StatePublisherFunc, this ));

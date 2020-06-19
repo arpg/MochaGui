@@ -216,7 +216,10 @@ add_library( planner
                 #${SHARED_SRC}
                 MochaPlanner.cpp)
 target_link_libraries(planner ${LIBRARIES})
-#add_dependencies(planner planner_gencfg)
+add_dependencies( planner
+  carplanner_msgs_gencfg
+  carplanner_msgs_gencfg
+)
 
 add_library( planner_nodelet MochaPlannerNodelet.cpp)
 target_link_libraries( planner_nodelet planner ${LIBRARIES} )

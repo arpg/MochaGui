@@ -39,6 +39,9 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <carplanner_msgs/mocha_conversions.hpp>
 
+#include <dynamic_reconfigure/server.h>
+#include <carplanner_msgs/MochaPlannerConfig.h>
+
 #define XY_WEIGHT 1.5
 #define Z_WEIGHT 1.5
 #define THETA_WEIGHT 0.2
@@ -310,6 +313,9 @@ private:
 
 
     void waypointsCb(const carplanner_msgs::OdometryArray&);
+
+    dynamic_reconfigure::Server<carplanner_msgs::MochaPlannerConfig> m_dynReconfig_server;
+    void dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, uint32_t level);
 
     ros::Timer m_timerPubLoop;
     void PubLoopFunc(const ros::TimerEvent& event);
