@@ -9,7 +9,7 @@
 #define	MOCHAVEHICLE_H
 
 #include <ros/ros.h>
-// #include <tf/transform_broadcaster.h>
+#include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 // #include <tf2_ros/transform_listener.h>
 // #include <tf2_ros/static_transform_broadcaster.h>
@@ -30,7 +30,8 @@
 
 #include <actionlib/server/simple_action_server.h>
 #include <carplanner_msgs/ApplyVelocitiesAction.h>
-// #include <carplanner_msgs/UpdateStateAction.h>
+#include <carplanner_msgs/SetStateAction.h>
+#include <carplanner_msgs/UpdateStateAction.h>
 // #include <carplanner_msgs/GetGravityCompensationAction.h>
 // #include <carplanner_msgs/GetFrictionCompensationAction.h>
 #include <carplanner_msgs/GetControlDelayAction.h>
@@ -59,8 +60,11 @@
 #include <boost/signals2/mutex.hpp>
 
 #include <CarPlanner/CarParameters.h>
-#include <CarPlanner/RaycastVehicle.h>
+// #include <CarPlanner/RaycastVehicle.h>
 #include "sophus/se3.hpp"
+
+#include "BulletDynamics/Vehicle/btVehicleRaycaster.h"
+#include "BulletDynamics/Vehicle/btHinge2Vehicle.h"
 
 #include <stdio.h>
 #include <chrono>
@@ -100,13 +104,26 @@
 #define COL_GROUND 4
 
 //vehicle parameter ordering
-#define VEHICLE_NUM_PARAMS 5
-#define VEHICLE_WIDTH 0.21
-#define VEHICLE_WHEEL_BASE 0.27
-#define VEHICLE_WHEEL_RADIUS 0.04
-#define VEHICLE_WHEEL_WIDTH 0.025
+// #define VEHICLE_NUM_PARAMS 5
+// #define VEHICLE_WIDTH 0.21
+// #define VEHICLE_WHEEL_BASE 0.27
+// #define VEHICLE_WHEEL_RADIUS 0.04
+// #define VEHICLE_WHEEL_WIDTH 0.025
 #define MIN_CONTROL_DELAY 0.0
 #define MAX_CONTROL_DELAY 0.3
+
+class DefaultVehicleRaycaster : public btVehicleRaycaster
+{
+    btDynamicsWorld*	m_dynamicsWorld;
+public:
+    DefaultVehicleRaycaster(btDynamicsWorld* world)
+        :m_dynamicsWorld(world)
+    {
+    }
+
+    virtual void* castRay(const btVector3& from,const btVector3& to, btVehicleRaycasterResult& result);
+
+};
 
 /// Structure to hold the steering, acceleration and reaction wheel caommands that are sent to the vehicle
 class ControlCommand
@@ -709,31 +726,31 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-class BulletVehicleState
-{
-public:
+// class BulletVehicleState
+// {
+// public:
 
-    BulletVehicleState() {}
-    ~BulletVehicleState() {}
+//     BulletVehicleState() {}
+//     ~BulletVehicleState() {}
 
-    void LoadState(RaycastVehicle *pVehicle)
-    {
-        //copy back the data
-        *pVehicle = m_pVehicleBuffer;
-        memcpy( (void*)pVehicle->getRigidBody(), m_pChassisBuffer,sizeof(RaycastVehicle));
-    }
+//     // void LoadState(RaycastVehicle *pVehicle)
+//     // {
+//     //     //copy back the data
+//     //     *pVehicle = m_pVehicleBuffer;
+//     //     memcpy( (void*)pVehicle->getRigidBody(), m_pChassisBuffer,sizeof(RaycastVehicle));
+//     // }
 
-    void SaveState(RaycastVehicle *pVehicle)
-    {
-        //make a backup of the vhicle
-        m_pVehicleBuffer = *pVehicle;
-        memcpy(m_pChassisBuffer, (void*)pVehicle->getRigidBody(),sizeof(btRigidBody));
-    }
+//     // void SaveState(RaycastVehicle *pVehicle)
+//     // {
+//     //     //make a backup of the vhicle
+//     //     m_pVehicleBuffer = *pVehicle;
+//     //     memcpy(m_pChassisBuffer, (void*)pVehicle->getRigidBody(),sizeof(btRigidBody));
+//     // }
 
-private:
-    unsigned char m_pChassisBuffer[sizeof(btRigidBody)];
-    RaycastVehicle m_pVehicleBuffer;
-};
+// private:
+//     unsigned char m_pChassisBuffer[sizeof(btRigidBody)];
+//     // RaycastVehicle m_pVehicleBuffer;
+// };
 
 struct BulletWorldInstance : public boost::mutex
 {
@@ -769,9 +786,9 @@ struct BulletWorldInstance : public boost::mutex
     btScalar *m_pHeightfieldData;
     btCollisionShape *m_pTerrainShape;
     btRigidBody *m_pTerrainBody;
-    RaycastVehicle::btVehicleTuning	m_Tuning;
+    // RaycastVehicle::btVehicleTuning	m_Tuning;
     btVehicleRaycaster*	m_pVehicleRayCaster;
-    RaycastVehicle*	m_pVehicle;
+    btHinge2Vehicle*	m_pVehicle;
     btCollisionShape* m_pVehicleChassisShape;
 
     btAlignedObjectArray<btCollisionShape*> m_vCollisionShapes;
@@ -785,7 +802,7 @@ struct BulletWorldInstance : public boost::mutex
 
     btRigidBody* m_pCarChassis;
     // GLDebugDrawer	m_DebugDrawer;
-    BulletVehicleState m_vehicleBackup;
+    // BulletVehicleState m_vehicleBackup;
     VehicleState m_state;
 
     CommandList m_lPreviousCommands;    //< List holding the previous commands sent to the model (Newest commands at the front, oldest at the back)
@@ -1046,6 +1063,7 @@ public:
     void _TerrainMeshPublisherFunc();
     // void _pubState();
     // void _pubState(VehicleState&);
+    void  _pubTFs();
     void _pubMesh();
     void _pubMesh(btCollisionShape*, ros::Publisher*);
     void _pubMesh(btCollisionShape*, btTransform*, ros::Publisher*);
@@ -1090,8 +1108,11 @@ public:
     actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8;
     actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9;
 
-    // void UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr&);
-    // actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>* m_actionUpdateState_server;
+    void SetStateService(const carplanner_msgs::SetStateGoalConstPtr&);
+    actionlib::SimpleActionServer<carplanner_msgs::SetStateAction> m_actionSetState_server;
+
+    void UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr&);
+    actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction> m_actionUpdateState_server;
 
     // void GetGravityCompensationService(const carplanner_msgs::GetGravityCompensationGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>* m_actionGetGravityCompensation_server;

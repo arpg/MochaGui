@@ -72,8 +72,8 @@
             "program": "/opt/ros/melodic/lib/nodelet/nodelet",
             "args": ["load","mochapc/MochaPlannerNodelet", "mocha_manager", 
                 "__name:=mocha_planner",
-                "__params_file:=/home/mike/code/mochapc/learning_params.csv",
-                "__terrain_mesh_file:=/home/mike/code/mochapc/labLoop.ply"],
+                "__params_file:=/home/mike/code/mochapc/husky_params.csv",
+                "__terrain_mesh_file:=/home/mike/code/mochapc/disk.ply"],
             "logging": { "trace": true, "traceResponse": true },
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -95,8 +95,8 @@
             "program": "/opt/ros/melodic/lib/nodelet/nodelet",
             "args": ["load","mochapc/MochaVehicleNodelet", "mocha_manager", 
                 "__name:=mocha_vehicle",
-                "__params_file:=/home/mike/code/mochapc/learning_params.csv",
-                "__terrain_mesh_file:=/home/mike/code/mochapc/labLoop.ply",
+                "__params_file:=/home/mike/code/mochapc/husky_params.csv",
+                "__terrain_mesh_file:=/home/mike/code/mochapc/disk.ply",
                 "__car_mesh_file:=/home/mike/code/mochapc/herbie/herbie.blend",
                 "__wheel_mesh_file:=/home/mike/code/mochapc/herbie/wheel.blend",
                 "__mode:=0"],
@@ -118,7 +118,7 @@
     "compounds": [
         {
             "name": "Mocha",
-            "configurations": ["Manager", "Vehicle", "Planner"]
+            "configurations": ["Vehicle", "Manager", "Planner"]
         },
         {
             "name": "MochaStandalone",

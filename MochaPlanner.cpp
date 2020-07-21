@@ -141,8 +141,6 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     //m_dTrajWeight(7) = BADNESS_WEIGHT;
 
     m_timerPubLoop = m_private_nh->createTimer(ros::Duration(0.1), &MochaPlanner::PubLoopFunc, this);
-    
-    m_timerPlanningLoop = m_private_nh->createTimer(ros::Duration(1.0), &MochaPlanner::PlanningLoopFunc, this);
 
     if (m_bSubToVehicleWp) {
         // m_subVehicleWp = m_nh->subscribe("vehicle_waypoint", 10, boost::bind(&MochaPlanner::vehicleWpCb, this, _1));
@@ -176,6 +174,9 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     // m_actionSetNoDelay_client.waitForServer();
 
     m_srvEnableTerrainPlanning_server = m_nh->advertiseService("plan_car/enable_terrain_planning", &MochaPlanner::EnableTerrainPlanningSvcCb, this);
+
+    m_timerPlanningLoop = m_private_nh->createTimer(ros::Duration(1.0), &MochaPlanner::PlanningLoopFunc, this);
+    m_bPlanContinuously = false;
     m_srvEnableContinuousPlanning_server = m_nh->advertiseService("plan_car/enable_continuous_planning", &MochaPlanner::EnableContinuousPlanningSvcCb, this);
 
     while( !m_bServersInitialized && ros::ok()) 
@@ -234,7 +235,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
             pose.translation()[0] = 0.75;
             pose.translation()[1] = -1.25;
             pose.translation()[2] = 0;
-            pose.setQuaternion(Eigen::Quaterniond(0.707, 0, 0, 0.707));
+            pose.setQuaternion(Eigen::Quaterniond(0.707, 0, 0, 0.707)); // w x y z
         
             double vel = 1;
             double curv = 0;
@@ -783,7 +784,8 @@ void MochaPlanner::SampleAcceleration(std::vector<ControlCommand>& vCommands, Pr
                           problem.m_dCoefs(2)*powi((t-problem.m_dTorqueStartTime),2) +
                           problem.m_dCoefs(3)*powi((t-problem.m_dTorqueStartTime),3);
         }
-        vCommands.push_back(ControlCommand(problem.m_vAccelProfile[accelIndex].m_dAccel+(problem.m_CurrentSolution.m_dOptParams[OPT_ACCEL_DIM]/problem.m_dSegmentTime),curvature,dTorques,actualDt,0));
+        double force = problem.m_vAccelProfile[accelIndex].m_dAccel+(problem.m_CurrentSolution.m_dOptParams[OPT_ACCEL_DIM]/problem.m_dSegmentTime);
+        vCommands.push_back(ControlCommand(force,curvature,dTorques,actualDt,0));
     }
 
     //if there is control delay, add empty commands to the end, so that the control delay queue can be flushed out
@@ -1121,6 +1123,7 @@ bool MochaPlanner::Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d
         {
             result = m_actionRaycast_client.getResult();
             dIntersect = Eigen::Vector3d(result->intersect.x, result->intersect.y, result->intersect.z);
+            // dIntersect[2] -= 0.25; 
 
             return true;
         }
@@ -1240,8 +1243,6 @@ bool MochaPlanner::InitializeProblem(Problem& problem,
     }else{
         problem.m_vVelProfile = *pVelProfile;
     }
-
-
 
     //this puts the result in m_dP
     problem.m_pBoundarySovler->Solve(&problem.m_BoundaryProblem);
@@ -1788,11 +1789,11 @@ void MochaPlanner::AddWaypoint(Waypoint& wp)
     Eigen::Vector3d dIntersect;
 
     Waypoint* wp_ptr = new Waypoint(wp); // in nwu
-    wp_ptr->state.FlipCoordFrame(); // now in ned
+    // wp_ptr->state.FlipCoordFrame(); // now in ned
 
-    if (Raycast(wp_ptr->state.m_dTwv.translation(), GetBasisVector(wp_ptr->state.m_dTwv,2)*0.2, dIntersect, true))
+    if (Raycast(wp_ptr->state.m_dTwv.translation(), -GetBasisVector(wp_ptr->state.m_dTwv,2)*0.2, dIntersect, true))
     {
-        wp_ptr->state.m_dTwv.translation() = dIntersect;// + Eigen::Vector3d(0,0,-0.1);
+        wp_ptr->state.m_dTwv.translation() = dIntersect;// + Eigen::Vector3d(0,0,-0.1); // in ned
 
         // m_vWaypoints.back() = new Waypoint(wp);
 
@@ -1809,9 +1810,9 @@ void MochaPlanner::SetWaypoint(int idx, Waypoint& wp)
     Eigen::Vector3d dIntersect;
 
     Waypoint* wp_ptr = new Waypoint(wp);
-    wp_ptr->state.FlipCoordFrame();
+    // wp_ptr->state.FlipCoordFrame();
 
-    if (Raycast(wp_ptr->state.m_dTwv.translation(), GetBasisVector(wp_ptr->state.m_dTwv,2)*0.2, dIntersect, true))
+    if (Raycast(wp_ptr->state.m_dTwv.translation(), -GetBasisVector(wp_ptr->state.m_dTwv,2)*0.2, dIntersect, true))
     {
         wp_ptr->state.m_dTwv.translation() = dIntersect;// + Eigen::Vector3d(0,0,-0.1);
 
@@ -2171,6 +2172,16 @@ bool MochaPlanner::replan()
                     numIterations++;
                 }
 
+                std::string cmds_str = "Commands:\n";
+                cmds_str += "\tForce\t\tPhi\n";
+                for (uint i=0; i<m_vSegmentSamples[dirtySegmentId].m_vCommands.size(); )
+                {
+                    cmds_str += "\t" + std::to_string(m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dForce) + "\t" + std::to_string(m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dPhi) + "\n";
+                    i+=2;
+                }
+                printf(cmds_str.c_str());
+
+
                 // float this_norm = problem.m_CurrentSolution.m_dNorm;
                 // last_norm = this_norm;
             }
@@ -2266,7 +2277,7 @@ bool MochaPlanner::_IteratePlanner(
 void MochaPlanner::_pubWaypoints(std::vector<Waypoint*>& pts)
 {
     if (pts.empty()) { pts.empty(); }
-    tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+    // tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
 
     geometry_msgs::PoseArray pts_msg;
     pts_msg.header.frame_id = "map";
@@ -2284,7 +2295,7 @@ void MochaPlanner::_pubWaypoints(std::vector<Waypoint*>& pts)
 
         tf::Transform pt_tf(tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()),
                             tf::Vector3((pt)(0),(pt)(1),(pt)(2)));
-        pt_tf = rot_180_x*pt_tf*rot_180_x;
+        // pt_tf = rot_180_x*pt_tf*rot_180_x;
 
         geometry_msgs::Pose pt_msg;
         pt_msg.position.x = pt_tf.getOrigin().x();
