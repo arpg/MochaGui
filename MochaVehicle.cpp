@@ -570,10 +570,10 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
 
 	dynamic_cast<btDefaultHinge2Vehicle*>(pWorld->m_pVehicle)->spawn(pWorld->m_pDynamicsWorld);
 
-    for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
-    {
-        pWorld->m_pVehicle->getWheel(i)->setMaxSteeringRate(pWorld->m_Parameters[CarParameters::MaxSteeringRate]);
-    }
+    // for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
+    // {
+    //     pWorld->m_pVehicle->getWheel(i)->setMaxSteeringRate(pWorld->m_Parameters[CarParameters::MaxSteeringRate]);
+    // }
 
     pWorld->m_pVehicle->updateConstraints();
 
@@ -1732,7 +1732,6 @@ void MochaVehicle::UpdateState(  const int& worldId,
     // pWorld->m_pVehicle->setEnabledLinearVelocity(1);
 
     pWorld->m_pVehicle->setEnabledSteeringAngle(delayedCommands.m_dPhi);
-    pWorld->m_pVehicle->updateConstraints();
 
     // Simulation mode -> this causes the car to move on the screen
     // Experiment mode + SIL -> this causes the car to go +z forever and spin on it's y-axis (through the length of the car)
@@ -1741,6 +1740,7 @@ void MochaVehicle::UpdateState(  const int& worldId,
     if (pWorld->m_pDynamicsWorld && bNoUpdate==false)
     {
         // pWorld->m_pVehicle->setEnabledTorqueForce(command.m_dTorque);
+        // pWorld->m_pVehicle->updateConstraints();
         pWorld->m_pDynamicsWorld->stepSimulation(dT,1,dT);
     }
     // printf("OK 2\n");

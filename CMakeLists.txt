@@ -242,6 +242,16 @@ target_link_libraries( vehicle_nodelet vehicle ${LIBRARIES} )
 add_executable(  vehicle_standalone_nodelet mochavehicle_nodelet.cpp )
 target_link_libraries( vehicle_standalone_nodelet vehicle_nodelet )
 
+
+add_executable( MochaSimulator
+  MochaSimulator.cpp
+)
+target_link_libraries( MochaSimulator
+  vehicle
+)
+
+
+
 # Generate config file for use in headers
 CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
