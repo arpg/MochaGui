@@ -177,6 +177,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
 
     m_srvEnableTerrainPlanning_server = m_nh->advertiseService("plan_car/enable_terrain_planning", &MochaPlanner::EnableTerrainPlanningSvcCb, this);
     m_srvEnableContinuousPlanning_server = m_nh->advertiseService("plan_car/enable_continuous_planning", &MochaPlanner::EnableContinuousPlanningSvcCb, this);
+    m_bPlanContinuously = false;
 
     while( !m_bServersInitialized && ros::ok()) 
     {

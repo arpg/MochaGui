@@ -9,7 +9,7 @@
 #define	MOCHAVEHICLE_H
 
 #include <ros/ros.h>
-// #include <tf/transform_broadcaster.h>
+#include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 // #include <tf2_ros/transform_listener.h>
 // #include <tf2_ros/static_transform_broadcaster.h>
@@ -19,6 +19,9 @@
 #include <carplanner_msgs/ResetMesh.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <nav_msgs/Odometry.h>
+
+#include <carplanner_msgs/SetStateAction.h>
+#include <carplanner_msgs/UpdateStateAction.h>
 
 #include <nodelet/nodelet.h>
 
@@ -1041,6 +1044,7 @@ public:
     // GUIHelperInterface* m_guiHelper;
 
     void InitROS();
+    void _pubTFs();
     void _PublisherFunc();
     // void _StatePublisherFunc();
     void _TerrainMeshPublisherFunc();
@@ -1090,8 +1094,11 @@ public:
     actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8;
     actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9;
 
-    // void UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr&);
-    // actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>* m_actionUpdateState_server;
+    void SetStateService(const carplanner_msgs::SetStateGoalConstPtr&);
+    actionlib::SimpleActionServer<carplanner_msgs::SetStateAction> m_actionSetState_server;
+
+    void UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr&);
+    actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction> m_actionUpdateState_server;
 
     // void GetGravityCompensationService(const carplanner_msgs::GetGravityCompensationGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>* m_actionGetGravityCompensation_server;
