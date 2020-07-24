@@ -2172,14 +2172,14 @@ bool MochaPlanner::replan()
                     numIterations++;
                 }
 
-                std::string cmds_str = "Commands:\n";
-                cmds_str += "\tForce\t\tPhi\n";
-                for (uint i=0; i<m_vSegmentSamples[dirtySegmentId].m_vCommands.size(); )
-                {
-                    cmds_str += "\t" + std::to_string(m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dForce) + "\t" + std::to_string(m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dPhi) + "\n";
-                    i+=2;
-                }
-                printf(cmds_str.c_str());
+                // std::string cmds_str = "Commands:\n";
+                // cmds_str += "\tForce\t\tPhi\n";
+                // for (uint i=0; i<m_vSegmentSamples[dirtySegmentId].m_vCommands.size(); )
+                // {
+                //     cmds_str += "\t" + std::to_string(m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dForce) + "\t" + std::to_string(m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dPhi) + "\n";
+                //     i+=2;
+                // }
+                // printf(cmds_str.c_str());
 
 
                 // float this_norm = problem.m_CurrentSolution.m_dNorm;

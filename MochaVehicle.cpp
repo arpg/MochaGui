@@ -216,13 +216,13 @@ void MochaVehicle::Init()
         DLOG(INFO) << " to Simulation";
         pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
                                                           0, 1, 0, 0,
-                                                          0, 0,-1, 0,
+                                                          0, 0, 1, 0,
                                                           0, 0, 0, 1 );
     }else{
         DLOG(INFO) << " to Experiment";
         pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
                                                           0, 1, 0, 0,
-                                                          0, 0,-1, 0,
+                                                          0, 0, 1, 0,
                                                           0, 0, 0, 1 );
     }
     // std::cout << std::endl;
@@ -871,6 +871,55 @@ void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocities
             break;
     }
 
+    BulletWorldInstance* pWorld = GetWorldInstance(goal->world_id);
+    {
+        std::string prtstr = "\nid\tidx\tx\ty\tz\ttheta\tv\taccel\tphi";
+        for (uint i=0; i<actionApplyVelocities_result.motion_sample.commands.size(); i++)
+        {
+            VehicleState state; state.fromROS(actionApplyVelocities_result.motion_sample.states[i]);
+            Eigen::Vector6d state_vec = state.ToXYZTCV();
+            ControlCommand command; command.fromROS(actionApplyVelocities_result.motion_sample.commands[i]);
+            prtstr += "\n" + std::to_string(goal->world_id) + "\t" 
+                + std::to_string(i) + "\t" ;
+            //     + std::to_string((state_vec[0]) + "\t" 
+            //     + std::to_string((state_vec[1]) + "\t" 
+            //     + std::to_string((state_vec[2]) + "\t" 
+            //     + std::to_string((state_vec[3]) + "\t" 
+            //     + std::to_string(command.m_dForce) + "\t" 
+            //     + std::to_string(command.m_dPhi) ;
+            {
+                std::string tempstr = std::to_string(state_vec[0]);
+                // std::cout << "*** a: " << tempstr << std::endl;
+                // std::cout << "*** b: " << std::to_string(tempstr.find_first_of(".")) << std::endl;
+                // std::cout << "*** c: " << tempstr.substr(0,tempstr.find_first_of(".")+2) << std::endl;
+                tempstr = tempstr.substr(0,tempstr.find_first_of(".")+3);
+                prtstr += tempstr + "\t";
+            }
+            {
+                std::string tempstr = std::to_string(state_vec[1]);
+                tempstr = tempstr.substr(0,tempstr.find_first_of(".")+3);
+                prtstr += tempstr + "\t";
+            }
+            {
+                std::string tempstr = std::to_string(state_vec[2]);
+                tempstr = tempstr.substr(0,tempstr.find_first_of(".")+3);
+                prtstr += tempstr + "\t";
+            }
+            {
+                std::string tempstr = std::to_string(state_vec[3]);
+                tempstr = tempstr.substr(0,tempstr.find_first_of(".")+3);
+                prtstr += tempstr + "\t";
+            }
+            {
+                std::string tempstr = std::to_string(state_vec[5]);
+                tempstr = tempstr.substr(0,tempstr.find_first_of(".")+3);
+                prtstr += tempstr + "\t";
+            }
+            prtstr += std::to_string( command.m_dForce ) + "\t" 
+                + std::to_string( command.m_dPhi ) ;
+        }
+        ROS_INFO(prtstr.c_str());
+    }
 }
 
 // void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
@@ -1405,7 +1454,7 @@ double MochaVehicle::GetCorrectedSteering(double& dCurvature, int index)
 double MochaVehicle::GetSteeringAngle(const double dcurvature, double& dCorrectedCurvature, int index, double steeringCoef /*= 1*/)
 {
     BulletWorldInstance* pWorld = GetWorldInstance(index);
-    double phi = -atan(dcurvature*pWorld->m_Parameters[CarParameters::WheelBase])*steeringCoef;
+    double phi = atan(dcurvature*pWorld->m_Parameters[CarParameters::WheelBase])*steeringCoef;
     //double phi = 1.0/atan((1-powi(pWorld->m_Parameters[CarParameters::WheelBase]/2,2)*powi(dcurvature,2))/(powi(dcurvature,2)*powi(pWorld->m_Parameters[CarParameters::WheelBase],2)));
 
     dCorrectedCurvature  = (tan(phi)/pWorld->m_Parameters[CarParameters::WheelBase]);
@@ -1874,6 +1923,11 @@ void MochaVehicle::SetState( int nWorldId,  const VehicleState& state /* in ned 
     pWorld->m_pVehicle->getRigidBody()->setAngularVelocity(w);
 
     pWorld->m_pVehicle->setEnabledLinearVelocity(vel.norm());
+    for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
+    {
+        pWorld->m_pVehicle->getWheel(i)->getBody()->setLinearVelocity(vel);
+        pWorld->m_pVehicle->getWheel(i)->getBody()->setAngularVelocity(pWorld->m_pVehicle->getWheel(i)->getBody()->getWorldTransform().getBasis() * btVector3(0, vel.norm()/pWorld->m_pVehicle->getWheel(i)->getRadius(), 0));
+    }
 
     //set the steering
     pWorld->m_pVehicle->setEnabledSteeringAngle(state.m_dSteering);
