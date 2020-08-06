@@ -6,6 +6,7 @@ StaticSideFrictionCoef,1.353970000
 SlipCoefficient,0.000000000
 ControlDelay,0.100000000
 Mass,20.473368000
+WheelMass,1.0
 WheelRadius,0.1650000000
 WheelWidth,0.125000000
 TractionFriction,1000.000000000

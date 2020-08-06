@@ -31,18 +31,24 @@
 #include <carplanner_msgs/GetInertiaTensorAction.h>
 #include <carplanner_msgs/SetNoDelayAction.h>
 
+#include <carplanner_msgs/GetStateAction.h>
+#include <carplanner_msgs/SetStateAction.h>
+
 #include <carplanner_msgs/EnableTerrainPlanning.h>
 #include <carplanner_msgs/EnableContinuousPlanning.h>
+#include <carplanner_msgs/Replay.h>
 
 #include <carplanner_msgs/OdometryArray.h>
 #include <geometry_msgs/PoseArray.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <carplanner_msgs/mocha_conversions.hpp>
+#include <carplanner_msgs/io_conversion_tools.hpp>
 
 #include <dynamic_reconfigure/server.h>
 #include <carplanner_msgs/MochaPlannerConfig.h>
 
-#define XY_WEIGHT 1.5
+#define X_WEIGHT 3.0
+#define Y_WEIGHT 3.0
 #define Z_WEIGHT 1.5
 #define THETA_WEIGHT 0.2
 #define VEL_WEIGHT_TRAJ 0.5
@@ -50,11 +56,12 @@
 #define TIME_WEIGHT 0.05
 #define CURV_WEIGHT 0.001
 #define TILT_WEIGHT 1.5 // dRoll
+#define CONTACT_WEIGHT 0.1 
 #define BADNESS_WEIGHT 5e-8;
 #define DAMPING_STEPS 8
 #define DAMPING_DIVISOR 1.3
 
-#define POINT_COST_ERROR_TERMS 6
+#define POINT_COST_ERROR_TERMS 7
 #define TRAJ_EXTRA_ERROR_TERMS 2
 #define TRAJ_UNIT_ERROR_TERMS 6
 
@@ -165,7 +172,9 @@ struct Problem
         m_dStartTorques = Eigen::Vector3d::Zero();
         m_bInertialControlActive = false;
         m_pBestSolution = nullptr;
-        m_lSolutions.clear();;
+        m_lSolutions.clear();
+        m_CurrentSolution = Solution();
+        m_CurrentSolution.m_dNorm = DBL_MAX;
     }
 
     Problem()
@@ -233,7 +242,7 @@ struct Problem
 
     void UpdateOptParams(const Eigen::VectorXd& dOptParams)
     {
-        m_CurrentSolution.m_dOptParams.head(OPT_DIM) = dOptParams;
+        m_CurrentSolution.m_dOptParams.head(OPT_DIM) = dOptParams; // x, y, theta, acceleration, aggressiveness
         m_BoundaryProblem.m_dGoalPose.head(3) = dOptParams.head(3);
         if(OPT_DIM > OPT_AGGR_DIM){
             //DLOG(INFO) << "Setting opt params to " << dOptParams.transpose();
@@ -293,7 +302,7 @@ private:
     void SetNoDelay(bool);    
     actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;
 
-    inline void EnableTerrainPlanning(bool do_plan) { m_bPlanForTerrain = do_plan; }
+    inline void EnableTerrainPlanning(bool do_plan) { m_bIterateGN = do_plan; }
     bool EnableTerrainPlanningSvcCb(carplanner_msgs::EnableTerrainPlanning::Request &req, carplanner_msgs::EnableTerrainPlanning::Response &res);
     ros::ServiceServer m_srvEnableTerrainPlanning_server;
 
@@ -303,6 +312,16 @@ private:
 
     bool Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool& biDirectional, int index=0);
     actionlib::SimpleActionClient<carplanner_msgs::RaycastAction> m_actionRaycast_client;
+
+    bool ReplaySvcCb(carplanner_msgs::Replay::Request &req, carplanner_msgs::Replay::Response &res);
+    ros::ServiceServer m_srvReplay_server;
+    void replay(float rate=1.f);
+
+    VehicleState SetVehicleState(VehicleState stateIn, int worldId=0);
+    actionlib::SimpleActionClient<carplanner_msgs::SetStateAction> m_actionSetState_client;
+
+    VehicleState GetVehicleState(int worldId=0);
+    actionlib::SimpleActionClient<carplanner_msgs::GetStateAction> m_actionGetState_client;
 
     // virtual void onInit();
 
@@ -334,7 +353,7 @@ private:
     bool replan();
 
     double& m_dTimeInterval;
-    bool m_bPlanForTerrain;
+    bool m_bIterateGN;
     bool m_bPlanContinuously;
     bool m_bSimulate3dPath;
     // MochaVehicle m_PlanCarModel;
@@ -417,6 +436,7 @@ private:
 
 
     BezierBoundarySolver m_BoundarySolver;                      //< The boundary value problem solver
+    Problem bestProblem;
 
     Eigen::MatrixXd& m_dPointWeight;                                       //< The matrix which holds the weighted Gauss-Newton weights
     Eigen::MatrixXd& m_dTrajWeight;

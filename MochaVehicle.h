@@ -20,6 +20,8 @@
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <nav_msgs/Odometry.h>
 
+#include <carplanner_msgs/SetDriveMode.h>
+
 #include <nodelet/nodelet.h>
 
 #include "mesh_conversion_tools.hpp"
@@ -31,6 +33,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <carplanner_msgs/ApplyVelocitiesAction.h>
 #include <carplanner_msgs/SetStateAction.h>
+#include <carplanner_msgs/GetStateAction.h>
 #include <carplanner_msgs/UpdateStateAction.h>
 // #include <carplanner_msgs/GetGravityCompensationAction.h>
 // #include <carplanner_msgs/GetFrictionCompensationAction.h>
@@ -86,6 +89,7 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 
+#include <map>
 
 #define CAR_UP_AXIS 2   //this is the index for the bullet Z axis
 #define CAR_FORWARD_AXIS 0   //this is the index for the bullet X axis
@@ -111,6 +115,18 @@
 // #define VEHICLE_WHEEL_WIDTH 0.025
 #define MIN_CONTROL_DELAY 0.0
 #define MAX_CONTROL_DELAY 0.3
+
+struct CollisionEvent 
+{ 
+    const btCollisionObject* bodyA; 
+    const btCollisionObject* bodyB;
+    btVector3 point;
+
+    CollisionEvent(const btCollisionObject* bodyA_, const btCollisionObject* bodyB_, btVector3 point_)
+        : bodyA(bodyA_), bodyB(bodyB_), point(point_)
+    {
+    }
+};
 
 class DefaultVehicleRaycaster : public btVehicleRaycaster
 {
@@ -167,9 +183,11 @@ public:
         m_dCurvature = msg.curvature;
         m_dT = msg.dt;
         m_dPhi = msg.dphi;
-        m_dTorque[0] = msg.torques[0];
-        m_dTorque[1] = msg.torques[1];
-        m_dTorque[2] = msg.torques[2];
+        m_dTorque.resize(msg.torques.size());
+        for (uint i=0; i<m_dTorque.size(); i++)
+        {
+            m_dTorque[i] = msg.torques[i];
+        }
         m_dTime = msg.time;
 
         return;
@@ -616,7 +634,11 @@ struct VehicleState
 
     //   Sophus::SE3d Twv = rot_180_x*(*this).m_dTwv*rot_180_x;
       Sophus::SE3d Twv = (*this).m_dTwv;
-      state_msg.pose.header.stamp.sec = (*this).GetTime();
+    //   state_msg.time = (*this).GetTime();
+      double time = (*this).GetTime();
+      state_msg.header.stamp.sec = floor(time);
+      state_msg.header.stamp.nsec = (time-state_msg.pose.header.stamp.sec)*1e9;
+      state_msg.pose.header.stamp = ros::Time::now();
       state_msg.pose.header.frame_id = "world";
       state_msg.pose.child_frame_id = "base_link";
       state_msg.pose.transform.translation.x = Twv.translation()[0];
@@ -680,6 +702,7 @@ struct VehicleState
             msg.pose.transform.rotation.y,
             msg.pose.transform.rotation.z));
 
+        m_vWheelStates.resize(msg.wheel_poses.size());
         for( unsigned int i=0; i<(*this).m_vWheelStates.size(); i++ )
         {
             (*this).m_vWheelStates[i].translation() = Eigen::Vector3d(
@@ -693,6 +716,7 @@ struct VehicleState
                 msg.wheel_poses[i].transform.rotation.z));
         }
 
+        m_vWheelContacts.resize(msg.wheel_contacts.size());
         for(uint i=0; i<m_vWheelContacts.size(); i++)
         {
             m_vWheelContacts[i] = msg.wheel_contacts[i];
@@ -708,8 +732,9 @@ struct VehicleState
         (*this).m_dCurvature = msg.curvature;
 
         (*this).m_dSteering = msg.steering;
-    }
 
+        (*this).m_dTime = msg.header.stamp.sec + (double)msg.header.stamp.nsec*(double)1e-9;
+    }
 
     Sophus::SE3d m_dTwv;                     //< 4x4 matrix denoting the state of the car
     std::vector<Sophus::SE3d> m_vWheelStates;   //< 4x4 matrices which denote the pose of each wheel
@@ -897,7 +922,7 @@ struct MotionSample
         return vPoses;
     }
 
-    double GetBadnessCost() const
+    double GetTiltCost() const
     {
         double cost = 0;
 
@@ -917,8 +942,44 @@ struct MotionSample
 
         for(size_t ii = 1; ii < m_vStates.size() ; ii++){
             const VehicleState& state = m_vStates[ii];
-            cost += fabs(state.m_dW[0]*state.m_dW[1]);
+            Eigen::Vector3d dWCS(state.m_dW.transpose() * state.m_dTwv.rotationMatrix());
+            Eigen::Vector3d error_weights(1,.6,.2); // roll pitch yaw
+            cost += error_weights.dot(dWCS);
             // cost += fabs(state.m_dW[0]);
+        }
+        cost /= GetDistance();
+
+        return cost;
+    }
+
+    double GetContactCost() const
+    {
+        double cost = 0;
+
+        // if(m_vCommands.size() != 0){
+        //     const ControlCommand* pPrevCommand = &m_vCommands.front();
+        //     for(size_t ii = 1; ii < m_vStates.size() ; ii++){
+        //         //const VehicleState& state = m_vStates[ii];
+        //         const ControlCommand& command = m_vCommands[ii];
+        //         //cost = std::max(state.m_dV.norm() * state.m_dW.norm(),cost);
+        //         //cost += fabs(state.m_dV.norm() * state.m_dW[2]) - fabs(m_vCommands[ii].m_dCurvature);
+        //         cost += fabs(command.m_dPhi - pPrevCommand->m_dPhi);
+        //         pPrevCommand = &m_vCommands[ii];
+        //         //cost += fabs(state.m_dSteering);
+        //     }
+        //     cost /= GetDistance();
+        // }
+
+        for(size_t ii = 1; ii < m_vStates.size() ; ii++){
+            const VehicleState& state = m_vStates[ii];
+            // Eigen::Vector3d dWCS(state.m_dW.transpose() * state.m_dTwv.rotationMatrix());
+            // Eigen::Vector3d error_weights(1,.8,.4); // roll pitch yaw
+            // cost += error_weights.dot(dWCS);
+            // cost += fabs(state.m_dW[0]);
+            for(size_t jj = 0; jj < state.m_vWheelContacts.size(); jj++)
+            {
+                cost += (state.m_vWheelContacts[jj] ? 0.0 : 1.0);
+            }
         }
         cost /= GetDistance();
 
@@ -986,42 +1047,7 @@ struct MotionSample
 
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-class ControlPlan
-{
-public:
-
-    double m_dStartTime;
-    double m_dEndTime;
-    double m_dNorm;
-    MotionSample m_Sample;
-
-    Sophus::SE3d m_dStartPose;
-    Sophus::SE3d m_dEndPose;
-
-    int m_nStartSegmentIndex;   //the segment at which this plan starts
-    int m_nStartSampleIndex; //the sample in the segment at which this control plan starts
-
-    int m_nEndSegmentIndex;   //the segment at which this plan ends
-    int m_nEndSampleIndex; //the sample in the segment at which this control plan ends
-    int m_nPlanId;
-
-
-    VehicleState m_StartState;
-    Eigen::Vector3d m_dStartTorques;
-    VehicleState m_GoalState;
-
-    void Clear() {
-        m_Sample.Clear();
-    }
-
-    ~ControlPlan(){
-        //DLOG(INFO) << "Deleting control plan.";
-    }
-
-public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
+////
 
 class MochaVehicle
 {
@@ -1049,7 +1075,8 @@ public:
     ros::Subscriber m_terrainMeshSub;
     bool reset_mesh_frame;
     // ros::ServiceServer m_resetmeshSrv;
-    // ros::Subscriber m_meshSub2;
+    ros::ServiceServer m_srvSetDriveMode;
+        // ros::Subscriber m_meshSub2;
     // std::string m_meshSubTopic = "/infinitam/mesh";
     // std::string m_meshSubTopic = "/fake_mesh_publisher/mesh";
     // ros::Publisher m_posePub;
@@ -1061,16 +1088,23 @@ public:
     void _PublisherFunc();
     // void _StatePublisherFunc();
     void _TerrainMeshPublisherFunc();
+    void _pubVehicleMesh(uint);
     // void _pubState();
     // void _pubState(VehicleState&);
-    void  _pubTFs();
-    void _pubMesh();
+    void _pubTFs(uint);
+    void _pubPreviousCommands(uint);
+    void _pubTerrainMesh(uint);
+    // void _pubMesh(uint);
     void _pubMesh(btCollisionShape*, ros::Publisher*);
     void _pubMesh(btCollisionShape*, btTransform*, ros::Publisher*);
     // void _meshCB(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
     // bool ResetMesh(carplanner_msgs::ResetMesh::Request&, carplanner_msgs::ResetMesh::Response&);
     // void _PoseThreadFunc();
     // void _CommandThreadFunc(const carplanner_msgs::Command::ConstPtr&);
+
+
+    bool SetDriveModeSvcCb(carplanner_msgs::SetDriveMode::Request&, carplanner_msgs::SetDriveMode::Response&);
+    void SetDriveMode(uint nWorldId, uint mode);
 
     void ApplyVelocities(const VehicleState& startingState,
                                               std::vector<ControlCommand>& vCommands,
@@ -1110,6 +1144,9 @@ public:
 
     void SetStateService(const carplanner_msgs::SetStateGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::SetStateAction> m_actionSetState_server;
+
+    void GetStateService(const carplanner_msgs::GetStateGoalConstPtr&);
+    actionlib::SimpleActionServer<carplanner_msgs::GetStateAction> m_actionGetState_server;
 
     void UpdateStateService(const carplanner_msgs::UpdateStateGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction> m_actionUpdateState_server;
@@ -1216,10 +1253,43 @@ protected:
 
     static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2; }
 
+    static void getCollisions(btDynamicsWorld* world, std::vector<CollisionEvent>& collisions)
+    {
+        int numManifolds = world->getDispatcher()->getNumManifolds();
+        for (int i=0;i<numManifolds;i++)
+        {
+            btPersistentManifold* contactManifold =  world->getDispatcher()->getManifoldByIndexInternal(i);
+            const btCollisionObject* obA = static_cast<const btCollisionObject*>(contactManifold->getBody0());
+            const btCollisionObject* obB = static_cast<const btCollisionObject*>(contactManifold->getBody1());
+
+            btVector3 avgpt(0,0,0);
+
+            int numContacts = contactManifold->getNumContacts();
+            for (int j=0;j<numContacts;j++)
+            {
+                btManifoldPoint& pt = contactManifold->getContactPoint(j);
+                if (pt.getDistance()<0.f)
+                {
+                    const btVector3& ptA = pt.getPositionWorldOnA();
+                    const btVector3& ptB = pt.getPositionWorldOnB();
+                    const btVector3& normalOnB = pt.m_normalWorldOnB;
+
+                    avgpt += ptA + ptB;
+                }
+            }
+
+            if (numContacts>0)
+            {
+                avgpt /= numContacts*2;
+                collisions.push_back(CollisionEvent(obA, obB, avgpt));
+            }
+        }
+    }
+
+
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 };
-
 
 #endif	/* MOCHAVEHICLE_H */

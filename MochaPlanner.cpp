@@ -2,15 +2,15 @@
 #include "MochaPlanner.h"
 
 static bool& g_bUseCentralDifferences = CVarUtils::CreateGetUnsavedCVar("debug.UseCentralDifferences",true);
-static double& g_dSuccessNorm = CVarUtils::CreateGetUnsavedCVar("debug.SuccessNorm",0.01);
 static double& g_dTimeTarget = CVarUtils::CreateGetUnsavedCVar("debug.TimeTarget",0.00);
 //static bool& g_bUseGoalPoseStepping = CVarUtils::CreateGetCVar("debug.UseGoalPoseStepping",false);
 static bool& g_bDisableDamping = CVarUtils::CreateGetUnsavedCVar("debug.DisableDamping",false);
 static bool& g_bMonotonicCost(CVarUtils::CreateGetUnsavedCVar("debug.MonotonicCost", true,""));
-static bool& g_bVerbose(CVarUtils::CreateGetUnsavedCVar("debug.Verbose", true,""));
+static bool& g_bVerbose(CVarUtils::CreateGetUnsavedCVar("debug.Verbose", false,""));
 static bool& g_bTrajectoryCost(CVarUtils::CreateGetUnsavedCVar("debug.TrajectoryCost", true,""));
 static int& g_nTrajectoryCostSegments(CVarUtils::CreateGetUnsavedCVar("debug.TrajectoryCostSegments", 10,""));
 static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.IterationLimit", 10, "");
+static double& g_dSuccessNorm = CVarUtils::CreateGetUnsavedCVar("debug.SuccessNorm",4.0);
 
 namespace mochapc {
 struct ApplyCommandsThreadFunctor {
@@ -35,14 +35,21 @@ struct ApplyCommandsThreadFunctor {
         }
         m_poseOut = m_pPlanner->SimulateTrajectory(m_Sample, m_Problem, m_index);
         m_dErrorOut = m_pPlanner->_CalculateSampleError(m_Sample, m_Problem, m_Problem.m_CurrentSolution.m_dMinTrajectoryTime);
+        double norm = m_pPlanner->_CalculateErrorNorm(m_Problem, m_dErrorOut);
 
-        DLOG(INFO) << "Ran ACF." 
-            << " Index " << m_index << "."
-        //     // << "|  SolveBoundary " << (m_bSolveBoundary ? "true" : "false") << ".\n"
-        //     // << "|  Problem OptParams " << m_Problem.m_CurrentSolution.m_dOptParams.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << ".\n"
-            << "\n PoseOut (of " << std::to_string(m_Sample.m_vStates.size()) << ") " << m_poseOut.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << "."
-            << "\n ErrorsOut " << m_dErrorOut.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << "."
-            ;
+        // DLOG(INFO) << "Ran ACF." 
+        //     << " Index " << m_index << "."
+        // //     // << "|  SolveBoundary " << (m_bSolveBoundary ? "true" : "false") << ".\n"
+        // //     // << "|  Problem OptParams " << m_Problem.m_CurrentSolution.m_dOptParams.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << ".\n"
+        //     << "\n PoseOut (of " << std::to_string(m_Sample.m_vStates.size()) << ") " << m_poseOut.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << "."
+        //     << "\n ErrorsOut " << m_dErrorOut.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << "."
+        //     ;
+
+        ROS_INFO("Ran ACF, idx %d, final pose [%s], error [%s], norm %f",
+            m_index,
+            convertEigenMatrix2String(m_poseOut.transpose()).c_str(), 
+            convertEigenMatrix2String(m_dErrorOut.transpose()).c_str(),
+            norm);
 
         return;
     }
@@ -108,6 +115,8 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_actionGetInertiaTensor_client("plan_car/get_inertia_tensor",true),
     m_actionSetNoDelay_client("plan_car/set_no_delay",true),
     m_actionRaycast_client("plan_car/raycast",true),
+    m_actionSetState_client("plan_car/set_state",true),
+    m_actionGetState_client("plan_car/get_state",true),
     m_bServersInitialized(false),
     m_bSubToVehicleWp(true), 
     m_dWpLookupDuration(5.0)
@@ -117,22 +126,27 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
 
     m_ThreadPool.size_controller().resize(OPT_DIM*2+1);
 
+    bestProblem.Reset();
+    bestProblem.m_nPlanId = -1;
+    // bestProblem.m_CurrentSolution.m_dNorm 
+
     //weight matrix
     m_dPointWeight = Eigen::MatrixXd(POINT_COST_ERROR_TERMS,1);
     m_dTrajWeight = Eigen::MatrixXd(TRAJ_EXTRA_ERROR_TERMS+TRAJ_UNIT_ERROR_TERMS,1);
     m_dPointWeight.setIdentity();
     m_dTrajWeight.setIdentity();
 
-    m_dPointWeight(0) = XY_WEIGHT;
-    m_dPointWeight(1) = XY_WEIGHT;
+    m_dPointWeight(0) = X_WEIGHT;
+    m_dPointWeight(1) = Y_WEIGHT;
     m_dPointWeight(2) = Z_WEIGHT;
     m_dPointWeight(3) = THETA_WEIGHT;
     m_dPointWeight(4) = VEL_WEIGHT_POINT;
     // m_dPointWeight(5) = CURV_WEIGHT;
     m_dPointWeight(5) = TILT_WEIGHT;
+    m_dPointWeight(6) = CONTACT_WEIGHT;
 
-    m_dTrajWeight(0) = XY_WEIGHT;
-    m_dTrajWeight(1) = XY_WEIGHT;
+    m_dTrajWeight(0) = X_WEIGHT;
+    m_dTrajWeight(1) = Y_WEIGHT;
     m_dTrajWeight(2) = Z_WEIGHT;
     m_dTrajWeight(3) = THETA_WEIGHT;
     m_dTrajWeight(4) = VEL_WEIGHT_TRAJ;
@@ -178,6 +192,8 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_timerPlanningLoop = m_private_nh->createTimer(ros::Duration(1.0), &MochaPlanner::PlanningLoopFunc, this);
     m_bPlanContinuously = false;
     m_srvEnableContinuousPlanning_server = m_nh->advertiseService("plan_car/enable_continuous_planning", &MochaPlanner::EnableContinuousPlanningSvcCb, this);
+
+    m_srvReplay_server = m_nh->advertiseService("plan_car/replay", &MochaPlanner::ReplaySvcCb, this);
 
     while( !m_bServersInitialized && ros::ok()) 
     {
@@ -260,18 +276,23 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
         }
     }
 
-    DLOG(INFO) << "Initialized.";    
+    // DLOG(INFO) << "Initialized."; 
 
     if (!m_bPlanContinuously)
         replan();
 
-    m_nh->param("xy_weight",        m_dPointWeight(0), m_dPointWeight(0));
+    m_nh->param("x_weight",         m_dPointWeight(0), m_dPointWeight(0));
+    m_nh->param("y_weight",         m_dPointWeight(1), m_dPointWeight(1));
     m_nh->param("z_weight",         m_dPointWeight(2), m_dPointWeight(2));
     m_nh->param("theta_weight",     m_dPointWeight(3), m_dPointWeight(3));
     m_nh->param("vel_weight",       m_dPointWeight(4), m_dPointWeight(4));
     m_nh->param("tilt_weight",      m_dPointWeight(5), m_dPointWeight(5));
+    m_nh->param("contact_weight",   m_dPointWeight(6), m_dPointWeight(6));
+    m_nh->param("eps",              m_dEps,            m_dEps           );
 
     m_dynReconfig_server.setCallback(boost::bind(&MochaPlanner::dynReconfigCb, this, _1, _2));
+
+    ROS_INFO("Initialized.");   
 }
 
 MochaPlanner::~MochaPlanner()
@@ -287,13 +308,14 @@ void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, ui
 {
     ROS_INFO("Reconfigure requested.");
 
-    m_dPointWeight(0) = config.xy_weight;
-    m_dPointWeight(1) = config.xy_weight;
+    m_dPointWeight(0) = config.x_weight;
+    m_dPointWeight(1) = config.y_weight;
     m_dPointWeight(2) = config.z_weight;
     m_dPointWeight(3) = config.theta_weight;
     m_dPointWeight(4) = config.vel_weight;
     m_dPointWeight(5) = config.tilt_weight;
-    
+    m_dPointWeight(6) = config.contact_weight;
+    m_dEps = config.eps;
 }
 
 // virtual void MochaPlanner::onInit()
@@ -519,7 +541,8 @@ Eigen::VectorXd MochaPlanner::_CalculateSampleError(const MotionSample& sample, 
         error[4] = problem.m_dTransformedGoal[5] - endPose[5];
         //error[5] = state.m_dV.norm()*dW_goal[2] - problem.m_GoalState.m_dCurvature;
 
-        error[5] = sample.GetBadnessCost();
+        error[5] = sample.GetTiltCost();
+        error[6] = sample.GetContactCost();
         //error[5] = -std::log(problem.m_BoundaryProblem.m_dAggressiveness);
         //error.array() *= m_dPointWeight.block<POINT_COST_ERROR_TERMS,1>(0,0).array();
         //DLOG(INFO) << "Error vector is " << error.transpose() << " weights are " << m_dPointWeight.transpose();
@@ -594,7 +617,9 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
     Eigen::Vector6d pPoses[OPT_DIM*2],dCurrentPose;
 
     const double dEps = m_dEps;// * problem.m_CurrentSolution.m_dNorm;
-    DLOG(INFO) << "Calcing Jacobian";
+    // DLOG(INFO) << "Calcing Jacobian";
+    ROS_INFO("Calculating Jacobian.");
+    ROS_INFO("Running ACF on %d threads for each +OPT_DIM, -OPT_DIM, current.", OPT_DIM*2+1);
 
     //g_bUseCentralDifferences = false;
     for( int ii = 0; ii < OPT_DIM; ii++ )
@@ -644,12 +669,15 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
 
 
     //wait for all simulations to finish
-    DLOG(INFO) << "Waiting for threads to finish...";
+    // DLOG(INFO) << "Waiting for threads to finish...";
+    ROS_INFO("Waiting for ACF threads to finish...");
     // boost::xtime t = boost::xtime::system_time();
     // // t.system_time();
     // t.sec += 1;
     m_ThreadPool.wait();
-    DLOG(INFO) << "Done waiting.";
+    // DLOG(INFO) << "Done waiting.";
+    ROS_INFO("Done waiting.");
+    ROS_INFO("Calculating coordinate descent solution.");
 
     dCurrentErrorVec = dCurrentError;
 
@@ -685,14 +713,28 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
 
         Eigen::VectorXd col = g_bUseCentralDifferences ? ((errors[plusIdx]) - (errors[minusIdx]))/(2.0*dEps) : ((errors[plusIdx]) - dCurrentErrorVec)/(dEps);
 
-        std::string str = "Col "+std::to_string(ii)+" ";
-        for(uint i=0; i<col.size(); i++){
-            str += std::to_string(col(ii)) + " ";
-        }
-        DLOG(INFO) << str;
-        (g_bUseCentralDifferences ? 
-            DLOG(INFO) << "with centraldiff. errors+ " << errors[plusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " errors- " << errors[minusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " dEps " << std::to_string(dEps) : 
-            DLOG(INFO) << "without centraldiff. errors+ " << errors[plusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " currerr " << dCurrentErrorVec.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " dEps " << std::to_string(dEps) );
+        // std::string str = "Col "+std::to_string(ii)+" ";
+        // for(uint i=0; i<col.size(); i++){
+        //     str += std::to_string(col(ii)) + " ";
+        // }
+        // // DLOG(INFO) << str;
+        // if (g_bUseCentralDifferences)
+        // {
+        //     str += "with centraldiff. errors+ ";
+        //     str << errors[plusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]"));
+        //     str += " errors- ";
+        //     str << errors[minusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]"));
+        //     str += " dEps " + std::to_string(dEps);
+        // } 
+        // else
+        // {
+        //     str += "without centraldiff. errors+ " ;
+        //     str << errors[plusIdx].format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) ;
+        //     str += " currerr " ;
+        //     str << dCurrentErrorVec.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) ;
+        //     str += " dEps " + std::to_string(dEps) ;
+        // }
+        // ROS_DEBUG(str);
 
         J.col(ii) = -col;
         //if this term is NAN, sound the alarm
@@ -711,7 +753,8 @@ bool MochaPlanner::_CalculateJacobian(Problem& problem,
 
     coordinateDescent = pCoordinateDescent->m_CurrentSolution;
     coordinateDescent.m_dNorm = dBestNorm;
-
+    
+    ROS_INFO("Done calculating Jacobian\n%s\nwith curr norm %f, CD norm %f\nerrors [%s]", convertEigenMatrix2String(J,2,", ","\n","\t").c_str(), problem.m_CurrentSolution.m_dNorm, dBestNorm, convertEigenMatrix2String(dCurrentErrorVec.transpose()).c_str());
 
     if(g_bVerbose){
         DLOG(INFO) << "Jacobian:" << J.format(CleanFmt) << std::endl;
@@ -948,7 +991,7 @@ void MochaPlanner::ApplyVelocities(const VehicleState& startState,
       // "\nstart " << std::to_string(VehicleState::fromROS(goal->initial_state))
       ;
 
-    float timeout(5.0);
+    float timeout(15.0);
     bool finished_before_timeout = actionApplyVelocities_client.waitForResult(ros::Duration(timeout));
     if (finished_before_timeout)
     {
@@ -1141,6 +1184,139 @@ bool MochaPlanner::Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d
     }
 }
 
+bool MochaPlanner::ReplaySvcCb(carplanner_msgs::Replay::Request &req, carplanner_msgs::Replay::Response &res)
+{
+    DLOG(INFO) << "replay service called.";
+
+    replay(req.rate);
+
+    return true;
+}
+
+void MochaPlanner::replay(float rate)
+{
+    if (rate==0.0) {rate = 1.0;}
+
+    MotionSample last_segment = m_vSegmentSamples[m_vSegmentSamples.size()-1];
+    VehicleState last_state_of_last_segment = last_segment.m_vStates[last_segment.m_vStates.size()-1];
+    double est_time = last_state_of_last_segment.m_dTime*(1.f/rate);
+    ROS_INFO("Replaying motion trajectories at %f Hz, est time %f sec.", rate, est_time);
+
+    VehicleState origState = GetVehicleState(0);
+
+    ros::Time t0, t1;
+
+    double sim_dt=0.0, actual_dt=0.0, des_dt=0.0;
+    uint skip=0;
+    for (uint i_seg=0; i_seg<m_vSegmentSamples.size(); i_seg++)
+    {
+        MotionSample seg = m_vSegmentSamples[i_seg];
+        assert(seg.m_vStates.size()>1);
+        for (uint i_motion=0; i_motion<seg.m_vStates.size(); i_motion++)
+        {
+            if (skip > 0)
+            {
+                skip--;
+                continue;
+            }
+
+            sim_dt = seg.m_vCommands[i_motion].m_dT;
+            des_dt = sim_dt/rate;
+
+            {
+                t0 = ros::Time::now();
+                
+                VehicleState stateIn = seg.m_vStates[i_motion];
+                SetVehicleState(stateIn, 0);
+            
+                t1 = ros::Time::now();
+                actual_dt = t1.toSec() - t0.toSec();
+            }
+
+            if (des_dt > actual_dt)
+            {
+                ros::Duration(des_dt - actual_dt).sleep();
+            }
+            else
+            {
+                skip = round(actual_dt / des_dt);
+            }
+
+            // ROS_INFO("actual_dt %f sim_dt %f des_dt %f skip %d", actual_dt, sim_dt, des_dt, skip);
+            ros::spinOnce();
+        }
+    }
+
+    SetVehicleState(origState, 0);
+}
+
+VehicleState MochaPlanner::SetVehicleState(VehicleState stateIn, int worldId)
+{
+    carplanner_msgs::SetStateGoal goal;
+    carplanner_msgs::SetStateResultConstPtr result;
+    VehicleState stateOut;
+
+    goal.world_id = worldId;
+    goal.state_in = stateIn.toROS();
+    m_actionSetState_client.sendGoal(goal);
+
+    bool finished_before_timeout = m_actionSetState_client.waitForResult(ros::Duration(0.5));
+    if (finished_before_timeout)
+    {
+        actionlib::SimpleClientGoalState state = m_actionSetState_client.getState();
+        // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
+        if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
+            result = m_actionSetState_client.getResult();
+            stateOut.fromROS(result->state_out);
+            return stateOut;
+        }
+        else
+        {
+            ROS_INFO("SetState Action failed.");
+            return stateOut;
+        }
+    }
+    else
+    {
+        ROS_INFO("SetState Action did not finish before the time out.");
+        return stateOut;
+    }
+}
+
+VehicleState MochaPlanner::GetVehicleState(int worldId)
+{
+    carplanner_msgs::GetStateGoal goal;
+    carplanner_msgs::GetStateResultConstPtr result;
+    VehicleState stateOut;
+
+    goal.world_id = worldId;
+    m_actionGetState_client.sendGoal(goal);
+
+    bool finished_before_timeout = m_actionGetState_client.waitForResult(ros::Duration(0.5));
+    if (finished_before_timeout)
+    {
+        actionlib::SimpleClientGoalState state = m_actionGetState_client.getState();
+        // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
+        if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
+            result = m_actionGetState_client.getResult();
+            stateOut.fromROS(result->state_out);
+            return stateOut;
+        }
+        else
+        {
+            ROS_INFO("GetState Action failed.");
+            return stateOut;
+        }
+    }
+    else
+    {
+        ROS_INFO("GetState Action did not finish before the time out.");
+        return stateOut;
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////
 bool MochaPlanner::InitializeProblem(Problem& problem,
                                           const double dStartTime,
@@ -1277,12 +1453,7 @@ bool MochaPlanner::Iterate(Problem &problem )
 {
     try
     {
-        if(problem.m_CurrentSolution.m_dNorm < g_dSuccessNorm) {
-            DLOG(INFO) << problem.m_nPlanId << ":Succeeded to plan. Norm = " << problem.m_CurrentSolution.m_dNorm;
-            return true;
-        }
-
-        //get the current state and norm for the first iteration
+                //get the current state and norm for the first iteration
         if(problem.m_lSolutions.size() == 0 ) {
             //here we have to re-evaluate the segment time of the trajectory
 
@@ -1313,7 +1484,7 @@ bool MochaPlanner::Iterate(Problem &problem )
 
         _IterateGaussNewton(problem);
 
-        return true;
+        return false;
     }catch(...){
         return false;
     }
@@ -1481,16 +1652,17 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
         return false;
     }
 
-    ROS_INFO("Errors:");
-    for (uint i=0; i<error.size(); i++)
-    {
-        ROS_INFO("%f",error[i]);
-    }
+    // ROS_INFO("Errors:");
+    // for (uint i=0; i<error.size(); i++)
+    // {
+    //     ROS_INFO("%f",error[i]);
+    // }
 
-    problem.m_CurrentSolution.m_dNorm = _CalculateErrorNorm(problem,error);
-    if(g_bVerbose){
-        DLOG(INFO) << "Calculated jacobian with base norm: " << problem.m_CurrentSolution.m_dNorm;
-    }
+    // problem.m_CurrentSolution.m_dNorm = _CalculateErrorNorm(problem,error);
+    // if(g_bVerbose){
+    //     DLOG(INFO) << "Calculated jacobian with base norm: " << problem.m_CurrentSolution.m_dNorm;
+    // }
+    // ROS_INFO("Calculated jacobian with base norm %f", problem.m_CurrentSolution.m_dNorm);
 
     //if any of the columns are zero, reguralize
     bool bZeroCols = false;
@@ -1500,7 +1672,6 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
             break;
         }
     }
-
 
     //solve for the dDeltaP
     dDeltaP = J.transpose()*dW*error;
@@ -1521,6 +1692,7 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
     if(g_bVerbose){
         DLOG(INFO) << "Gauss newton delta: [" << dDeltaP.transpose().format(CleanFmt) << "]";
     }
+    ROS_INFO("Gauss newton delta [%s]", convertEigenMatrix2String(dDeltaP.transpose()).c_str());
 
 
     if(std::isfinite(dDeltaP.norm()) == false){
@@ -1528,6 +1700,8 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
         problem.m_eError = eDeltaNan;
         return false;
     }
+
+    ROS_INFO("Finished GN with norm %f, opts [%s]", problem.m_CurrentSolution.m_dNorm, convertEigenMatrix2String(problem.m_CurrentSolution.m_dOptParams.transpose()).c_str());
 
     //if no damping is required, just pick the result of the gauss newton
     if(g_bDisableDamping == true){
@@ -1540,7 +1714,8 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
         problem.m_CurrentSolution.m_dNorm = _CalculateErrorNorm(problem,_CalculateSampleError(problem,problem.m_CurrentSolution.m_dMinTrajectoryTime));
         problem.m_lSolutions.push_back(problem.m_CurrentSolution);
         problem.m_pBestSolution = &problem.m_lSolutions.back();
-        DLOG(INFO) << "Iteration with no damping finished with norm " << problem.m_CurrentSolution.m_dNorm << " and opts "<< problem.m_CurrentSolution.m_dOptParams.transpose().format(CleanFmt);
+        // DLOG(INFO) << "Iteration with no damping finished with norm " << problem.m_CurrentSolution.m_dNorm << " and opts "<< problem.m_CurrentSolution.m_dOptParams.transpose().format(CleanFmt);
+        ROS_INFO("Finished GN without dampening.");
         return true;
     }
 
@@ -1560,6 +1735,7 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
     double dampings[DAMPING_STEPS];
     damping = 1.0;
 
+    ROS_INFO("Running ACF on %d threads to dampen current solution.", DAMPING_STEPS);
 
     Solution dampedSolution;
     dampedSolution.m_dNorm = DBL_MAX;
@@ -1594,7 +1770,9 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
             if(g_bVerbose){
                 DLOG(INFO) << " " << norm;
             }
+            ROS_INFO("Dampened solution step %d, norm %f, dampening %f, final state [%s], errors [%s]", ii, norm, dampings[ii], convertEigenMatrix2String(pDampingStates[ii].transpose()).c_str(), convertEigenMatrix2String(pDampingErrors[ii].transpose()).c_str());
             if(norm < dampedSolution.m_dNorm ) {
+                ROS_INFO("New best damped solution with norm %f.", norm);
                 dampedSolution = vCubicProblems[ii]->m_CurrentSolution;
                 dampedSolution.m_dNorm = norm;
                 bestDamping = dampings[ii];
@@ -1617,14 +1795,17 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
 
     if(coordinateDescent.m_dNorm > problem.m_CurrentSolution.m_dNorm && g_bMonotonicCost){
         problem.m_bInLocalMinimum = true;
-        DLOG(INFO) << problem.m_nPlanId << ":In local minimum with Norm = " << problem.m_CurrentSolution.m_dNorm;
+        // DLOG(INFO) << problem.m_nPlanId << ":In local minimum with Norm = " << problem.m_CurrentSolution.m_dNorm;
+        ROS_INFO("Finished GN dampening for plan %d in local minimum, norm %f.", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
     }else if( dampedSolution.m_dNorm > problem.m_CurrentSolution.m_dNorm && g_bMonotonicCost) {
-        //newSolution = coordinateDescent;
+        // newSolution = coordinateDescent;
         problem.m_bInLocalMinimum = true;
-        DLOG(INFO) << problem.m_nPlanId << ":Accepted coordinate descent with norm = " << problem.m_CurrentSolution.m_dNorm;
+        // DLOG(INFO) << problem.m_nPlanId << ":Accepted coordinate descent with Norm = " << problem.m_CurrentSolution.m_dNorm;
+        ROS_INFO("Finished GN dampening for plan %d with coordinated descent solution, norm %f.", problem.m_nPlanId, newSolution.m_dNorm);
     }else{
         newSolution = dampedSolution;
-        DLOG(INFO) <<  problem.m_nPlanId << ":New norm from damped gauss newton = " << newSolution.m_dNorm << " with damping = " << bestDamping << " best damped traj error is " << pDampingErrors[nBestDampingIdx].transpose().format(CleanFmt);
+        // DLOG(INFO) <<  problem.m_nPlanId << ":New norm from damped gauss newton = " << newSolution.m_dNorm << " with damping = " << bestDamping << " best damped traj error is " << pDampingErrors[nBestDampingIdx].transpose().format(CleanFmt);
+        ROS_INFO("Finished GN dampening for plan %d with damped solution, norm %f, index %d", problem.m_nPlanId, newSolution.m_dNorm, nBestDampingIdx);
     }
 
 
@@ -1635,6 +1816,7 @@ bool MochaPlanner::_IterateGaussNewton( Problem& problem )
     //update the best solution if necessary
     if(problem.m_bInLocalMinimum == false){
         if(newSolution.m_dNorm < problem.m_CurrentSolution.m_dNorm){
+            ROS_INFO("Updating best solution with norm %f.", newSolution.m_dNorm);
             //add this solution to the list
             problem.m_lSolutions.push_back(newSolution);
             problem.m_pBestSolution = &problem.m_lSolutions.back();
@@ -1778,6 +1960,8 @@ void MochaPlanner::waypointsCb(const carplanner_msgs::OdometryArray& odom_arr_ms
     }
 
     m_vSegmentSamples.resize(m_vWaypoints.size()-1);
+
+    bestProblem.Reset();
 
     if (!m_bPlanContinuously)
         replan();
@@ -2127,7 +2311,7 @@ bool MochaPlanner::replan()
 
             //do connected planning if possibles
             // if(g_bContinuousPathPlanning == true){
-            //     if( !(iSegment == 0 || m_vSegmentSamples[iSegment-1].m_vStates.empty() == true /*|| m_bPlanForTerrain == false*/) ){
+            //     if( !(iSegment == 0 || m_vSegmentSamples[iSegment-1].m_vStates.empty() == true /*|| m_bIterateGN == false*/) ){
             //         startState = m_vSegmentSamples[iSegment-1].m_vStates.back();
             //         startState.m_dCurvature = m_vSegmentSamples[iSegment-1].m_vCommands.back().m_dCurvature;
             //     }
@@ -2142,29 +2326,46 @@ bool MochaPlanner::replan()
             
             bool success = false;
             uint numIterations = 0;
-            // float last_norm=INFINITY, this_norm=INFINITY;
-            // float norm_eps = 0.1;
-            while(success == false && /*(last_norm-this_norm < norm_eps) &&*/ ros::ok())
+            float last_norm=INFINITY, this_norm=INFINITY;
+            float norm_eps = 0.1;
+            while(success == false && ros::ok())
             {
-                DLOG(INFO) << "Iteration " << std::to_string(numIterations+1);
+                // DLOG(INFO) << "Iteration " << std::to_string(numIterations+1);
 
                 if(numIterations+1 > g_nIterationLimit)
                 {
-                    dout("Reached iteration limit. Skipping");
+                    // dout("Reached iteration limit. Skipping");
+                    ROS_INFO("Reached iteration limit. Skipping.");
+                    success = true;
+                }
+                else if(problem.m_CurrentSolution.m_dNorm < g_dSuccessNorm) 
+                {
+                    // DLOG(INFO) << problem.m_nPlanId << ":Succeeded to plan. Norm = " << problem.m_CurrentSolution.m_dNorm;
+                    // ROS_DEBUG("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
+                    ROS_INFO("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
+                    success = true;
+                }
+                else if(fabs(this_norm - last_norm)<norm_eps)
+                {
+                    ROS_INFO("Norm not improving. Skipping.");
                     success = true;
                 }
                 else
                 {
                     // get plan for current motion sample under consideration
-                    m_vActualTrajectory.clear();
-                    m_vControlTrajectory.clear();
-                    success = _IteratePlanner(problem, m_vSegmentSamples[dirtySegmentId],m_vActualTrajectory,m_vControlTrajectory);
-                    DLOG(INFO) << "Planner iterated " << std::to_string(numIterations+1) << " times.";
+                    // m_vActualTrajectory.clear();
+                    // m_vControlTrajectory.clear();
+                    last_norm = this_norm;
+                    ROS_INFO("Iterating planner.");
+                    success = _IteratePlanner(problem, m_vSegmentSamples[dirtySegmentId], m_vActualTrajectory, m_vControlTrajectory);
+                    ROS_INFO("Planner %s after %dth iteration.", (success ? "succeeded" : "failed"), numIterations+1);
+                    this_norm = problem.m_CurrentSolution.m_dNorm;
                 }
 
                 if (success)
                 {
-                    DLOG(INFO) << "Success";
+                    // DLOG(INFO) << "Success";
+                    // ROS_INFO("Success");
                     numIterations = 0;
                 }
                 else
@@ -2180,11 +2381,14 @@ bool MochaPlanner::replan()
                 //     i+=2;
                 // }
                 // printf(cmds_str.c_str());
-
-
-                // float this_norm = problem.m_CurrentSolution.m_dNorm;
-                // last_norm = this_norm;
             }
+
+            if (problem.m_CurrentSolution.m_dNorm < bestProblem.m_CurrentSolution.m_dNorm && m_bIterateGN == true)
+            {
+                bestProblem = problem;
+            }
+            // DLOG(INFO) <<  bestProblem.m_nPlanId << " has Best norm = " << bestProblem.m_CurrentSolution.m_dNorm/* << " with damping = " << bestDamping << " best damped traj error is " << pDampingErrors[nBestDampingIdx].transpose().format(CleanFmt)*/;
+            ROS_INFO("Best soln overall: id %d, norm %f", bestProblem.m_nPlanId, bestProblem.m_CurrentSolution.m_dNorm);
         }
         
         m_bPlanning = false;
@@ -2218,7 +2422,7 @@ bool MochaPlanner::_IteratePlanner(
     //StressTest(problem);
 
     if(only2d == false) {
-        if( m_bPlanForTerrain == true ) // planner on && sim off
+        if( m_bIterateGN == true ) // planner on && sim off
         {
             // run full Gauss-Newton minimization and calc best solution
             printf("Running full sim.\n");
