@@ -45,12 +45,13 @@
 // #include "btBulletDynamicsCommon.h"
 #include "BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h"
 #include "BulletDynamics/ConstraintSolver/btHingeConstraint.h"
-#include "BulletDynamics/ConstraintSolver/btSliderConstraint.h"
+#include "BulletDynamics/ConstraintSolver/btTypedConstraint.h"
 #include "BulletCollision/CollisionShapes/btShapeHull.h"
 // #include "ExampleBrowser/CollisionShape2TriangleMesh.h"
 #include "BulletCollision/CollisionShapes/btConvexPolyhedron.h"
 #include "BulletDynamics/Dynamics/btDiscreteDynamicsWorld.h"
 #include "BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolver.h"
+#include "BulletDynamics/Vehicle/btHinge2Vehicle.h"
 
 #include <boost/thread.hpp>
 #include <queue>
@@ -1102,6 +1103,7 @@ public:
     // void _PoseThreadFunc();
     // void _CommandThreadFunc(const carplanner_msgs::Command::ConstPtr&);
 
+    // double global_time;
 
     bool SetDriveModeSvcCb(carplanner_msgs::SetDriveMode::Request&, carplanner_msgs::SetDriveMode::Response&);
     void SetDriveMode(uint nWorldId, uint mode);
@@ -1251,7 +1253,7 @@ protected:
     Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;
 
-    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2; }
+    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+1; }
 
     static void getCollisions(btDynamicsWorld* world, std::vector<CollisionEvent>& collisions)
     {

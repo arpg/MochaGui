@@ -865,6 +865,8 @@ void MochaVehicle::SetDriveMode(uint nWorldId, uint mode)
 
 void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
 {
+    // ROS_INFO("Goal %d received at %.2fs", goal->world_id, ros::Time::now().toSec());
+
     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
 
@@ -872,6 +874,9 @@ void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocities
     //   " world " << std::to_string(goal->world_id)
     //   // "\nstart " << std::to_string(VehicleState::fromROS(goal->initial_state))
     //   ;
+
+    // global_time = 0;
+    // double t0 = Tic();
 
     VehicleState state;
     state.fromROS(goal->initial_state);
@@ -882,6 +887,9 @@ void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocities
         sample,
         goal->world_id,
         goal->no_compensation);
+
+    // ROS_INFO("Cumulative step sim time %f", global_time);
+    // ROS_INFO("Total apply vel time %f", Toc(t0));
         
     actionApplyVelocities_result.motion_sample = sample.toROS();
     // actionApplyVelocities_result.last_state = sample.m_vStates.back().toROS();
@@ -923,6 +931,8 @@ void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocities
         default:
             break;
     }
+
+    // ROS_INFO("Sending result %d at %.2fs", goal->world_id, ros::Time::now().toSec());
 
     // BulletWorldInstance* pWorld = GetWorldInstance(goal->world_id);
     // {
@@ -1054,8 +1064,12 @@ void MochaVehicle::ApplyVelocities(const VehicleState& startingState,
 
     vStatesOut.resize(iMotionEnd-iMotionStart);
 
+    // double t0 = Tic();
+
     ControlCommand command;
     for (int iMotion = iMotionStart; iMotion < iMotionEnd; iMotion++) {
+        // ROS_INFO("Updating state %d world %d", iMotion, nWorldId);
+
         //update the vehicle state
         //approximation for this dt
         command = vCommands[iMotion];
@@ -1070,7 +1084,7 @@ void MochaVehicle::ApplyVelocities(const VehicleState& startingState,
 //             double aExtra = 0;
             double dCorrectedCurvature;
             command.m_dPhi = GetSteeringAngle(command.m_dCurvature,
-                                                dCorrectedCurvature,nWorldId,4.);
+                                                dCorrectedCurvature,nWorldId,3.);
             // command.m_dCurvature = dCorrectedCurvature;
 
 //             //if(dRatio < 1.0){
@@ -1126,6 +1140,7 @@ void MochaVehicle::ApplyVelocities(const VehicleState& startingState,
         UpdateState(nWorldId, command, command.m_dT, m_bNoDelay);
         GetVehicleState(nWorldId, vStatesOut[iMotion-iMotionStart]);
 
+
         /*
         UpdateState(nWorldId,command,command.m_dT,m_bNoDelay);
         // VehicleState last_state;
@@ -1146,6 +1161,9 @@ void MochaVehicle::ApplyVelocities(const VehicleState& startingState,
 
         vCommands[iMotion] = command;
     }
+
+    // double t1 = Tic();
+    // ROS_INFO("UpdateStates for world %d and %d states took %.2fs", nWorldId, iMotionEnd-iMotionStart, t1-t0);
 }
 
 VehicleState MochaVehicle::ApplyVelocities(const VehicleState& startState,
@@ -1882,8 +1900,8 @@ void MochaVehicle::UpdateState(  const int& worldId,
     pWorld->m_pVehicle->setEnabledAngularAcceleration(delayedCommands.m_dForce, delayedCommands.m_dT);
     // pWorld->m_pVehicle->setEnabledLinearVelocity(1);
 
-    // pWorld->m_pVehicle->setEnabledSteeringAngle(delayedCommands.m_dPhi);
-    pWorld->m_pVehicle->setEnabledYawVelocity(delayedCommands.m_dCurvature);
+    pWorld->m_pVehicle->setEnabledSteeringAngle(delayedCommands.m_dPhi);
+    // pWorld->m_pVehicle->setEnabledYawVelocity(delayedCommands.m_dCurvature);
 
     btTransform chassisTranWS = pWorld->m_pVehicle->getChassisWorldTransform();
     // for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
@@ -1910,7 +1928,11 @@ void MochaVehicle::UpdateState(  const int& worldId,
     {
         // pWorld->m_pVehicle->setEnabledTorqueForce(command.m_dTorque);
         // pWorld->m_pVehicle->updateConstraints();
+        // double t0 = Tic();
         pWorld->m_pDynamicsWorld->stepSimulation(dT,1,dT);
+        // double t1 = Tic();
+        // global_time += t1-t0;
+        // ROS_INFO_THROTTLE(.2,"StepSim of dt %.2fs took %.2fs", dT, t1-t0);
     }
     // printf("OK 2\n");
 

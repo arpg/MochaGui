@@ -8,7 +8,7 @@ rostopic pub /plan_car/input_waypoints carplanner_msgs/OdometryArray "odoms:
   child_frame_id: ''
   pose:
     pose:
-      position: {x: ${1-1.5}, y: ${2--2}, z: ${3-0.0}}
+      position: {x: ${1-1.75}, y: ${2--1.75}, z: ${3-0.0}}
       orientation: {x: ${4-0.0}, y: ${5-0.0}, z: ${6-0.707}, w: ${7-0.707}}
     covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -29,7 +29,7 @@ rostopic pub /plan_car/input_waypoints carplanner_msgs/OdometryArray "odoms:
   child_frame_id: ''
   pose:
     pose:
-      position: {x: ${8-1}, y: ${9-2}, z: ${10-0.0}}
+      position: {x: ${8-1}, y: ${9-1.75}, z: ${10-0.0}}
       orientation: {x: ${11-0.0}, y: ${12-0.0}, z: ${13-0.707}, w: ${14-0.707}}
     covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,

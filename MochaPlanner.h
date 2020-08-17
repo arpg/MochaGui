@@ -58,7 +58,7 @@
 #define TILT_WEIGHT 1.5 // dRoll
 #define CONTACT_WEIGHT 0.1 
 #define BADNESS_WEIGHT 5e-8;
-#define DAMPING_STEPS 8
+#define DAMPING_STEPS 7
 #define DAMPING_DIVISOR 1.3
 
 #define POINT_COST_ERROR_TERMS 7
@@ -68,6 +68,8 @@
 #define OPT_ACCEL_DIM 3
 #define OPT_AGGR_DIM 4
 #define OPT_DIM 4
+
+// assert(DAMPING_STEPS <= OPT_DIM*2+1);
 
 // other structs
 struct Waypoint
@@ -213,7 +215,7 @@ struct Problem
 
     double m_dStartTime;
 
-    //Eigen::Vector5d m_dOptParams;               //< Optimization parameters, which are parametrized as [x,y,t,a]
+    Eigen::Vector5d m_dOptParams;               //< Optimization parameters, which are parametrized as [x,y,theta,accel,aggr]
     Eigen::Vector5d m_dInitOptParams;
     Eigen::Vector6d m_dTransformedGoal;
     double m_dT;                                //< The dt used in the functor to push the simulation forward
@@ -252,6 +254,7 @@ struct Problem
 
     std::list<Solution> m_lSolutions;
     Solution* m_pBestSolution;
+    Eigen::VectorXd m_vBestSolutionErrors;
     Solution m_CurrentSolution;
 };
 
@@ -286,7 +289,7 @@ private:
 
     bool m_bServersInitialized = false;
 
-    void ApplyVelocities(const VehicleState& startState,
+    bool ApplyVelocities(const VehicleState& startState,
                                                       MotionSample& sample,
                                                       int nWorldId=0,
                                                       bool noCompensation=false);
@@ -398,7 +401,7 @@ public:
     Eigen::VectorXd _CalculateSampleError(const MotionSample &sample, Problem &problem, double &dMinTrajTime) const;
     Eigen::VectorXd _GetWeightVector(const Problem& problem);
     double _CalculateErrorNorm(const Problem &problem, const Eigen::VectorXd& dError);
-    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2;}
+    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+1;}
     
     bool _IteratePlanner(
         Problem& problem,
