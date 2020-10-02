@@ -33,15 +33,16 @@ add_definitions(-DBT_NO_PROFILE)
 # Add to module path, so we can find our cmake modules
 
 #the boost libraries that we need
-set(BOOST_LIBS regex thread date_time system timer  )
+set(BOOST_LIBS thread date_time system timer filesystem regex )
 
 
 #this dependency is required for newer versions of the boost library. unfortunately
 #boost doesn't seem to link to it..
 
 #find_package( Pangolin REQUIRED)
+find_package( Eigen3 REQUIRED )
 find_package( GLog REQUIRED)
-find_package( carplanner REQUIRED )
+# find_package( carplanner REQUIRED )
 #find_package( CarPlanner REQUIRED )
 #find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
@@ -49,7 +50,7 @@ find_package( CVars REQUIRED )
 find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
 #find_package( Protobuf REQUIRED )
 find_package( Bullet REQUIRED )
-find_package( CeresSolver REQUIRED )
+# find_package( CeresSolver REQUIRED )
 #find_package( SensorFusion REQUIRED )
 find_package( LibAO REQUIRED )
 if(_OSX_)
@@ -69,7 +70,9 @@ find_package(catkin REQUIRED
     pcl_conversions
     nav_msgs
     nodelet
+    mesh_msgs
     actionlib
+    # mt_actionlib
     )
 
 add_definitions(${EIGEN_DEFINITIONS})
@@ -85,12 +88,12 @@ catkin_package(
   CATKIN_DEPENDS roscpp std_msgs tf carplanner_msgs
   )
 
-link_directories( ${Pangolin_LIBRARY_DIRS} )
+# link_directories( ${Pangolin_LIBRARY_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
 
 set( NV_CMAKE_DIR ${CMAKE_MODULE_PATH} )
 #add_subdirectory( NvWidgets )
-add_subdirectory( Gamepad )
+# add_subdirectory( Gamepad )
 
 include_directories( ${CMAKE_BINARY_DIR} )
 #PROTOBUF_GENERATE_CPP( PROTO_SRCS PROTO_HDRS CarMessages.proto )
@@ -103,7 +106,7 @@ set( _INCLUDE_DIRS
             ${LIBAO_INCLUDE_DIR}
             #${Pangolin_INCLUDE_DIRS}
             ${BOOST_INCLUDE_DIR}
-	    ${carplanner_INCLUDE_DIRS}
+	    # ${carplanner_INCLUDE_DIRS}
 	    #${CarPlanner_INCLUDE_DIRS}
 	    ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
@@ -121,19 +124,20 @@ set( _INCLUDE_DIRS
 set( LIBRARIES
                ${GLog_LIBRARIES}
                #${Node_LIBRARIES}
+	${BULLET_LIBRARIES}
                ${CeresSolver_LIBRARIES}
                #${SensorFusion_LIBRARIES}
                #${Pangolin_LIBRARIES}
                ${LIBAO_LIBRARY}
                #${SceneGraph_LIBRARIES}
-	       ${carplanner_LIBRARIES}
+	      #  ${carplanner_LIBRARIES}
 	       #${CarPlanner_LIBRARIES}
 	       ${ZeroMQ_LIBRARIES}
          #${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
                ${CVars_LIBRARIES}
                #nvwidgets #this is built with MochaGui. No finding is required
-               Gamepad # this is also built with the solution
+              #  Gamepad # this is also built with the solution
                ${assimp_LIBRARIES}
                ${catkin_LIBRARIES}
         )
@@ -142,27 +146,42 @@ set( LIBRARIES
 
 include_directories( ${_INCLUDE_DIRS} )
 
-set( SHARED_HDRS PlannerGui.h
-                 GLBulletDebugDrawer.h
-                 UiCommon.h
-                 ProcessModelFusion.h
-                 GLCar.h
+set( SHARED_HDRS 
+  # PlannerGui.h
+                #  GLBulletDebugDrawer.h
+                #  UiCommon.h
+                #  ProcessModelFusion.h
+                #  GLCar.h
                  #EventLogger.h
-                 SensorFusionCeres.h
+                #  SensorFusionCeres.h
                  #Vicon.h
+                 BoundarySolver.h
+                 BezierBoundarySolver.h
+                 CarPlannerCommon.h
+                 CarParameters.h
+                 CVarHelpers.h
+                 RpgUtils.h
+                 MochaProblem.h
 		            mesh_conversion_tools.hpp
-		            tf_conversion_tools.hpp
+                tf_conversion_tools.hpp
+                RaycastVehicle.h
+                WheelInfo.h
                  )
 
 set( SHARED_SRC
-               PlannerGui.cpp
-                GLBulletDebugDrawer.cpp
-                ProcessModelFusion.cpp
-                JoystickHandler.cpp
+              #  PlannerGui.cpp
+                # GLBulletDebugDrawer.cpp
+                # ProcessModelFusion.cpp
+                # JoystickHandler.cpp
                 #EventLogger.cpp
                 #CarMessages.pb.cc
-                SensorFusionCeres.cpp
+                # SensorFusionCeres.cpp
                 #Vicon.cpp
+                 CarParameters.cpp
+                 BezierBoundarySolver.cpp
+                 MochaProblem.cpp
+                 RaycastVehicle.cpp
+                 WheelInfo.cpp
                 )
 
 
@@ -213,7 +232,7 @@ set( LEARNING_SRC
 add_library( planner
                 ${SHARED_HDRS}
                 MochaPlanner.h
-                #${SHARED_SRC}
+                ${SHARED_SRC}
                 MochaPlanner.cpp)
 target_link_libraries(planner ${LIBRARIES})
 add_dependencies( planner
@@ -224,14 +243,14 @@ add_dependencies( planner
 add_library( planner_nodelet MochaPlannerNodelet.cpp)
 target_link_libraries( planner_nodelet planner ${LIBRARIES} )
 
-add_executable(  planner_standalone_nodelet mochaplanner_nodelet.cpp )
+add_executable(  planner_standalone_nodelet MochaPlannerStandaloneNodelet.cpp )
 target_link_libraries( planner_standalone_nodelet planner_nodelet )
 
 ### vehicle libraries ###
 add_library( vehicle
                 ${SHARED_HDRS}
                 MochaVehicle.h
-                #${SHARED_SRC}
+                ${SHARED_SRC}
                 MochaVehicle.cpp)
 target_link_libraries(vehicle ${LIBRARIES})
 #add_dependencies(vehicle vehicle_gencfg)
@@ -239,18 +258,30 @@ target_link_libraries(vehicle ${LIBRARIES})
 add_library( vehicle_nodelet MochaVehicleNodelet.cpp)
 target_link_libraries( vehicle_nodelet vehicle ${LIBRARIES} )
 
-add_executable(  vehicle_standalone_nodelet mochavehicle_nodelet.cpp )
+add_executable(  vehicle_standalone_nodelet MochaVehicleStandaloneNodelet.cpp )
 target_link_libraries( vehicle_standalone_nodelet vehicle_nodelet )
 
+### controller ###
+add_library( controller
+                ${SHARED_HDRS}
+		            MochaController.h
+                ${SHARED_SRC}
+				        MochaController.cpp)
+target_link_libraries(controller ${LIBRARIES})
 
-add_executable( MochaSimulator
+add_library( controller_nodelet MochaControllerNodelet.cpp)
+target_link_libraries( controller_nodelet controller ${LIBRARIES} )
+
+add_executable(  controller_standalone_nodelet MochaControllerStandaloneNodelet.cpp )
+target_link_libraries( controller_standalone_nodelet controller_nodelet )
+
+### simulator ###
+add_executable( simulator
   MochaSimulator.cpp
 )
-target_link_libraries( MochaSimulator
+target_link_libraries( simulator
   vehicle
 )
-
-
 
 # Generate config file for use in headers
 CONFIGURE_FILE(

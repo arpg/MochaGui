@@ -1,11 +1,11 @@
-#include <MochaController.h>
+#include "MochaController.h"
 
 static bool& g_bShow2DResult = CVarUtils::CreateGetUnsavedCVar("debug.Show2DResult",false);
 static bool& g_bOptimize2DOnly = CVarUtils::CreateGetUnsavedCVar("debug.Optimize2DOnly",false);
 static bool& g_bForceZeroStartingCurvature = CVarUtils::CreateGetUnsavedCVar("debug.ForceZeroStartingCurvature",false);
 static double& g_dMinLookaheadTime(CVarUtils::CreateGetUnsavedCVar("debug.MinLookaheadTime",(double)0.05,""));
 static double& g_dMaxLookaheadTime(CVarUtils::CreateGetUnsavedCVar("debug.MaxLookaheadTime",(double)2.0,""));
-static double& g_dInitialLookaheadTime(CVarUtils::CreateGetUnsavedCVar("debug.InitialLookaheadTime",(double)0.5,""));
+static double& g_dInitialLookaheadTime(CVarUtils::CreateGetUnsavedCVar("debug.InitialLookaheadTime",(double)1.0,""));
 static double& g_dMaxPlanTimeLimit(CVarUtils::CreateGetUnsavedCVar("debug.MaxPlanTimeLimit",(double)1.0,""));
 static double& g_dLookaheadEmaWeight(CVarUtils::CreateGetUnsavedCVar("debug.LookaheadEmaWeight",1.0,""));
 // static bool& g_bFreezeControl(CVarUtils::CreateGetUnsavedCVar("debug.FreezeControl",false,""));
@@ -15,36 +15,76 @@ static bool& g_bInfiniteTime = CVarUtils::CreateGetUnsavedCVar("debug.InfiniteTi
 static bool& g_bFrontFlip = CVarUtils::CreateGetUnsavedCVar("debug.FrontFlip",false);
 static double& g_dMaxPlanNorm = CVarUtils::CreateGetUnsavedCVar("debug.MaxPlanNorm",5.0);
 
+// class MochaController;
+
 /////////////////////////////////////////////////////////////////////////////////////////
-MochaController::MochaController(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
-    m_private_nh(&private_nh),
-    m_nh(&nh),
+MochaController::MochaController(ros::NodeHandle& private_nh_, ros::NodeHandle& nh_) :
+    m_private_nh(private_nh_),
+    m_nh(nh_),
+    m_dTrajWeight(CVarUtils::CreateUnsavedCVar("planner.TrajCostWeights",Eigen::MatrixXd(1,1))),
     m_dControlRate(10),
     m_dMaxControlPlanTime(CVarUtils::CreateGetCVar("controller.MaxControlPlanTime",(float)0.2,"")),
     m_dLookaheadTime(CVarUtils::CreateUnsavedCVar("controller.LookaheadTime",(float)0.2,"")),
     m_pControlPlannerThread(NULL),
-    m_bControllerRunning(false)
+    m_ControllerState(IDLE),
+    m_dt(0.05)
+    // m_bControllerRunning(false)
 {
+    m_lControlPlans.clear();
     m_dLastDelta.setZero();
     //m_vControlPlans.reserve(10);
 
-    m_timerControlLoop = m_private_nh->createTimer(ros::Rate(m_dControlRate), &MochaController::ControlLoopFunc, this);
+    m_dTrajWeight = Eigen::MatrixXd(TRAJ_EXTRA_ERROR_TERMS+TRAJ_UNIT_ERROR_TERMS,1);
+    m_dTrajWeight.setIdentity();
+    m_dTrajWeight(0) = X_WEIGHT;
+    m_dTrajWeight(1) = Y_WEIGHT;
+    m_dTrajWeight(2) = Z_WEIGHT;
+    m_dTrajWeight(3) = THETA_WEIGHT;
+    m_dTrajWeight(4) = VEL_WEIGHT_TRAJ;
+    m_dTrajWeight(5) = TIME_WEIGHT;
+    m_dTrajWeight(6) = CURV_WEIGHT;
 
-    m_subVehicleState = m_private_nh->subscribe("/drive_car/vehicle_state", 1, &MochaController::vehicleStateCb, this);
+    m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), &MochaController::ControlLoopFunc, this);
+    // m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), boost::bind(&MochaController::ControlLoopFunc, this, _1));
+
+    m_subVehicleState = m_nh.subscribe("controller/state", 1, &MochaController::vehicleStateCb, this);
+
+    m_subPlan = m_nh.subscribe("planner/plan", 1, &MochaController::planCb, this);
+
+    m_pubCommands = m_nh.advertise<carplanner_msgs::Command>("controller/command",1);
+
+    m_pubLookaheadTraj = m_nh.advertise<nav_msgs::Path>("controller/lookahead_traj",1);
+    // m_pubLookaheadTraj = m_nh.advertise<carplanner_msgs::MotionSample>("controller/lookahead",1);
+
+    ROS_INFO("Controller constructed.");
+
+    InitController();
 }
 
+// void MochaController::dynReconfigCb(carplanner_msgs::MochaConfig &config, uint32_t level)
+// {
+//     ROS_INFO("Reconfigure requested.");
+
+//     m_dt = config.dt;
+// }
+
 /////////////////////////////////////////////////////////////////////////////////////////
-void MochaController::Init( std::vector<MotionSample>& segmentSamples, /*LocalPlanner *pPlanner, BulletCarModel *pModel, */ double dt ) {
-    m_vSegmentSamples = segmentSamples;
+void MochaController::InitController( ) {
+    // m_vSegmentSamples = segmentSamples;
     // m_pModel = pModel;
     // m_pPlanner = pPlanner;
     // m_bStopping = false;
     // m_bStarted = false;
     m_bFirstPose = true;
     // m_bStillRun = true;
-    //m_pCurrentPlan = NULL;
-    m_dt = dt;
     m_bPoseUpdated = false;
+
+
+    // m_nh.param("dt",               m_dt  , m_dt  );
+
+    // m_dynReconfig_server.setCallback(boost::bind(&MochaController::dynReconfigCb, this, _1, _2));
+
+    ROS_INFO("Controller initialized.");
 }
 
 
@@ -64,11 +104,13 @@ void MochaController::Reset()
     m_bFirstPose = true;
     // m_bStopping = false;
     // m_bStarted = false;
+    ROS_INFO("Controller reset.");
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-bool MochaController::_SampleControlPlan(ControlPlan* pPlan,Problem& problem)
+bool MochaController::_SampleControlPlan(ControlPlan* pPlan, MochaProblem& problem)
 {
+    ROS_INFO("Sampling control plan.");
     //get the motion sample for the new control plan
     if(g_bOptimize2DOnly == true){
         pPlan->m_Sample.m_vCommands = m_MotionSample2dOnly.m_vCommands;
@@ -80,18 +122,15 @@ bool MochaController::_SampleControlPlan(ControlPlan* pPlan,Problem& problem)
         //ONLY FOR VISUALIZATION. REMOVE WHEN NO LONGER NEEDED
        Eigen::Vector3dAlignedVec samples;
 
-        m_pPlanner->SamplePath(problem,samples,true);
+        problem.SamplePath(samples,true);
         pPlan->m_Sample.m_vStates.reserve(samples.size());
         for(const Eigen::Vector3d& pos : samples){
             Sophus::SE3d Twv(Sophus::SO3d(),pos);
             pPlan->m_Sample.m_vStates.push_back(VehicleState(Twv,0));
         }
     }else{
-        problem.m_pFunctor->ApplyVelocities(pPlan->m_StartState,
-                                            pPlan->m_Sample.m_vCommands,
-                                            pPlan->m_Sample.m_vStates,
-                                            0,
-                                            pPlan->m_Sample.m_vCommands.size(),
+        MochaProblem::ApplyVelocities(pPlan->m_StartState,
+                                            pPlan->m_Sample,
                                             0,
                                             true);
         //if we are in the air, make sure no force is applied and the wheels are straight
@@ -100,9 +139,9 @@ bool MochaController::_SampleControlPlan(ControlPlan* pPlan,Problem& problem)
                 if(g_bFrontFlip){
                     pPlan->m_Sample.m_vCommands[ii].m_dForce = 0;
                 }else{
-                    pPlan->m_Sample.m_vCommands[ii].m_dForce = 0 + problem.m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::AccelOffset]*SERVO_RANGE;
+                    pPlan->m_Sample.m_vCommands[ii].m_dForce = 0;// + problem.m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::AccelOffset]*SERVO_RANGE;
                 }
-                pPlan->m_Sample.m_vCommands[ii].m_dPhi = 0 + problem.m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::SteeringOffset]*SERVO_RANGE;
+                pPlan->m_Sample.m_vCommands[ii].m_dPhi = 0;// + problem.m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::SteeringOffset]*SERVO_RANGE;
             }
         }
     }
@@ -118,7 +157,7 @@ bool MochaController::_SampleControlPlan(ControlPlan* pPlan,Problem& problem)
     }
 
     if(pPlan->m_Sample.m_vCommands.empty()) {
-        DLOG(ERROR) << "Empty control plan discovered...";
+        ROS_ERROR("Empty control plan discovered. Skipping.");
         return false;
     }
 
@@ -130,9 +169,10 @@ bool MochaController::_SampleControlPlan(ControlPlan* pPlan,Problem& problem)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-bool MochaController::_SolveControlPlan(const ControlPlan* pPlan,Problem& problem,const MotionSample& trajectory)
+bool MochaController::_SolveControlPlan(const ControlPlan* pPlan,MochaProblem& problem,const MotionSample& trajectory)
 {
-    bool res = m_pPlanner->InitializeLocalProblem(problem,pPlan->m_dStartTime,&problem.m_vVelProfile,g_bPointCost ? eCostPoint : eCostTrajectory);
+    ROS_INFO("Solving control plan.");
+    bool res = problem.Initialize(pPlan->m_dStartTime,&problem.m_vVelProfile,g_bPointCost ? eCostPoint : eCostTrajectory);
     //double dLastDeltaNorm = m_dLastDelta.norm();
 //    if(std::isfinite(dLastDeltaNorm) && dLastDeltaNorm < 1.0 ){
 //        problem.m_CurrentSolution.m_dOptParams += m_dLastDelta;
@@ -146,22 +186,24 @@ bool MochaController::_SolveControlPlan(const ControlPlan* pPlan,Problem& proble
     problem.m_Trajectory = trajectory;
 
     if( res == false ){
-        DLOG(ERROR) << "2d planner failed to converge...";
+        ROS_ERROR("2d planner failed to converge. Skipping");
         return false;
     }
 
     res = true;
 
     boost::timer::cpu_timer timer;
-    while(m_bStillRun)
+    while(1)
     {
         //make sure the plan is not fully airborne
         //bool isAirborne = (pPlan->m_StartState.IsAirborne() && pPlan->m_GoalState.IsAirborne());
         if(g_bOptimize2DOnly /*|| isAirborne*/) {
-            m_pPlanner->SimulateTrajectory(m_MotionSample2dOnly,problem,0,true);
+            ROS_INFO("Simulating control trajectory.");
+            problem.SimulateTrajectory(m_MotionSample2dOnly,0,true);
             break;
         }else{
-            if( (m_pPlanner->Iterate(problem)) == true ) {
+            ROS_INFO("Iterating control trajectory.");
+            if( (problem.Iterate()) == true ) {
                 break;
             }
         }
@@ -188,7 +230,7 @@ bool MochaController::_SolveControlPlan(const ControlPlan* pPlan,Problem& proble
 
     if(problem.m_CurrentSolution.m_dNorm > g_dMaxPlanNorm){
         // DLOG(ERROR) << "Planned control plan with norm too high -> " << problem.m_CurrentSolution.m_dNorm;
-        ROS_INFO_THROTTLE(.1,"Planned control plan with norm too high -> %d", problem.m_CurrentSolution.m_dNorm);
+        ROS_WARN_THROTTLE(.1,"Planned control plan with norm too high -> %d", problem.m_CurrentSolution.m_dNorm);
         res = false;
     }
 
@@ -198,6 +240,7 @@ bool MochaController::_SolveControlPlan(const ControlPlan* pPlan,Problem& proble
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut) 
 {
+    ROS_INFO("\n*\n*\n*\n*\nPlanning control at %fs",dPlanStartTime);
     try
     {
         pPlanOut = NULL;
@@ -218,6 +261,7 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
             boost::mutex::scoped_lock lock(m_PoseMutex);
             if(m_bPoseUpdated == false) {
                 //DLOG(ERROR) << "Pose not updated, exiting control.";
+                ROS_WARN("Pose not updated. Skipping.");
                 return false;
             }
             /*else{
@@ -232,10 +276,12 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
 
             //first find out where we are on the current plan
             _GetCurrentPlanIndex(dPlanStartTime,nCurrentPlanIndex,nCurrentSampleIndex,interpolationAmount);
+            // ROS_INFO("Controller got current plan index at %f plan idx %d, sample idx %d interp amt %f", dPlanStartTime, distance(m_lControlPlans.begin(),nCurrentPlanIndex), nCurrentSampleIndex, interpolationAmount);
 
             if(nCurrentPlanIndex == m_lControlPlans.end() )
             {
-                //or if we have overshot all plans, clear
+                // if we have overshot all plans, clear
+                ROS_WARN("Controller overshot plans, clearing control plans.");
                 while(m_lControlPlans.begin() != m_lControlPlans.end() )
                 {
                     delete(m_lControlPlans.front());
@@ -246,6 +292,7 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
             {
                 if(nCurrentPlanIndex != m_lControlPlans.begin() )
                 {
+                    ROS_INFO("Controller undershot plans, clearing unneccessary control plans.");
                     //remove all plans before the current plan
                     while(m_lControlPlans.begin() != nCurrentPlanIndex)
                     {
@@ -293,9 +340,10 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         // ApplyVelocitesFunctor5d delayFunctor(m_pModel,planStartTorques, NULL);
         //push forward the start state if there are commands stacked up
         MotionSample delaySample;
-        double totalDelay = delayFunctor.GetCarModel()->GetParameters(0)[CarParameters::ControlDelay];
+        double totalDelay = 0.1;
         if(totalDelay > 0 && m_lCurrentCommands.size() != 0)
         {
+            ROS_INFO("Controller pushing start state forward with stacked up commands.");
             for(const ControlCommand& command: m_lCurrentCommands){
                 if(totalDelay <= 0){
                     break;
@@ -306,16 +354,17 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
                 totalDelay -= delayCommand.m_dT;
             }
             //delayFunctor.ResetPreviousCommands();
-            delayFunctor.SetNoDelay(true);
+            // delayFunctor.SetNoDelay(true);
             //this applyvelocities call has noCompensation set to true, as the commands
             //are from a previous plan which includes compensation
-            delayFunctor.ApplyVelocities(currentState,delaySample,0,true);
+            MochaProblem::ApplyVelocities(currentState,delaySample,0,true);
             //and now set the starting state to this new value
             pPlan->m_StartState = delaySample.m_vStates.back();
             m_LastCommand = delaySample.m_vCommands.back();
         }
         else
         {
+            ROS_INFO("Controller init'ing undelayed start state.");
             Eigen::Vector3d targetVel;
             Sophus::SE3d targetPos;
             GetCurrentCommands(dPlanStartTime,m_LastCommand,targetVel,targetPos);
@@ -328,47 +377,53 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         //DLOG(INFO) << "Plan starting curvature: " << planStartCurvature;
 
         //double distanceToPath = 0;
-        //if we do not have a plan, create new one from our
-        //current position
-        if(m_lControlPlans.empty()){
-            //get the starting curvature of our current plan
+        {
+            boost::mutex::scoped_lock motionplanlock(m_MotionPlanMutex);
+            //if we do not have a plan, create new one from our
+            //current position
+            if(m_lControlPlans.empty()){
+                ROS_INFO("Controller init'ing new control plan.");
+                //get the starting curvature of our current plan
 
-            //set the start time as now
-            pPlan->m_dStartTime = dPlanStartTime;
-            pPlan->m_nStartSegmentIndex = oldPlanStartSegment;
-            pPlan->m_nStartSampleIndex = oldPlanStartSample;
-
-            //start by finding the closest segment to our current location
-            if(m_bFirstPose)
-            {
-                //if this is the first pose, search everywhere for the car
-                oldPlanStartSegment = 0;
-                oldPlanStartSample = 0;
-                sampleCount = 0;
-                for(size_t jj = 0 ; jj < m_vSegmentSamples.size() ; jj++) {
-                    sampleCount += m_vSegmentSamples[jj].m_vCommands.size();
-                }
-                m_bFirstPose = false;
-                AdjustStartingSample(m_vSegmentSamples,pPlan->m_StartState,pPlan->m_nStartSegmentIndex,pPlan->m_nStartSampleIndex,0,sampleCount);
-            }else{
-               AdjustStartingSample(m_vSegmentSamples,pPlan->m_StartState,pPlan->m_nStartSegmentIndex,pPlan->m_nStartSampleIndex);
-            }
-
-        }else {
-            if(nCurrentSampleIndex == -1) {
-                //if we have overshot the current plan, function must be called again to create a new plan
-                DLOG(ERROR) << "Overshot plan.";
-                return false;
-            }else {
-                //get the curvature at the end of the projection to have a smooth transition in steering
+                //set the start time as now
                 pPlan->m_dStartTime = dPlanStartTime;
+                pPlan->m_nStartSegmentIndex = oldPlanStartSegment;
+                pPlan->m_nStartSampleIndex = oldPlanStartSample;
 
-                pPlan->m_nStartSegmentIndex = (*nCurrentPlanIndex)->m_nStartSegmentIndex;
-                //push forward the index by the precalculated amount
-                pPlan->m_nStartSampleIndex = (*nCurrentPlanIndex)->m_nStartSampleIndex;// + nCurrentSampleIndex;
-                MotionSample::FixSampleIndexOverflow(m_vSegmentSamples, pPlan->m_nStartSegmentIndex, pPlan->m_nStartSampleIndex);
+                //start by finding the closest segment to our current location
+                if(m_bFirstPose)
+                {
+                    ROS_INFO("Controller init'ing first starting sample.");
+                    //if this is the first pose, search everywhere for the car
+                    oldPlanStartSegment = 0;
+                    oldPlanStartSample = 0;
+                    sampleCount = 0;
+                    for(size_t jj = 0 ; jj < m_vSegmentSamples.size() ; jj++) {
+                        sampleCount += m_vSegmentSamples[jj].m_vCommands.size();
+                    }
+                    m_bFirstPose = false;
+                    AdjustStartingSample(m_vSegmentSamples,pPlan->m_StartState,pPlan->m_nStartSegmentIndex,pPlan->m_nStartSampleIndex,0,sampleCount);
+                }else{
+                    AdjustStartingSample(m_vSegmentSamples,pPlan->m_StartState,pPlan->m_nStartSegmentIndex,pPlan->m_nStartSampleIndex);
+                }
 
-                AdjustStartingSample(m_vSegmentSamples,pPlan->m_StartState, pPlan->m_nStartSegmentIndex, pPlan->m_nStartSampleIndex);
+            }else {
+                if(nCurrentSampleIndex == -1) {
+                    //if we have overshot the current plan, function must be called again to create a new plan
+                    ROS_ERROR("Overshot plan.");
+                    return false;
+                }else {
+                    ROS_INFO("Controller init'ing existing plan.");
+                    //get the curvature at the end of the projection to have a smooth transition in steering
+                    pPlan->m_dStartTime = dPlanStartTime;
+
+                    pPlan->m_nStartSegmentIndex = (*nCurrentPlanIndex)->m_nStartSegmentIndex;
+                    //push forward the index by the precalculated amount
+                    pPlan->m_nStartSampleIndex = (*nCurrentPlanIndex)->m_nStartSampleIndex;// + nCurrentSampleIndex;
+                    MotionSample::FixSampleIndexOverflow(m_vSegmentSamples, pPlan->m_nStartSegmentIndex, pPlan->m_nStartSampleIndex);
+
+                    AdjustStartingSample(m_vSegmentSamples,pPlan->m_StartState, pPlan->m_nStartSegmentIndex, pPlan->m_nStartSampleIndex);
+                }
             }
         }
 
@@ -381,9 +436,17 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         VelocityProfile profile;
         //prepare the trajectory ahead
         MochaController::PrepareLookaheadTrajectory(m_vSegmentSamples, pPlan, profile, trajectorySample, g_dInitialLookaheadTime);
+        std::string str = "Lookahead traj:";
+        for(uint i=0; i<trajectorySample.m_vStates.size(); i++)
+        {
+            str += "\n" + convertEigenMatrix2String(trajectorySample.m_vStates[i].ToXYZTCV().transpose());
+        }
+        ROS_INFO("%s",str.c_str());
+        PublishLookaheadTrajectory(trajectorySample);
 
-        SetNoDelay(true);
-        Problem problem(pPlan->m_StartState,pPlan->m_GoalState,m_dt);
+        // SetNoDelay(true);
+        MochaProblem problem("ControlProblem",pPlan->m_StartState,pPlan->m_GoalState,m_dt);
+        problem.SetTrajWeights(m_dTrajWeight);
         problem.m_dStartTorques = planStartTorques;
         problem.m_CurrentSolution.m_dMinTrajectoryTime = g_dInitialLookaheadTime;
         problem.m_vVelProfile = profile;
@@ -392,13 +455,13 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         if( _SolveControlPlan(pPlan,problem,trajectorySample) == false ) {
             //do not use the plan
             // DLOG(ERROR) << "Could not solve plan.";
-            ROS_INFO_THROTTLE(.1,"Could not solve plan.");
+            ROS_ERROR("Could not solve plan.");
             return false;
         }
 
         //only need to sample the planner if the plan is not airborne
         if( _SampleControlPlan(pPlan,problem) == false ) {
-            DLOG(ERROR) << "Failed to sample plan.";
+            ROS_ERROR("Failed to sample plan.");
             return false;
         }
 
@@ -414,9 +477,10 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         pPlan->m_dEndPose = pPlan->m_GoalState.m_dTwv;
 
         {
-            boost::mutex::scoped_lock lock(m_PlanMutex);
+            boost::mutex::scoped_lock planlock(m_PlanMutex);
             pPlan->m_nPlanId = rand() % 10000;
             //DLOG(INFO) << "Created control plan id:" << pPlan->m_nPlanId << " with starting torques: " << planStartTorques.transpose() << "with norm " << m_pPlanner->GetCurrentNorm();
+            ROS_INFO("Controller created new control plan id %d norm %f", pPlan->m_nPlanId, pPlan->m_dNorm);
             m_lControlPlans.push_back(pPlan);
         }
 
@@ -436,6 +500,7 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         return false;
     }
 
+    ROS_INFO("Planned control.");
     return true;
 }
 
@@ -444,6 +509,18 @@ VehicleState MochaController::GetCurrentPose() {
     boost::mutex::scoped_lock lock(m_PoseMutex);
     poseOut = m_CurrentState;
     return poseOut;
+}
+
+void MochaController::PublishLookaheadTrajectory(MotionSample& sample)
+{
+    if (sample.m_vStates.size()==0) { return; }
+    
+    // carplanner_msgs::MotionSample sample_msg = sample.toROS();
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(sample, &path_msg);
+
+    m_pubLookaheadTraj.publish(path_msg);
+    ros::spinOnce();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -502,10 +579,13 @@ void MochaController::GetCurrentCommands(const double time,
                                        Eigen::Vector3d& targetVel,
                                        Sophus::SE3d& dT_target)
 {
-    boost::mutex::scoped_lock lock(m_PlanMutex);
+    boost::mutex::scoped_lock planlock(m_PlanMutex);
+    boost::mutex::scoped_lock motionplanlock(m_MotionPlanMutex);
+
     int nCurrentSampleIndex;
     PlanPtrList::iterator nCurrentPlanIndex;
     double interpolationAmount;
+
     _GetCurrentPlanIndex(time,nCurrentPlanIndex,nCurrentSampleIndex,interpolationAmount);
 
     if( nCurrentSampleIndex == -1 || nCurrentPlanIndex == m_lControlPlans.end() ) {
@@ -558,7 +638,9 @@ void MochaController::_GetCurrentPlanIndex(double currentTime, PlanPtrList::iter
             //for the exact command
             if(currentTime >= (*it)->m_Sample.m_vCommands.front().m_dTime &&
                currentTime <= (*it)->m_Sample.m_vCommands.back().m_dTime &&
-               (*it)->m_Sample.m_vCommands.size() > 1){
+               (*it)->m_Sample.m_vCommands.size() > 1)
+            {
+                ROS_INFO("Controller current time of %fs is between %fs and %fs", currentTime, (*it)->m_Sample.m_vCommands.front().m_dTime, (*it)->m_Sample.m_vCommands.back().m_dTime);
                 planIndex = it;
                 for(size_t jj = 1; jj < (*it)->m_Sample.m_vCommands.size() ; jj++){
                     if(((*it)->m_Sample.m_vCommands[jj].m_dTime) >= currentTime){
@@ -573,6 +655,11 @@ void MochaController::_GetCurrentPlanIndex(double currentTime, PlanPtrList::iter
                     sampleIndex = jj;
                 }
             }
+            else
+            {
+                ROS_WARN("Controller failed to get plan index at %fs. Only have %fs - %fs.", currentTime, (*it)->m_Sample.m_vCommands.front().m_dTime, (*it)->m_Sample.m_vCommands.back().m_dTime);
+            }
+            
         }
     }
 
@@ -644,6 +731,7 @@ void MochaController::PrepareLookaheadTrajectory(const std::vector<MotionSample>
                                                MotionSample& trajectorySample,
                                                const double dLookaheadTime)
 {
+    ROS_INFO("Controller preparing lookahead trajectory.");
     double dLookahead = dLookaheadTime;
     //create a motion sample from this plan
     trajectoryProfile.push_back(VelocityProfileNode(0,pPlan->m_StartState.m_dV.norm()));
@@ -739,29 +827,38 @@ void MochaController::PrepareLookaheadTrajectory(const std::vector<MotionSample>
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-void MochaController::ControlLoopFunc()
+void MochaController::ControlLoopFunc(const ros::TimerEvent& event)
 {
     // int nNumControlPlans = 0;
     // m_dControlPlansPerS = 0;
     // double dLastTime = Tic();
 
-    m_bControllerRunning = false;
-    m_pControlLine->Clear();
+    if (m_vSegmentSamples.size()==0) return;
 
-    m_Controller.Init(m_vSegmentSamples,&m_Planner,&m_ControlCarModel,m_dTimeInterval);
+    // m_bControllerRunning = false;
+    m_ControllerState = IDLE;
 
     //reset the control commands
     //m_ControlCommand = ControlCommand();
-    m_bControllerRunning = true;
+    // m_bControllerRunning = true;
+
 
     //now run the controller to create a plan
     ControlPlan* pPlan;
-    if(m_bPause == false && g_bInfiniteTime == false){
+    if(g_bInfiniteTime == false){
         m_dPlanTime = Tic();
     }
-    m_Controller.PlanControl(m_dPlanTime, pPlan);
+    PlanControl(m_dPlanTime, pPlan);
 
-    m_pCurrentControlPlan(pPlan);
+    // ROS_INFO("New plan: id %d start %f %f %f %f end %f %f %f %f norm %f sample len %d", 
+    //     pPlan->m_nPlanId, 
+    //     pPlan->m_dStartTime, pPlan->m_dStartPose.translation().x(), pPlan->m_dStartPose.translation().y(), pPlan->m_dStartPose.translation().z(),
+    //     pPlan->m_dEndTime, pPlan->m_dEndPose.translation().x(), pPlan->m_dEndPose.translation().y(), pPlan->m_dEndPose.translation().z(),
+    //     pPlan->m_dNorm,
+    //     pPlan->m_Sample.m_vStates.size()
+    //     );
+
+    pubCurrentCommand();
 
 //                //calculate error metrics
 //                m_dTargetVel = dTargetVel.norm();
@@ -784,13 +881,43 @@ void MochaController::ControlLoopFunc()
     //     }
     // }
 
-    m_bControllerRunning = false;
-    m_Controller.Reset();
+    // m_bControllerRunning = false;
+    m_ControllerState = IDLE;
+    return;
+}
+
+void MochaController::pubCurrentCommand()
+{
+    ControlCommand command;
+    double now = Tic();
+    GetCurrentCommands(now, command);
+    pubCommand(command);
+    ROS_INFO("Published command at %f: force %f curv %f torque %f dt %f phi %f", now, command.m_dForce, command.m_dCurvature, command.m_dTorque.norm(), command.m_dT, command.m_dPhi);
+}
+
+void MochaController::pubCommand(ControlCommand& cmd)
+{
+    carplanner_msgs::Command cmd_msg;
+    cmd_msg.force       = cmd.m_dForce;
+    cmd_msg.curvature   = cmd.m_dCurvature;
+    cmd_msg.dt          = cmd.m_dTime;
+    cmd_msg.dphi        = cmd.m_dPhi;
+    for(unsigned int i=0; i<3; i++)
+    {
+        cmd_msg.torques.push_back(cmd.m_dTorque[i]);
+    }
+
+    m_pubCommands.publish(cmd_msg);
+    ros::spinOnce();
 }
 
 void MochaController::vehicleStateCb(const carplanner_msgs::VehicleState::ConstPtr& state_msg)
 {
-    SetCurrentPose(VehicleState::fromROS(*state_msg), );
+    // ROS_INFO("Controller got new state.");
+
+    VehicleState state;
+    state.fromROS(*state_msg);
+    SetCurrentPose(state);
 
     // boost::mutex::scoped_lock(m_PoseMutex);
     // m_CurrentState.fromROS(*state_msg);
@@ -799,9 +926,20 @@ void MochaController::vehicleStateCb(const carplanner_msgs::VehicleState::ConstP
     return;
 }
 
-void MochaController::planCb(const carplanner_msgs::ControlPlan::ConstPtr& plan_msg)
+void MochaController::planCb(const carplanner_msgs::MotionPlan::ConstPtr& plan_msg)
 {
-    // boost::mutex::scoped_lock(m_PlanMutex);
-    // m_CurrentPlan.fromROS(*plan_msg);
+    ROS_INFO("Controller got new plan.");
+    boost::mutex::scoped_lock lock(m_MotionPlanMutex);
+    m_vSegmentSamples.clear();
+    for (uint i=0; i<plan_msg->samples.size(); i++)
+    {
+        MotionSample sample;
+        sample.fromROS(plan_msg->samples[i]);
+        m_vSegmentSamples.push_back(sample);
+    }
+
+    Reset();
+    InitController();
+
     return;
 }

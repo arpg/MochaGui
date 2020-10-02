@@ -8,6 +8,8 @@
 #ifndef MOCHAVEHICLE_H
 #define	MOCHAVEHICLE_H
 
+// #include <mt_actionlib/server/mt_simple_action_server.h>
+
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
@@ -29,6 +31,7 @@
 //#include "/home/ohrad/code/mochagui/mesh_conversion_tools.hpp"
 //#include "/home/ohrad/code/mochagui/tf_conversion_tools.hpp"
 // #include <mochagui/conversion_tools.h>
+#include <carplanner_msgs/io_conversion_tools.hpp>
 
 #include <actionlib/server/simple_action_server.h>
 #include <carplanner_msgs/ApplyVelocitiesAction.h>
@@ -51,23 +54,22 @@
 #include "BulletCollision/CollisionShapes/btConvexPolyhedron.h"
 #include "BulletDynamics/Dynamics/btDiscreteDynamicsWorld.h"
 #include "BulletDynamics/ConstraintSolver/btSequentialImpulseConstraintSolver.h"
-#include "BulletDynamics/Vehicle/btHinge2Vehicle.h"
+// #include "BulletDynamics/Vehicle/btHinge2Vehicle.h"
+// #include "BulletDynamics/Vehicle/btMagicRaycastVehicle.h"
+#include "RaycastVehicle.h"
+#include "CarParameters.h"
 
 #include <boost/thread.hpp>
 #include <queue>
-#include <CarPlanner/threadpool.hpp>
-#include <CarPlanner/RpgUtils.h>
+#include "threadpool.hpp"
+#include "RpgUtils.h"
 
 // #include <CarPlanner/GLDebugDrawer.h>
 
 #include <boost/thread.hpp>
 #include <boost/signals2/mutex.hpp>
 
-#include <CarPlanner/CarParameters.h>
-// #include <CarPlanner/RaycastVehicle.h>
 #include "sophus/se3.hpp"
-
-#include "BulletDynamics/Vehicle/btVehicleRaycaster.h"
 #include "BulletDynamics/Vehicle/btHinge2Vehicle.h"
 
 #include <stdio.h>
@@ -117,6 +119,7 @@
 #define MIN_CONTROL_DELAY 0.0
 #define MAX_CONTROL_DELAY 0.3
 
+
 struct CollisionEvent 
 { 
     const btCollisionObject* bodyA; 
@@ -129,18 +132,7 @@ struct CollisionEvent
     }
 };
 
-class DefaultVehicleRaycaster : public btVehicleRaycaster
-{
-    btDynamicsWorld*	m_dynamicsWorld;
-public:
-    DefaultVehicleRaycaster(btDynamicsWorld* world)
-        :m_dynamicsWorld(world)
-    {
-    }
 
-    virtual void* castRay(const btVector3& from,const btVector3& to, btVehicleRaycasterResult& result);
-
-};
 
 /// Structure to hold the steering, acceleration and reaction wheel caommands that are sent to the vehicle
 class ControlCommand
@@ -184,8 +176,8 @@ public:
         m_dCurvature = msg.curvature;
         m_dT = msg.dt;
         m_dPhi = msg.dphi;
-        m_dTorque.resize(msg.torques.size());
-        for (uint i=0; i<m_dTorque.size(); i++)
+        assert(msg.torques.size() <= m_dTorque.size());
+        for (uint i=0; i<msg.torques.size(); i++)
         {
             m_dTorque[i] = msg.torques[i];
         }
@@ -812,9 +804,10 @@ struct BulletWorldInstance : public boost::mutex
     btScalar *m_pHeightfieldData;
     btCollisionShape *m_pTerrainShape;
     btRigidBody *m_pTerrainBody;
-    // RaycastVehicle::btVehicleTuning	m_Tuning;
+    RaycastVehicle::btVehicleTuning	m_Tuning;
     btVehicleRaycaster*	m_pVehicleRayCaster;
-    btHinge2Vehicle*	m_pVehicle;
+    // btHinge2Vehicle*	m_pVehicle;
+    RaycastVehicle* 	m_pVehicle;
     btCollisionShape* m_pVehicleChassisShape;
 
     btAlignedObjectArray<btCollisionShape*> m_vCollisionShapes;
@@ -1064,14 +1057,32 @@ public:
     MochaVehicle(ros::NodeHandle&, ros::NodeHandle&);
     ~MochaVehicle();
 
-    ros::NodeHandle* m_private_nh;
-    ros::NodeHandle* m_nh;
+    // Initialization
+    void Init(btCollisionShape *pCollisionShape, const btVector3 &dMin, const btVector3 &dMax, CarParameterMap &parameters, unsigned int numWorlds, bool real=false );
+    void Init(const struct aiScene *pAIScene,CarParameterMap& parameters, unsigned int numWorlds, bool real=false );
+    void Init();
+
+    // Apply Velocities to the Bullet vehicle
+    void ApplyVelocities( VehicleState& startingState,
+                                              std::vector<ControlCommand>& vCommands,
+                                              std::vector<VehicleState>& vStatesOut,
+                                              const int iMotionStart,
+                                              const int iMotionEnd,
+                                              const int nWorldId,
+                                              const bool bNoCompensation /*= false (bUsingBestSolution)*/,
+                                              const CommandList *pPreviousCommands /*= NULL*/);
+
+    VehicleState ApplyVelocities( VehicleState& startState,
+                                                        MotionSample& sample,
+                                                        int nWorldId /*= 0*/,
+                                                        bool noCompensation /*= false*/);
+
+    ros::NodeHandle m_private_nh;
+    ros::NodeHandle m_nh;
     // tf::TransformBroadcaster m_tfbr;
     tf::TransformListener m_tflistener;
     // tf2_ros::Buffer m_tfbuffer;
     // tf2_ros::TransformListener m_tflistener(m_tfbuffer);
-    ros::Publisher m_statePub;
-    ros::Publisher m_terrainMeshPub;
     ros::Publisher m_chassisMeshPub;
     ros::Subscriber m_terrainMeshSub;
     bool reset_mesh_frame;
@@ -1088,13 +1099,32 @@ public:
     void InitROS();
     void _PublisherFunc();
     // void _StatePublisherFunc();
-    void _TerrainMeshPublisherFunc();
+    // void _TerrainMeshPublisherFunc();
     void _pubVehicleMesh(uint);
     // void _pubState();
     // void _pubState(VehicleState&);
     void _pubTFs(uint);
     void _pubPreviousCommands(uint);
-    void _pubTerrainMesh(uint);
+
+    void InitializeStatePublishers();
+    void InitializeCommandSubscribers();
+
+    std::vector<ros::Publisher*> m_vStatePublishers;
+    ros::Timer m_timerStatePubLoop;
+    double m_dStatePubRate = 50.0;
+    void StatePubLoopFunc(const ros::TimerEvent&);
+    void pubState(uint, ros::Publisher*);
+    void pubState(VehicleState&, ros::Publisher*);
+
+    std::vector<ros::Subscriber*> m_vCommandSubscribers;
+    void commandCb(const carplanner_msgs::Command::ConstPtr& , int);
+
+    ros::Publisher m_terrainMeshPub;
+    ros::Timer m_timerTerrainMeshPubLoop;
+    double m_dTerrainMeshPubRate = 1.0;
+    void TerrainMeshPubLoopFunc(const ros::TimerEvent&);
+    void pubTerrainMesh(uint);
+
     // void _pubMesh(uint);
     void _pubMesh(btCollisionShape*, ros::Publisher*);
     void _pubMesh(btCollisionShape*, btTransform*, ros::Publisher*);
@@ -1107,20 +1137,6 @@ public:
 
     bool SetDriveModeSvcCb(carplanner_msgs::SetDriveMode::Request&, carplanner_msgs::SetDriveMode::Response&);
     void SetDriveMode(uint nWorldId, uint mode);
-
-    void ApplyVelocities(const VehicleState& startingState,
-                                              std::vector<ControlCommand>& vCommands,
-                                              std::vector<VehicleState>& vStatesOut,
-                                              const int iMotionStart,
-                                              const int iMotionEnd,
-                                              const int nWorldId,
-                                              const bool bNoCompensation /*= false (bUsingBestSolution)*/,
-                                              const CommandList *pPreviousCommands /*= NULL*/);
-
-    VehicleState ApplyVelocities(const VehicleState& startState,
-                                                        MotionSample& sample,
-                                                        int nWorldId /*= 0*/,
-                                                        bool noCompensation /*= false*/);
 
     void RaycastService(const carplanner_msgs::RaycastGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::RaycastAction> m_actionRaycast_server;
@@ -1172,10 +1188,7 @@ public:
 
     static btVector3 GetUpVector(int upAxis,btScalar regularValue,btScalar upValue);
     /////////////////////////////////////////////////////////////////////////////////////////
-    static void GenerateStaticHull(const struct aiScene *pAIScene, const struct aiNode *pAINode, const aiMatrix4x4 parentTransform, const float flScale, btTriangleMesh &triangleMesh , btVector3& dMin, btVector3& dMax);
-    void Init(btCollisionShape *pCollisionShape, const btVector3 &dMin, const btVector3 &dMax, CarParameterMap &parameters, unsigned int numWorlds, bool real=false );
-    void Init(const struct aiScene *pAIScene,CarParameterMap& parameters, unsigned int numWorlds, bool real=false );
-    void Init();
+
     void DebugDrawWorld(int worldId);
 
     std::pair<double, double> GetSteeringRequiredAndMaxForce(const int nWorldId, const int nWheelId, const double dPhi, const double dt);
@@ -1194,7 +1207,7 @@ public:
     Eigen::Vector3d GetVehicleLinearVelocity(int worldId);
     Eigen::Vector3d GetVehicleAngularVelocity(int worldId);
     Eigen::Vector3d GetVehicleInertiaTensor(int worldId);
-    virtual void SetState(int nWorldId,  const VehicleState& state );
+    virtual void SetState(int nWorldId, VehicleState& state , bool raycast=false);
     //virtual void SetState( int worldId,  const Eigen::Matrix4d& vState  );
     virtual void SetStateNoReset(BulletWorldInstance *pWorld, const Sophus::SE3d &Twv );
     BulletWorldInstance *GetWorldInstance(int id){ return m_vWorlds[id]; }
@@ -1235,6 +1248,9 @@ protected:
     CommandList m_lPreviousCommands;
     bool m_bNoDelay;
 
+
+    static void GenerateStaticHull(const struct aiScene *pAIScene, const struct aiNode *pAINode, const aiMatrix4x4 parentTransform, const float flScale, btTriangleMesh &triangleMesh , btVector3& dMin, btVector3& dMax);
+
     void _GetDelayedControl(int worldId, double timeDelay, ControlCommand& delayedCommands);
     btRigidBody* _LocalAddRigidBody(BulletWorldInstance *pWorld, double mass, const btTransform& startTransform, btCollisionShape* shape, short group, short mask);
     // btRigidBody* _LocalAddRigidBody(BulletWorldInstance *pWorld, double mass, const btTransform& startTransform, btCollisionShape* shape);
@@ -1253,7 +1269,7 @@ protected:
     Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;
 
-    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+1; }
+    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2; }
 
     static void getCollisions(btDynamicsWorld* world, std::vector<CollisionEvent>& collisions)
     {

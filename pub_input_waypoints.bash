@@ -1,4 +1,4 @@
-rostopic pub /plan_car/input_waypoints carplanner_msgs/OdometryArray "odoms:
+rostopic pub /planner/input_waypoints carplanner_msgs/OdometryArray "odoms:
 - header:
     seq: 0
     stamp:

@@ -6,11 +6,35 @@
 
 #include "CarPlannerCommon.h"
 #include "CVarHelpers.h"
-#include "MochaPlanner.h"
-#include "MochaVehicle.h"
+#include "MochaProblem.h"
+// #include "MochaPlanner.h"
+// #include "MochaVehicle.h"
+#include <carplanner_msgs/MotionPlan.h>
 
+// #include <dynamic_reconfigure/server.h>
+// #include <carplanner_msgs/MochaConfig.h>
 
-typedef std::list<ControlPlan*> PlanPtrList;
+#define X_WEIGHT 3.0
+#define Y_WEIGHT 3.0
+#define Z_WEIGHT 1.5
+#define THETA_WEIGHT 0.2
+#define VEL_WEIGHT_TRAJ 0.5
+#define VEL_WEIGHT_POINT 0.75
+#define TIME_WEIGHT 0.05
+#define CURV_WEIGHT 0.001
+#define TILT_WEIGHT 1.5 // dRoll
+#define CONTACT_WEIGHT 0.1 
+#define BADNESS_WEIGHT 5e-8;
+#define DAMPING_STEPS 7
+#define DAMPING_DIVISOR 1.3
+
+#define POINT_COST_ERROR_TERMS 7
+#define TRAJ_EXTRA_ERROR_TERMS 2
+#define TRAJ_UNIT_ERROR_TERMS 5
+
+#define OPT_ACCEL_DIM 3
+#define OPT_AGGR_DIM 4
+#define OPT_DIM 4
 
 class ControlPlan
 {
@@ -48,21 +72,25 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+typedef std::list<ControlPlan*> PlanPtrList;
+
+enum ControllerState{ IDLE, PLANNING };
+
 class MochaController
 {
 public:
-    MochaController();
+    MochaController(ros::NodeHandle&,ros::NodeHandle&);
     ~MochaController()
     { 
         m_bStillRun = false;
     }
 
-    void Init(std::vector<MotionSample> &segmentSamples, LocalPlanner *pPlanner, BulletCarModel *pModel, double dt) ;
+    void InitController() ;
     void Reset();
 
     void GetCurrentCommands(const double time, ControlCommand &command);
     VehicleState GetCurrentPose();
-    void SetCurrentPoseFromCarModel(BulletCarModel* pModel, int nWorldId);
+    // void SetCurrentPoseFromCarModel(int nWorldId);
     void SetCurrentPose(VehicleState pose, CommandList* pCommandList = NULL);
     void GetCurrentCommands(const double time,
                             ControlCommand& command,
@@ -82,28 +110,41 @@ public:
                                            ControlPlan *pPlan, VelocityProfile &trajectoryProfile, MotionSample &trajectorySample, const double dLookaheadTime);
 
 private:
-    ros::NodeHandle private_nh, nh;
+    ros::NodeHandle m_private_nh;
+    ros::NodeHandle m_nh;
 
     ros::Subscriber m_subVehicleState;
     void vehicleStateCb(const carplanner_msgs::VehicleState::ConstPtr&);
     // VehicleState m_CurrentVehicleState;
 
     ros::Subscriber m_subPlan;
-    void planCb(const carplanner_msgs::Plan::ConstPtr&);
-    ControlPlan* m_pCurrentControlPlan;
+    void planCb(const carplanner_msgs::MotionPlan::ConstPtr&);
 
-    ros::Timer m_timerControllingLoop;
-    void ControlLoopFunc();
+    ros::Publisher m_pubCommands;
+    void pubCurrentCommand();
+    void pubCommand(ControlCommand& );
+
+    ros::Timer m_timerControlLoop;
+    void ControlLoopFunc(const ros::TimerEvent& event);
     double m_dControlRate;
 
-    bool _SampleControlPlan(ControlPlan* pPlan,LocalProblem& problem);
-    bool _SolveControlPlan(const ControlPlan* pPlan, LocalProblem& problem, const MotionSample &trajectory);
+    ros::Publisher m_pubLookaheadTraj;
+    void PublishLookaheadTrajectory(MotionSample&);
+
+
+    // dynamic_reconfigure::Server<carplanner_msgs::MochaControllerConfig> m_dynReconfig_server;
+    // void dynReconfigCb(carplanner_msgs::MochaControllerConfig &config, uint32_t level);
+
+    std::atomic<double> m_dPlanTime;
+
+    ControllerState m_ControllerState;
+
+    bool _SampleControlPlan(ControlPlan* pPlan, MochaProblem& problem);
+    bool _SolveControlPlan(const ControlPlan* pPlan, MochaProblem& problem, const MotionSample &trajectory);
 
     void _GetCurrentPlanIndex(double currentTime, PlanPtrList::iterator& planIndex, int& sampleIndex, double& interpolationAmount);
 
-
-
-    int m_nLastCurrentPlanIndex;s
+    int m_nLastCurrentPlanIndex;
     VehicleState m_CurrentState;
     // BulletCarModel* m_pModel;
     // LocalPlanner* m_pPlanner;
@@ -130,8 +171,11 @@ private:
 
     boost::mutex m_PlanMutex;
     boost::mutex m_PoseMutex;
+    boost::mutex m_MotionPlanMutex;
 
     Eigen::Vector5d m_dLastDelta;
+
+    Eigen::MatrixXd& m_dTrajWeight;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

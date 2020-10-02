@@ -5,7 +5,7 @@
 #include "mesh_conversion_tools.hpp"
 #include <tf/transform_listener.h>
 
-DEFINE_string(mesh, "~/code/MochaGui_ros/labLoop.ply", "File for terrain mesh.");
+DEFINE_string(mesh, "~/code/mochagui/labLoop.ply", "File for terrain mesh.");
 
 int main( int argc, char* argv[] )
 {

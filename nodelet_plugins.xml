@@ -13,5 +13,12 @@
     </description>
   </class>
 </library>
+<library path="lib/libcontroller_nodelet">
+  <class name="mochapc/MochaControllerNodelet" type="mochapc::MochaControllerNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet for running the MochaController
+    </description>
+  </class>
+</library>
 </class_libraries>
 
