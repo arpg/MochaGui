@@ -34,6 +34,7 @@
 #include <carplanner_msgs/io_conversion_tools.hpp>
 
 #include <actionlib/server/simple_action_server.h>
+#include <actionlib/client/simple_action_client.h>
 #include <carplanner_msgs/ApplyVelocitiesAction.h>
 #include <carplanner_msgs/SetStateAction.h>
 #include <carplanner_msgs/GetStateAction.h>
@@ -42,7 +43,7 @@
 // #include <carplanner_msgs/GetFrictionCompensationAction.h>
 #include <carplanner_msgs/GetControlDelayAction.h>
 #include <carplanner_msgs/GetInertiaTensorAction.h>
-#include <carplanner_msgs/SetNoDelayAction.h>
+// #include <carplanner_msgs/SetNoDelayAction.h>
 #include <carplanner_msgs/RaycastAction.h>
 
 // #include "btBulletDynamicsCommon.h"
@@ -161,10 +162,13 @@ public:
         msg.curvature = m_dCurvature;
         msg.dt = m_dT;
         msg.dphi = m_dPhi;
-        msg.torques.clear();
-        msg.torques.push_back(m_dTorque[0]);
-        msg.torques.push_back(m_dTorque[1]);
-        msg.torques.push_back(m_dTorque[2]);
+        // msg.torques.clear();
+        // msg.torques.push_back(m_dTorque[0]);
+        // msg.torques.push_back(m_dTorque[1]);
+        // msg.torques.push_back(m_dTorque[2]);
+        msg.torques[0] = m_dTorque[0];
+        msg.torques[1] = m_dTorque[1];
+        msg.torques[2] = m_dTorque[2];
         msg.time = m_dTime;
 
         return msg;
@@ -526,6 +530,7 @@ struct VehicleState
 
     inline static VehicleState& OdomMsg2VehicleState(const nav_msgs::Odometry& odom_msg, double steer=0, double curv=0)
     {
+
         VehicleState* state = new VehicleState();
         state->m_dTime                       = odom_msg.header.stamp.sec + (double)odom_msg.header.stamp.nsec*(double)1e-9;
 
@@ -545,8 +550,7 @@ struct VehicleState
         state->m_dV[0]                       = odom_msg.twist.twist.linear.x;
         state->m_dV[1]                       = odom_msg.twist.twist.linear.y;
         state->m_dV[2]                       = odom_msg.twist.twist.linear.z;
-
-        state->m_dV = state->m_dTwv.so3() * state->m_dV;
+        // state->m_dV = state->m_dTwv.so3() * state->m_dV;
 
         // Eigen::Vector3d linvel_cs(odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.linear.z);
         // Eigen::Vector3d linvel_ws = state->m_dTwv.so3() * linvel_cs;
@@ -729,6 +733,17 @@ struct VehicleState
         (*this).m_dTime = msg.header.stamp.sec + (double)msg.header.stamp.nsec*(double)1e-9;
     }
 
+    std::string toString(std::string delimiter="\n")
+    {
+        Eigen::Vector6d vel; vel << m_dV[0], m_dV[1], m_dV[2], m_dW[0], m_dW[1], m_dW[2];
+        std::string str;
+        str += "T " + convertEigenMatrix2String(ToXYZRPY().transpose()) + delimiter;
+        str += "V " + convertEigenMatrix2String(vel.transpose()) + delimiter;
+        str += "s " + std::to_string(m_dSteering) + delimiter;
+        str += "t " + std::to_string(m_dTime);
+        return str;
+    }
+
     Sophus::SE3d m_dTwv;                     //< 4x4 matrix denoting the state of the car
     std::vector<Sophus::SE3d> m_vWheelStates;   //< 4x4 matrices which denote the pose of each wheel
     std::vector<bool> m_vWheelContacts;         //< Angular velocity of the vehicle in world coordinates
@@ -744,31 +759,31 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// class BulletVehicleState
-// {
-// public:
+class BulletVehicleState
+{
+public:
 
-//     BulletVehicleState() {}
-//     ~BulletVehicleState() {}
+    BulletVehicleState() {}
+    ~BulletVehicleState() {}
 
-//     // void LoadState(RaycastVehicle *pVehicle)
-//     // {
-//     //     //copy back the data
-//     //     *pVehicle = m_pVehicleBuffer;
-//     //     memcpy( (void*)pVehicle->getRigidBody(), m_pChassisBuffer,sizeof(RaycastVehicle));
-//     // }
+    void LoadState(RaycastVehicle *pVehicle)
+    {
+        //copy back the data
+        *pVehicle = m_pVehicleBuffer;
+        memcpy( (void*)pVehicle->getRigidBody(), m_pChassisBuffer,sizeof(RaycastVehicle));
+    }
 
-//     // void SaveState(RaycastVehicle *pVehicle)
-//     // {
-//     //     //make a backup of the vhicle
-//     //     m_pVehicleBuffer = *pVehicle;
-//     //     memcpy(m_pChassisBuffer, (void*)pVehicle->getRigidBody(),sizeof(btRigidBody));
-//     // }
+    void SaveState(RaycastVehicle *pVehicle)
+    {
+        //make a backup of the vhicle
+        m_pVehicleBuffer = *pVehicle;
+        memcpy(m_pChassisBuffer, (void*)pVehicle->getRigidBody(),sizeof(btRigidBody));
+    }
 
-// private:
-//     unsigned char m_pChassisBuffer[sizeof(btRigidBody)];
-//     // RaycastVehicle m_pVehicleBuffer;
-// };
+private:
+    unsigned char m_pChassisBuffer[sizeof(btRigidBody)];
+    RaycastVehicle m_pVehicleBuffer;
+};
 
 struct BulletWorldInstance : public boost::mutex
 {
@@ -821,7 +836,7 @@ struct BulletWorldInstance : public boost::mutex
 
     btRigidBody* m_pCarChassis;
     // GLDebugDrawer	m_DebugDrawer;
-    // BulletVehicleState m_vehicleBackup;
+    BulletVehicleState m_vehicleBackup;
     VehicleState m_state;
 
     CommandList m_lPreviousCommands;    //< List holding the previous commands sent to the model (Newest commands at the front, oldest at the back)
@@ -937,7 +952,7 @@ struct MotionSample
         for(size_t ii = 1; ii < m_vStates.size() ; ii++){
             const VehicleState& state = m_vStates[ii];
             Eigen::Vector3d dWCS(state.m_dW.transpose() * state.m_dTwv.rotationMatrix());
-            Eigen::Vector3d error_weights(1,.6,.2); // roll pitch yaw
+            Eigen::Vector3d error_weights(1,.3,0); // roll pitch yaw
             cost += error_weights.dot(dWCS);
             // cost += fabs(state.m_dW[0]);
         }
@@ -1041,7 +1056,10 @@ struct MotionSample
 
 
 
-////
+typedef actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> ApplyVelocitiesClient;
+typedef std::vector<ApplyVelocitiesClient*> ApplyVelocitiesClients;
+
+// typedef actionlib::SimpleActionClient<carplanner_msgs::ApplyAllVelocitiesAction> ApplyAllVelocitiesClient;
 
 class MochaVehicle
 {
@@ -1063,19 +1081,34 @@ public:
     void Init();
 
     // Apply Velocities to the Bullet vehicle
+    // static bool ApplyAllVelocitiesFromClient(ApplyAllVelocitiesClient* client,
+    //                             const std::vector<VehicleState>& startStates,
+    //                             std::vector<MotionSample>& samples,
+    //                             bool noCompensation=false,
+    //                             bool noDelay=false);
+
+    static bool ApplyVelocitiesFromClient(ApplyVelocitiesClient* client,
+                                const VehicleState& startState,
+                                MotionSample& sample,
+                                int nWorldId=0,
+                                bool noCompensation=false,
+                                bool noDelay=false);
+
     void ApplyVelocities( VehicleState& startingState,
-                                              std::vector<ControlCommand>& vCommands,
-                                              std::vector<VehicleState>& vStatesOut,
-                                              const int iMotionStart,
-                                              const int iMotionEnd,
-                                              const int nWorldId,
-                                              const bool bNoCompensation /*= false (bUsingBestSolution)*/,
-                                              const CommandList *pPreviousCommands /*= NULL*/);
+                        std::vector<ControlCommand>& vCommands,
+                        std::vector<VehicleState>& vStatesOut,
+                        const int iMotionStart,
+                        const int iMotionEnd,
+                        const int nWorldId,
+                        const bool bNoCompensation = false /*(bUsingBestSolution)*/,
+                        const CommandList *pPreviousCommands = NULL,
+                        bool noDelay = false);
 
     VehicleState ApplyVelocities( VehicleState& startState,
-                                                        MotionSample& sample,
-                                                        int nWorldId /*= 0*/,
-                                                        bool noCompensation /*= false*/);
+                                MotionSample& sample,
+                                int nWorldId = 0,
+                                bool noCompensation = false,
+                                bool noDelay = false);
 
     ros::NodeHandle m_private_nh;
     ros::NodeHandle m_nh;
@@ -1178,8 +1211,8 @@ public:
     void GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_server;
 
-    void SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server;
+    // void SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr&);
+    // actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server;
 
     void meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
 
@@ -1240,13 +1273,13 @@ public:
     CommandList& GetPreviousCommand() { return m_lPreviousCommands; }
     void SetPreviousCommands(const CommandList& list) { m_lPreviousCommands = list;}
     void ResetPreviousCommands() { return m_lPreviousCommands.clear(); }
-    bool SetNoDelay(bool bNoDelay){ return (m_bNoDelay = bNoDelay); }
+    // bool SetNoDelay(bool bNoDelay){ return (m_bNoDelay = bNoDelay); }
 
 protected:
     // MochaVehicle *m_pCarModel;
     Eigen::Vector3d m_dInitTorques;
     CommandList m_lPreviousCommands;
-    bool m_bNoDelay;
+    // bool m_bNoDelay;
 
 
     static void GenerateStaticHull(const struct aiScene *pAIScene, const struct aiNode *pAINode, const aiMatrix4x4 parentTransform, const float flScale, btTriangleMesh &triangleMesh , btVector3& dMin, btVector3& dMax);

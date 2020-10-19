@@ -29,10 +29,9 @@
 // #include "tf_conversion_tools.hpp"
 
 #include <actionlib/client/simple_action_client.h>
-#include <carplanner_msgs/GetControlDelayAction.h>
-#include <carplanner_msgs/GetInertiaTensorAction.h>
-#include <carplanner_msgs/SetNoDelayAction.h>
-
+// #include <carplanner_msgs/GetControlDelayAction.h>
+// #include <carplanner_msgs/GetInertiaTensorAction.h>
+// #include <carplanner_msgs/SetNoDelayAction.h>
 #include <carplanner_msgs/GetStateAction.h>
 #include <carplanner_msgs/SetStateAction.h>
 
@@ -146,14 +145,14 @@ private:
     // actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_client;
     // void ApplyVelocitiesDoneCb(const actionlib::SimpleClientGoalState&, const carplanner_msgs::ApplyVelocitiesResultConstPtr&);
 
-    double GetControlDelay(int worldId);
-    actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_client;
+    // double GetControlDelay(int worldId);
+    // actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_client;
 
     // const Eigen::Vector3d GetInertiaTensor(int worldId);
     // actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_client;
 
-    void SetNoDelay(bool);    
-    actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;
+    // void SetNoDelay(bool);    
+    // actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;
 
     inline void EnableTerrainPlanning(bool do_plan) { m_bIterateGN = do_plan; }
     bool EnableTerrainPlanningSvcCb(carplanner_msgs::EnableTerrainPlanning::Request &req, carplanner_msgs::EnableTerrainPlanning::Response &res);
@@ -170,10 +169,10 @@ private:
     ros::ServiceServer m_srvReplay_server;
     void replay(float rate=1.f);
 
-    VehicleState SetVehicleState(VehicleState stateIn, int worldId=0);
+    bool SetVehicleState(VehicleState stateIn, int worldId=0);
     actionlib::SimpleActionClient<carplanner_msgs::SetStateAction> m_actionSetState_client;
 
-    VehicleState GetVehicleState(int worldId=0);
+    bool GetVehicleState(VehicleState&, int worldId=0);
     actionlib::SimpleActionClient<carplanner_msgs::GetStateAction> m_actionGetState_client;
 
     // virtual void onInit();
@@ -208,7 +207,7 @@ private:
     void PlanningLoopFunc(const ros::TimerEvent& event);
     bool replan();
 
-    double& m_dTimeInterval;
+    double m_dTimeInterval;
     bool m_bIterateGN;
     bool m_bPlanContinuously;
     bool m_bSimulate3dPath;

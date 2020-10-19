@@ -108,7 +108,11 @@ public:
                                        int upperLimit = 100);
     static void PrepareLookaheadTrajectory(const std::vector<MotionSample>& vSegmentSamples,
                                            ControlPlan *pPlan, VelocityProfile &trajectoryProfile, MotionSample &trajectorySample, const double dLookaheadTime);
-
+    static bool ApplyVelocities(const VehicleState& startState,
+                                                      MotionSample& sample,
+                                                      int nWorldId=0,
+                                                      bool noCompensation=false,
+                                                      bool noDelay=false);
 private:
     ros::NodeHandle m_private_nh;
     ros::NodeHandle m_nh;

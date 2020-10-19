@@ -168,10 +168,11 @@ void	RaycastVehicle::updateWheelTransform( const int nWheelIndex , bool bInterpo
 {
     WheelInfo& wheel = m_wheelInfo[ nWheelIndex ];
     updateWheelTransformsWS(wheel,bInterpolatedTransform);
+	wheel.m_worldTransform.setOrigin(
+		wheel.m_raycastInfo.m_hardPointWS + wheel.m_raycastInfo.m_wheelDirectionWS * wheel.m_raycastInfo.m_suspensionLength);
     UpdateWheelSteeringTransform(nWheelIndex);
-    wheel.m_worldTransform.setOrigin(
-        wheel.m_raycastInfo.m_hardPointWS + wheel.m_raycastInfo.m_wheelDirectionWS * wheel.m_raycastInfo.m_suspensionLength
-    );
+    // wheel.m_worldTransform.setOrigin(
+    //     wheel.m_raycastInfo.m_hardPointWS + wheel.m_raycastInfo.m_wheelDirectionWS * wheel.m_raycastInfo.m_suspensionLength);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -234,7 +235,6 @@ void	RaycastVehicle::updateWheelTransformsWS(WheelInfo& wheel , bool interpolate
 btScalar RaycastVehicle::rayCast(WheelInfo& wheel)
 {
     updateWheelTransformsWS( wheel,false);
-
 
     btScalar depth = -1;
 
@@ -353,6 +353,7 @@ void RaycastVehicle::updateVehicle( btScalar step )
     for (i=0;i<m_wheelInfo.size();i++){
         //btScalar depth;
         rayCast( m_wheelInfo[i]);
+        // printf("--wheel %d in contact %s\n", i, (m_wheelInfo[i].m_raycastInfo.m_isInContact ? "true" : "false"));
     }
 
     updateSuspension();
@@ -375,7 +376,8 @@ void RaycastVehicle::updateVehicle( btScalar step )
     }
 
     //get the total gravity force before applying the friction
-    m_dTotalGravityForce = (getRigidBody()->getWorldTransform().getRotation() * getRigidBody()->getTotalForce()).x();
+    // m_dTotalGravityForce = (getRigidBody()->getWorldTransform().getRotation() * getRigidBody()->getTotalForce())[getUpAxis()];
+    // std::cout << "grav force " << std::to_string(m_dTotalGravityForce) << std::endl;
 
     updateFriction( step);
 
@@ -395,9 +397,9 @@ void RaycastVehicle::updateVehicle( btScalar step )
             btScalar proj = fwd.dot(wheel.m_raycastInfo.m_contactNormalWS);
             fwd -= wheel.m_raycastInfo.m_contactNormalWS * proj;
 
-            btScalar proj2 = fwd.dot(vel);
+            btScalar lin_vel = fwd.dot(vel);
 
-            wheel.m_deltaRotation = (proj2 * step) / (wheel.m_wheelsRadius);
+            wheel.m_deltaRotation = (lin_vel * step) / wheel.m_wheelsRadius;
             wheel.m_rotation += wheel.m_deltaRotation;
 
         } else{
@@ -494,6 +496,7 @@ void	RaycastVehicle::updateSuspension()
 
     for (size_t w_it=0; w_it<getNumWheels(); w_it++){
         WheelInfo &wheel_info = m_wheelInfo[w_it];
+        // printf("++wheel %d in contact %s\n", w_it, (wheel_info.m_raycastInfo.m_isInContact ? "true" : "false"));
 
         if ( wheel_info.m_raycastInfo.m_isInContact ){
             btScalar force;
@@ -503,6 +506,8 @@ void	RaycastVehicle::updateSuspension()
                 btScalar	current_length = wheel_info.m_raycastInfo.m_suspensionLength;
 
                 btScalar length_diff = (susp_length - current_length);
+
+                // printf("++-wheel %d susp_length %f current_length %f\n", w_it, susp_length, current_length);
 
                 if(current_length <= 0){
                     force  = 0;
@@ -529,6 +534,8 @@ void	RaycastVehicle::updateSuspension()
                     force -= susp_damping * projected_rel_vel;
                 }
             }
+
+            // printf("+++wheel %d force %f\n", w_it, force);
 
             // RESULT
             wheel_info.m_wheelsSuspensionForce = force; //<< why was this multiplied by mass??
@@ -574,7 +581,7 @@ btScalar CalcRollingFriction(btWheelContactPoint& contactPoint)
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void	RaycastVehicle::updateFriction(btScalar	timeStep)
+void RaycastVehicle::updateFriction(btScalar timeStep)
 {
         //btScalar sideFrictionStiffness2 = btScalar(1.0);
         //calculate the impulse, so that the wheels don't move sidewards
@@ -589,7 +596,6 @@ void	RaycastVehicle::updateFriction(btScalar	timeStep)
 
         int numWheelsOnGround = 0;
 
-
         //collapse all those loops into one!
         for (size_t i=0;i<getNumWheels();i++){
             WheelInfo& wheelInfo = m_wheelInfo[i];
@@ -600,9 +606,8 @@ void	RaycastVehicle::updateFriction(btScalar	timeStep)
             m_forwardImpulse[i] = btScalar(0.);
 
         }
-
+        // find principle axes of motion and calc side impulse due to friction
         {
-
             for (size_t i=0;i<getNumWheels();i++){
                 WheelInfo& wheelInfo = m_wheelInfo[i];
 
@@ -653,6 +658,8 @@ void	RaycastVehicle::updateFriction(btScalar	timeStep)
                     //std::cout << "soft min between " << dMaxSideImpulse << " and " << m_sideImpulse[i] << " is " << SoftMinimum(dMaxSideImpulse*1000,m_sideImpulse[i]*100)/100 << std::endl;
                     //m_sideImpulse[i] = SoftMinimum(fabs(dMaxSideImpulse)*100,fabs(m_sideImpulse[i])*100)/100 * sgn(m_sideImpulse[i]);
                     m_sideImpulse[i] = std::min(fabs(dMaxSideImpulse),fabs(m_sideImpulse[i]))* sgn(m_sideImpulse[i]);
+
+                    // printf("side imp wheel %d susforce %f sidefriction %f dt %f chassis vel %f %f %f wheel dir %f %f %f slip %f max %f final %f\n", i, wheelInfo.m_wheelsSuspensionForce, m_dSideFriction, timeStep, vel_dir[0], vel_dir[1], vel_dir[2], m_forwardWS[i][0], m_forwardWS[i][1], m_forwardWS[i][2], slip, dMaxSideImpulse, m_sideImpulse[i]);
                 }
             }
         }
@@ -667,7 +674,6 @@ void	RaycastVehicle::updateFriction(btScalar	timeStep)
             class btRigidBody* groundObject = (class btRigidBody*) wheelInfo.m_raycastInfo.m_groundObject;
 
             btScalar	rollingFriction = 0.f;
-
             if (groundObject){
                 //bool bDynamic = false;
                 btScalar engineImpulse = wheelInfo.m_engineForce* timeStep;
@@ -740,6 +746,9 @@ void	RaycastVehicle::updateFriction(btScalar	timeStep)
 //            }
 //        }
 //    }
+
+
+    // printf("applying impulses\n forw %f %f %f %f\n side %f %f %f %f\n", m_forwardImpulse[0], m_forwardImpulse[1], m_forwardImpulse[2], m_forwardImpulse[3], m_sideImpulse[0], m_sideImpulse[1], m_sideImpulse[2], m_sideImpulse[3]);
 
     // apply the impulses
     {

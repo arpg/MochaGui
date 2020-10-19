@@ -24,10 +24,10 @@ MochaController::MochaController(ros::NodeHandle& private_nh_, ros::NodeHandle& 
     m_dTrajWeight(CVarUtils::CreateUnsavedCVar("planner.TrajCostWeights",Eigen::MatrixXd(1,1))),
     m_dControlRate(10),
     m_dMaxControlPlanTime(CVarUtils::CreateGetCVar("controller.MaxControlPlanTime",(float)0.2,"")),
-    m_dLookaheadTime(CVarUtils::CreateUnsavedCVar("controller.LookaheadTime",(float)0.2,"")),
+    m_dLookaheadTime(CVarUtils::CreateUnsavedCVar("controller.LookaheadTime",(float)1.0,"")),
     m_pControlPlannerThread(NULL),
     m_ControllerState(IDLE),
-    m_dt(0.05)
+    m_dt(0.01)
     // m_bControllerRunning(false)
 {
     m_lControlPlans.clear();
@@ -129,7 +129,7 @@ bool MochaController::_SampleControlPlan(ControlPlan* pPlan, MochaProblem& probl
             pPlan->m_Sample.m_vStates.push_back(VehicleState(Twv,0));
         }
     }else{
-        MochaProblem::ApplyVelocities(pPlan->m_StartState,
+        ApplyVelocities(pPlan->m_StartState,
                                             pPlan->m_Sample,
                                             0,
                                             true);
@@ -240,7 +240,7 @@ bool MochaController::_SolveControlPlan(const ControlPlan* pPlan,MochaProblem& p
 /////////////////////////////////////////////////////////////////////////////////////////
 bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut) 
 {
-    ROS_INFO("\n*\n*\n*\n*\nPlanning control at %fs",dPlanStartTime);
+    ROS_INFO("Planning control at %fs", dPlanStartTime);
     try
     {
         pPlanOut = NULL;
@@ -343,7 +343,7 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         double totalDelay = 0.1;
         if(totalDelay > 0 && m_lCurrentCommands.size() != 0)
         {
-            ROS_INFO("Controller pushing start state forward with stacked up commands.");
+            ROS_INFO("Controller pushing start state forward with %d commands.",m_lCurrentCommands.size());
             for(const ControlCommand& command: m_lCurrentCommands){
                 if(totalDelay <= 0){
                     break;
@@ -357,7 +357,7 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
             // delayFunctor.SetNoDelay(true);
             //this applyvelocities call has noCompensation set to true, as the commands
             //are from a previous plan which includes compensation
-            MochaProblem::ApplyVelocities(currentState,delaySample,0,true);
+            ApplyVelocities(currentState,delaySample,0,true,true);
             //and now set the starting state to this new value
             pPlan->m_StartState = delaySample.m_vStates.back();
             m_LastCommand = delaySample.m_vCommands.back();
@@ -436,12 +436,12 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         VelocityProfile profile;
         //prepare the trajectory ahead
         MochaController::PrepareLookaheadTrajectory(m_vSegmentSamples, pPlan, profile, trajectorySample, g_dInitialLookaheadTime);
-        std::string str = "Lookahead traj:";
-        for(uint i=0; i<trajectorySample.m_vStates.size(); i++)
-        {
-            str += "\n" + convertEigenMatrix2String(trajectorySample.m_vStates[i].ToXYZTCV().transpose());
-        }
-        ROS_INFO("%s",str.c_str());
+        // std::string str = "Lookahead traj:";
+        // for(uint i=0; i<trajectorySample.m_vStates.size(); i++)
+        // {
+        //     str += "\n" + convertEigenMatrix2String(trajectorySample.m_vStates[i].ToXYZTCV().transpose());
+        // }
+        // ROS_INFO("%s",str.c_str());
         PublishLookaheadTrajectory(trajectorySample);
 
         // SetNoDelay(true);
@@ -662,6 +662,11 @@ void MochaController::_GetCurrentPlanIndex(double currentTime, PlanPtrList::iter
             
         }
     }
+    else
+    {
+        ROS_WARN("No control plans.");
+    }
+    
 
     if( bPlanValid == false ) {
         planIndex = m_lControlPlans.end();
@@ -904,7 +909,7 @@ void MochaController::pubCommand(ControlCommand& cmd)
     cmd_msg.dphi        = cmd.m_dPhi;
     for(unsigned int i=0; i<3; i++)
     {
-        cmd_msg.torques.push_back(cmd.m_dTorque[i]);
+        cmd_msg.torques[i] = cmd.m_dTorque[i];
     }
 
     m_pubCommands.publish(cmd_msg);
@@ -942,4 +947,115 @@ void MochaController::planCb(const carplanner_msgs::MotionPlan::ConstPtr& plan_m
     InitController();
 
     return;
+}
+
+bool MochaController::ApplyVelocities(const VehicleState& startState,
+                                                      MotionSample& sample,
+                                                      int nWorldId /*= 0*/,
+                                                      bool noCompensation /*= false*/,
+                                                      bool noDelay /*=false*/) {
+    // ApplyVelocities(startState,
+    //                 sample.m_vCommands,
+    //                 sample.m_vStates,
+    //                 0,
+    //                 sample.m_vCommands.size(),
+    //                 nWorldId,
+    //                 noCompensation,
+    //                 NULL);
+    // return sample.m_vStates.back();
+
+    // boost::thread spin_thread(&spinThread);
+
+    // ROS_INFO("ApplyVelocities for world %d started", nWorldId);
+
+    // ROS_INFO("Applying velocities (%d)", nWorldId);
+
+    double t0 = Tic();
+
+    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> actionApplyVelocities_client("vehicle/"+std::to_string(nWorldId)+"/apply_velocities",true);
+    actionApplyVelocities_client.waitForServer();
+
+
+    carplanner_msgs::ApplyVelocitiesGoal goal;
+    carplanner_msgs::ApplyVelocitiesResultConstPtr result;
+    
+    goal.initial_state = startState.toROS();
+    goal.initial_motion_sample = sample.toROS();
+    goal.world_id = nWorldId;
+    goal.no_compensation = noCompensation;
+    goal.no_delay = noDelay;
+
+    double t1 = Tic();
+    ROS_DBG("Sending goal %d with %d states at %fs", nWorldId, goal.initial_motion_sample.states.size(), t1);
+    actionApplyVelocities_client.sendGoal(goal
+        // , boost::bind(&MochaProblem::ApplyVelocitiesDoneCb, this, _1, _2)
+        // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleActiveCallback()
+        // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleFeedbackCallback()
+        );
+
+    double t2 = Tic();
+
+    // {
+    // boost::mutex::scoped_lock lock(m_mutexApplyVelocitiesInfo);
+    // m_vApplyVelocitiesGoalIds.push_back(goal.goal_id);
+    // m_vApplyVelocitiesMotionSamples.push_back(&sample);
+    // }
+
+    // DLOG(INFO) << "AV called:" 
+    //     << " world " << std::to_string(goal.world_id) 
+      // "\nstart " << std::to_string(VehicleState::fromROS(goal->initial_state))
+    //   ;
+
+    bool success;
+
+    float timeout(15.0);
+    timeout = 0.1 * goal.initial_motion_sample.states.size();
+    bool finished_before_timeout = actionApplyVelocities_client.waitForResult(ros::Duration(timeout));
+    double t3 = Tic();
+    ROS_DBG("Got goal result %d at %fs, took %fs", nWorldId, t3, t3-t1);
+    if (finished_before_timeout)
+    {
+        success = true;
+        actionlib::SimpleClientGoalState state = actionApplyVelocities_client.getState();
+        // DLOG(INFO) << "ApplyVelocities finished: " << state.toString();
+
+        // ROS_INFO("Applying velocities (%d) succeeded, took %.2fs.", nWorldId, t3-t1);
+
+        result = actionApplyVelocities_client.getResult();
+        sample.fromROS(result->motion_sample);
+    }
+    else
+    {
+        success = false;
+        ROS_ERROR("ApplyVelocities (%d) did not finish before the %fs timeout.", nWorldId, timeout);
+    }
+
+    double t4 = Tic();
+    // ROS_INFO("Result %d received at %.2fs", nWorldId, ros::Time::now().toSec());
+
+    // spin_thread.join();
+
+    // while (actionApplyVelocities_client.getState() == actionlib::SimpleClientGoalState::PENDING
+    //     || actionApplyVelocities_client.getState() == actionlib::SimpleClientGoalState::ACTIVE
+    //     )
+    // {  
+    //     DLOG(INFO) << std::to_string(goal.world_id) << ": " << actionApplyVelocities_client.getState().toString();
+    //     ros::Rate(10).sleep();
+    // }
+
+    // result = actionApplyVelocities_client.getResult();
+    // sample.fromROS(result->motion_sample);
+
+    // DLOG(INFO) << "AV done:" 
+    //     << " world " << std::to_string(goal.world_id) 
+    //     << " " << actionApplyVelocities_client.getState().toString()
+    //     // << " poseOut " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x) 
+    //     //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x)  
+    //     //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.y)
+    //     //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.z) 
+    //     ;
+
+    // ROS_INFO("ApplyVelocities for world %d %s, server wait %.2fs, goal prep %.2fs, server call %.2fs, total %.2fs", nWorldId, (success ? "succeeded" : "failed"), t1-t0, t2-t1, t3-t2, t3-t0);
+
+    return success;
 }

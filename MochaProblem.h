@@ -27,11 +27,10 @@
 
 // #include "tf_conversion_tools.hpp"
 
-#include <actionlib/client/simple_action_client.h>
-#include <carplanner_msgs/GetControlDelayAction.h>
-#include <carplanner_msgs/GetInertiaTensorAction.h>
-#include <carplanner_msgs/SetNoDelayAction.h>
-
+// #include <actionlib/client/simple_action_client.h>
+// #include <carplanner_msgs/GetControlDelayAction.h>
+// #include <carplanner_msgs/GetInertiaTensorAction.h>
+// #include <carplanner_msgs/SetNoDelayAction.h>
 #include <carplanner_msgs/GetStateAction.h>
 #include <carplanner_msgs/SetStateAction.h>
 
@@ -134,7 +133,6 @@ enum CostMode
 
 inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1, const Eigen::Vector6d& line2, const Eigen::Vector6d& point, double &dInterpolationFactor);
 
-
 class MochaProblem
 {
 
@@ -196,6 +194,7 @@ public:
 
     void UpdateOptParams(const Eigen::VectorXd& dOptParams)
     {
+        ROS_DEBUG("Updating opt params.");
         m_CurrentSolution.m_dOptParams.head(OPT_DIM) = dOptParams; // x, y, theta, acceleration, aggressiveness
         m_BoundaryProblem.m_dGoalPose.head(3) = dOptParams.head(3);
         if(OPT_DIM > OPT_AGGR_DIM){
@@ -211,23 +210,25 @@ public:
 
     std::string m_problemName;
 
-    static bool ApplyVelocities(const VehicleState& startState,
+    bool ApplyVelocities(const VehicleState& startState,
                                                       MotionSample& sample,
                                                       int nWorldId=0,
-                                                      bool noCompensation=false);
+                                                      bool noCompensation=false,
+                                                      bool noDelay=false);
 private:
 
     bool m_bServersInitialized = false;
 
     // void ApplyVelocitiesDoneCb(const actionlib::SimpleClientGoalState&, const carplanner_msgs::ApplyVelocitiesResultConstPtr&);
+    ApplyVelocitiesClients m_clientsApplyVelocities;
 
-    double GetControlDelay(int worldId);
+    // double GetControlDelay(int worldId);
     // actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_client;
 
-    const Eigen::Vector3d GetInertiaTensor(int worldId);
+    // const Eigen::Vector3d GetInertiaTensor(int worldId);
     // actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_client;
 
-    void SetNoDelay(bool);    
+    // void SetNoDelay(bool);    
     // actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_client;
 
     // VehicleState SetVehicleState(VehicleState stateIn, int worldId=0);
@@ -288,7 +289,7 @@ public:
     Eigen::VectorXd CalculateTrajectoryError(const MotionSample &sample, double &dMinTrajTime) const;
     Eigen::VectorXd _GetWeightVector();
     double _CalculateErrorNorm(const Eigen::VectorXd& dError);
-    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2;}
+    static int GetNumWorldsRequired(const int nOptParams=OPT_DIM) { return nOptParams*2+2;}
     void CalculateTorqueCoefficients(MotionSample& pSample);
     
     ros::NodeHandle* m_nh;
@@ -326,6 +327,8 @@ private:
     Eigen::MatrixXd m_dPointWeight;                                       //< The matrix which holds the weighted Gauss-Newton weights
     Eigen::MatrixXd m_dTrajWeight;
     int m_nPlanCounter;
+
+    bool m_bNoDelay;
 };
 
 #endif

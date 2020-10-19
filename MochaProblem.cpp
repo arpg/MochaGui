@@ -37,7 +37,6 @@ inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1,const Eige
     return intError;
 }
 
-namespace mochapc {
 struct ApplyCommandsThreadFunctor {
     ApplyCommandsThreadFunctor(std::shared_ptr<MochaProblem> problem,const int index , Eigen::Vector6d& poseOut,Eigen::VectorXd& errorOut,
                                MotionSample& sample, const bool bSolveBoundary = false) :
@@ -59,6 +58,7 @@ struct ApplyCommandsThreadFunctor {
         double t0 = Tic();
         if(m_bSolveBoundary){
             // ROS_INFO("Solving BVP for %s", m_Problem->m_problemName.c_str());
+            ROS_DBG("Solving boundary problem (%d).", m_index);
             m_Problem->m_pBoundarySovler->Solve(&(m_Problem->m_BoundaryProblem));
         }
         double t1 = Tic();
@@ -98,7 +98,89 @@ struct ApplyCommandsThreadFunctor {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
-}
+
+// struct ApplyCommandsThreadPreFunctor {
+//     ApplyCommandsThreadPreFunctor(std::shared_ptr<MochaProblem> problem,const int index , Eigen::Vector6d& poseOut,Eigen::VectorXd& errorOut,
+//                                MotionSample& sample, const bool bSolveBoundary = false) :
+//         m_Problem(problem),
+//         m_index(index),
+//         m_poseOut(poseOut),
+//         m_dErrorOut(errorOut),
+//         m_Sample(sample),
+//         m_bSolveBoundary(bSolveBoundary)
+//     {
+//         // ROS_INFO("Constructing ApplyCommandsFunctor for %s idx %d", m_Problem.m_problemName.c_str(), m_index);
+//     }
+
+//     void operator()()
+//     {
+//         SetThreadName((boost::format("Bullet AC Thread #%d") % m_index).str().c_str());
+//         if(m_bSolveBoundary){
+//             // ROS_INFO("Solving BVP for %s", m_Problem->m_problemName.c_str());
+//             ROS_DBG("Solving boundary problem.");
+//             m_Problem->m_pBoundarySovler->Solve(&(m_Problem->m_BoundaryProblem));
+//         }
+//         // m_poseOut = m_Problem->SimulateTrajectory(m_Sample, m_index);
+//         m_Sample.Clear();
+//         bool bUsingBestSolution = false;
+//         if(bBestSolution && m_pBestSolution != NULL && m_pBestSolution->m_Sample.m_vCommands.size() != 0){
+//             ROS_DBG(" with best solution.");
+//             bUsingBestSolution = true;
+//             m_Sample.m_vCommands = m_pBestSolution->m_Sample.m_vCommands;
+//         }else{
+//             ROS_DBG(" with new solution.");
+//             // calc sample.commands from problem velocity profile
+//             SampleAcceleration(m_Sample.m_vCommands);
+//         }
+//         return;
+//     }
+
+//     std::shared_ptr<MochaProblem> m_Problem;
+//     const int m_index;
+//     Eigen::Vector6d& m_poseOut;
+//     Eigen::VectorXd& m_dErrorOut;
+//     MotionSample& m_Sample;
+//     bool m_bSolveBoundary;
+
+// public:
+//     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+// };
+
+// struct ApplyVelocitiesThreadFunctor {
+//     ApplyVelocitiesThreadFunctor(std::shared_ptr<MochaProblem> problem,const int index , Eigen::Vector6d& poseOut,Eigen::VectorXd& errorOut,
+//                                MotionSample& sample, const bool bSolveBoundary = false) :
+//         m_Problem(problem),
+//         m_index(index),
+//         m_poseOut(poseOut),
+//         m_dErrorOut(errorOut),
+//         m_Sample(sample),
+//         m_bSolveBoundary(bSolveBoundary)
+//     {
+//         // ROS_INFO("Constructing ApplyCommandsFunctor for %s idx %d", m_Problem.m_problemName.c_str(), m_index);
+//     }
+
+//     void operator()()
+//     {
+//         SetThreadName((boost::format("Bullet AV Thread #%d") % m_index).str().c_str());
+//         if(m_bSolveBoundary){
+//             // ROS_INFO("Solving BVP for %s", m_Problem->m_problemName.c_str());
+//             ROS_DBG("Solving boundary problem.");
+//             m_Problem->m_pBoundarySovler->Solve(&(m_Problem->m_BoundaryProblem));
+//         }
+//         m_poseOut = m_Problem->SimulateTrajectory(m_Sample, m_index);
+//         return;
+//     }
+
+//     std::shared_ptr<MochaProblem> m_Problem;
+//     const int m_index;
+//     Eigen::Vector6d& m_poseOut;
+//     Eigen::VectorXd& m_dErrorOut;
+//     MotionSample& m_Sample;
+//     bool m_bSolveBoundary;
+
+// public:
+//     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+// };
 
 MochaProblem::MochaProblem(std::string name) :
     m_dSegmentTime(-1), 
@@ -116,6 +198,14 @@ MochaProblem::MochaProblem(std::string name) :
     // m_actionGetControlDelay_client("vehicle/manager/get_control_delay",true)
 {
     Reset();
+
+    // m_clientsApplyVelocities.clear();
+    // for (uint i=0; i<GetNumWorldsRequired(); i++)
+    // {
+    //     ApplyVelocitiesClient* client = new ApplyVelocitiesClient("vehicle/"+std::to_string(i)+"/apply_velocities",true);
+    //     m_clientsApplyVelocities.push_back(client);
+    //     client->waitForServer();
+    // }
 }
 
 MochaProblem::MochaProblem(std::string name, const VehicleState& startState, const VehicleState& goalState, const double& dt) :
@@ -136,6 +226,14 @@ MochaProblem::MochaProblem(std::string name, const VehicleState& startState, con
     Reset();
     m_StartState = startState;
     m_GoalState = goalState;
+
+    // m_clientsApplyVelocities.clear();
+    // for (uint i=0; i<GetNumWorldsRequired(); i++)
+    // {
+    //     ApplyVelocitiesClient* client = new ApplyVelocitiesClient("vehicle/"+std::to_string(i)+"/apply_velocities",true);
+    //     m_clientsApplyVelocities.push_back(client);
+    //     client->waitForServer();
+    // }
 }
 
 MochaProblem::~MochaProblem()
@@ -204,6 +302,14 @@ MochaProblem::MochaProblem(const MochaProblem& problem)
     m_nPlanCounter = problem.m_nPlanCounter;
 
     m_nh = problem.m_nh;
+
+    // m_clientsApplyVelocities.clear();
+    // for (uint i=0; i<GetNumWorldsRequired(); i++)
+    // {
+    //     ApplyVelocitiesClient* client = new ApplyVelocitiesClient("vehicle/"+std::to_string(i)+"/apply_velocities",true);
+    //     m_clientsApplyVelocities.push_back(client);
+    //     client->waitForServer();
+    // }
 }
 
 void MochaProblem::Reset()
@@ -280,6 +386,37 @@ void MochaProblem::SetTrajWeights(Eigen::VectorXd weights)
     // m_dTrajWeight(6) = CURV_WEIGHT;
     // // m_dTrajWeight(7) = BADNESS_WEIGHT;
 }
+
+// void MochaProblem::ApplyCommands(std::vector<Eigen::VectorXd> delta)
+// {
+//     uint numThreads = 2*epsVec.size();
+
+//     Eigen::Vector6d pPoses[numThreads], dCurrentPose;
+//     Eigen::VectorXd errors[numThreads], dCurrentError;
+
+//     std::vector<std::shared_ptr<MochaProblem>> vCubicProblems;
+//     vCubicProblems.resize(numThreads);
+
+//     std::vector<std::shared_ptr<ApplyCommandsThreadFunctor > > vFunctors;
+//     vFunctors.resize(numThreads);
+    
+//     for( int ii = 0; ii < numThreads; ii++ )
+//     {
+//         int plusIdx = ii*2, minusIdx = ii*2+1;
+//         vCubicProblems[plusIdx] = std::make_shared<MochaProblem>(*this);
+//         Eigen::VectorXd delta(OPT_DIM);
+//         delta.setZero();
+//         delta(ii) += dEps;
+//         vCubicProblems[plusIdx]->UpdateOptParams(vCubicProblems[plusIdx]->m_CurrentSolution.m_dOptParams.head(OPT_DIM)+delta);
+//         vFunctors[plusIdx] = std::make_shared<ApplyCommandsThreadFunctor>(vCubicProblems[plusIdx],
+//                                                                           plusIdx,
+//                                                                           pPoses[plusIdx],
+//                                                                           errors[plusIdx],
+//                                                                           (vCubicProblems[plusIdx]->m_CurrentSolution.m_Sample),
+//                                                                           true);
+//         m_ThreadPool.schedule(*vFunctors[plusIdx]);
+//     }
+// }
 
 void MochaProblem::SamplePath(Eigen::Vector3dAlignedVec& vSamples, bool bBestSolution /* = true */ )
 {
@@ -406,6 +543,7 @@ Eigen::VectorXd MochaProblem::_GetWeightVector()
 ///////////////////////////////////////////////////////////////////////
 double MochaProblem::_CalculateErrorNorm(const Eigen::VectorXd& dError)
 {
+    ROS_DBG("Calculating weighted error norm.");
     Eigen::VectorXd dW = _GetWeightVector();
     Eigen::VectorXd error = dError;
     //DLOG(INFO) << "error vector is " << error.transpose();
@@ -416,9 +554,10 @@ double MochaProblem::_CalculateErrorNorm(const Eigen::VectorXd& dError)
 ///////////////////////////////////////////////////////////////////////
 Eigen::VectorXd MochaProblem::_CalculateSampleError(const MotionSample& sample, double& dMinTrajTime) const
 {
+    ROS_DBG("Calculating sample error.");
     if(sample.m_vStates.size() == 0 ){
         // DLOG(ERROR) << m_nPlanId << ":Sample with size 0 detected. Aborting.";
-        ROS_INFO_THROTTLE(.1, "%d:Sample with size 0 detected. Aborting.", m_nPlanId);
+        ROS_WARN("%d:Sample with size 0 detected. Aborting.", m_nPlanId);
         int errorVecSize = m_eCostMode == eCostPoint ? POINT_COST_ERROR_TERMS : TRAJ_UNIT_ERROR_TERMS*g_nTrajectoryCostSegments+TRAJ_EXTRA_ERROR_TERMS;
         Eigen::VectorXd error;
         error = Eigen::VectorXd(errorVecSize);
@@ -540,18 +679,21 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
                                       Eigen::MatrixXd& J)
 {
     Eigen::IOFormat CleanFmt(8, 0, ", ", "\n", "[", "]");
-    Eigen::VectorXd errors[OPT_DIM*2],dCurrentError;
-    std::vector<std::shared_ptr<MochaProblem>> vCubicProblems;
-    std::vector<std::shared_ptr<mochapc::ApplyCommandsThreadFunctor > > vFunctors;
-    vCubicProblems.resize(OPT_DIM*2);
-    vFunctors.resize(OPT_DIM*2);
+
     Eigen::Vector6d pPoses[OPT_DIM*2],dCurrentPose;
+    Eigen::VectorXd errors[OPT_DIM*2],dCurrentError;
+
+    std::vector<std::shared_ptr<MochaProblem>> vCubicProblems;
+    vCubicProblems.resize(OPT_DIM*2);
+
+    std::vector<std::shared_ptr<ApplyCommandsThreadFunctor > > vCommandsFunctors;
+    vCommandsFunctors.resize(OPT_DIM*2);
 
     const double dEps = m_dEps;// * m_CurrentSolution.m_dNorm;
     // DLOG(INFO) << "Calcing Jacobian";
-    ROS_INFO("Calculating Jacobian.");
-    ROS_INFO("Running ACF on %d threads for each +OPT_DIM, -OPT_DIM, current.", OPT_DIM*2+1);
-
+    // ROS_INFO("Calculating Jacobian.");
+    ROS_DBG("Calcing Jacobian on %d threads", OPT_DIM*2+1);
+    double t0 = Tic();
     //g_bUseCentralDifferences = false;
     for( int ii = 0; ii < OPT_DIM; ii++ )
     {
@@ -561,13 +703,13 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
         delta.setZero();
         delta(ii) += dEps;
         vCubicProblems[plusIdx]->UpdateOptParams(vCubicProblems[plusIdx]->m_CurrentSolution.m_dOptParams.head(OPT_DIM)+delta);
-        vFunctors[plusIdx] = std::make_shared<mochapc::ApplyCommandsThreadFunctor>(vCubicProblems[plusIdx],
+        vCommandsFunctors[plusIdx] = std::make_shared<ApplyCommandsThreadFunctor>(vCubicProblems[plusIdx],
                                                                           plusIdx,
                                                                           pPoses[plusIdx],
                                                                           errors[plusIdx],
                                                                           (vCubicProblems[plusIdx]->m_CurrentSolution.m_Sample),
                                                                           true);
-        m_ThreadPool.schedule(*vFunctors[plusIdx]);
+        m_ThreadPool.schedule(*vCommandsFunctors[plusIdx]);
 
         if(g_bUseCentralDifferences == true){
             vCubicProblems[minusIdx] = std::make_shared<MochaProblem>(*this);
@@ -575,36 +717,61 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
             delta.setZero();
             delta(ii) -= dEps;
             vCubicProblems[minusIdx]->UpdateOptParams(vCubicProblems[minusIdx]->m_CurrentSolution.m_dOptParams.head(OPT_DIM)+delta);
-            vFunctors[minusIdx] = std::make_shared<mochapc::ApplyCommandsThreadFunctor>(vCubicProblems[minusIdx],
+            vCommandsFunctors[minusIdx] = std::make_shared<ApplyCommandsThreadFunctor>(vCubicProblems[minusIdx],
                                                                                minusIdx,
                                                                                pPoses[minusIdx],
                                                                                errors[minusIdx],
                                                                                (vCubicProblems[minusIdx]->m_CurrentSolution.m_Sample),
                                                                                true);
-            m_ThreadPool.schedule(*vFunctors[minusIdx]);
+            m_ThreadPool.schedule(*vCommandsFunctors[minusIdx]);
         }
     }
+    // MochaVehicle::ApplyAllVelocitiesFromClient(ApplyAllVelocitiesClient* client,
+    //                                             const std::vector<VehicleState>& startStates,
+    //                                             std::vector<MotionSample>& samples,
+    //                                             bool noCompensation=false,
+    //                                             bool noDelay=false);
+    // for (int ii=0; i<samples.size(); i++)
+    // {
+    //     VehicleState vState;
+    //     if(samples[ii].m_vCommands.size() == 0){
+    //         vState = m_StartState;
+    //     }else {
+    //         if (samples[ii].m_vStates.size()>0)
+    //             vState = samples[ii].m_vStates.back();
+    //         else
+    //             vState = VehicleState();
+    //     }
+    //     pPoses[ii] = _Transform3dGoalPose(vState);
+    //     errors[ii] = _CalculateSampleError(samples[ii]);
+    // }
 
     std::shared_ptr<MochaProblem > currentProblem = std::make_shared<MochaProblem>(*this);
-    std::shared_ptr<mochapc::ApplyCommandsThreadFunctor > currentFunctor =
-        std::make_shared<mochapc::ApplyCommandsThreadFunctor>(currentProblem,
+    std::shared_ptr<ApplyCommandsThreadFunctor > currentFunctor =
+        std::make_shared<ApplyCommandsThreadFunctor>(currentProblem,
                                                      OPT_DIM*2,
                                                      dCurrentPose,
                                                      dCurrentError,
                                                      (currentProblem->m_CurrentSolution.m_Sample),
                                                      true);
     m_ThreadPool.schedule(*currentFunctor);
-
+    // MochaVehicle::ApplyVelocitiesFromClient(ApplyVelocitiesClient* client,
+    //                                             const std::vector<VehicleState>& startStates,
+    //                                             std::vector<MotionSample>& samples,
+    //                                             OPT_DIM*2,
+    //                                             bool noCompensation=false,
+    //                                             bool noDelay=false);
 
     //wait for all simulations to finish
     // DLOG(INFO) << "Waiting for threads to finish...";
-    ROS_INFO("Waiting for ACF threads to finish...");
+    // ROS_INFO("Waiting for ACF threads to finish...");
     // boost::xtime t = boost::xtime::system_time();
     // // t.system_time();
     // t.sec += 1;
     m_ThreadPool.wait();
     // DLOG(INFO) << "Done waiting.";
-    ROS_INFO("Done waiting.");
+    // ROS_INFO("Done waiting.");
+    ROS_DBG("Jacobian calulation done, took %fs.", Toc(t0));
 
     // ROS_INFO("Pubbing potential paths viz from Coordinate Descent.");
     m_vPotentialPaths.push_back(this->m_CurrentSolution.m_Sample);
@@ -619,7 +786,7 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
     }
     // pubPotentialPathsViz();
 
-    ROS_INFO("Calculating coordinate descent solution.");
+    ROS_DBG("Calculating coordinate descent solution.");
 
     dCurrentErrorVec = dCurrentError;
 
@@ -675,7 +842,7 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
         //     str << dCurrentErrorVec.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) ;
         //     str += " dEps " + std::to_string(dEps) ;
         // }
-        // ROS_DEBUG(str);
+        // ROS_DBG(str);
 
         J.col(ii) = -col;
         //if this term is NAN, sound the alarm
@@ -695,7 +862,7 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
     coordinateDescent = pCoordinateDescent->m_CurrentSolution;
     coordinateDescent.m_dNorm = dBestNorm;
     
-    ROS_INFO("Done calculating Jacobian\n%s\nwith curr norm %f, CD norm %f\nerrors [%s]", convertEigenMatrix2String(J,2,", ","\n","\t").c_str(), m_CurrentSolution.m_dNorm, dBestNorm, convertEigenMatrix2String(dCurrentErrorVec.transpose()).c_str());
+    // ROS_INFO("Done calculating Jacobian\n%s\nwith curr norm %f, CD norm %f\nerrors [%s]", convertEigenMatrix2String(J,2,", ","\n","\t").c_str(), m_CurrentSolution.m_dNorm, dBestNorm, convertEigenMatrix2String(dCurrentErrorVec.transpose()).c_str());
 
     // if(g_bVerbose){
     //     DLOG(INFO) << "Jacobian:" << J.format(CleanFmt) << std::endl;
@@ -735,7 +902,7 @@ void MochaProblem::SampleAcceleration(std::vector<ControlCommand>& vCommands)
     //m_dSegmentTime += m_dSegmentTimeDelta;
     if(std::isfinite(m_dSegmentTime) == false ){
         // DLOG(ERROR) << m_nPlanId << ":Segment time of " << m_dSegmentTime << " was not finite.";
-        ROS_INFO_THROTTLE(.1,"%d:Segment time of %d was not finite.", m_nPlanId, m_dSegmentTime);
+        ROS_WARN("%d:Segment time of %d was not finite.", m_nPlanId, m_dSegmentTime);
         return;
     }
     double t;
@@ -770,18 +937,8 @@ void MochaProblem::SampleAcceleration(std::vector<ControlCommand>& vCommands)
         }
         double force = m_vAccelProfile[accelIndex].m_dAccel+(m_CurrentSolution.m_dOptParams[OPT_ACCEL_DIM]/m_dSegmentTime);
         vCommands.push_back(ControlCommand(force,curvature,dTorques,actualDt,0));
+        // ROS_INFO("adding accel %f at %f", -force, t);
     }
-
-    //if there is control delay, add empty commands to the end, so that the control delay queue can be flushed out
-//    double totalDelay = m_pFunctor->GetCarModel()->GetParameters(iWorld)[CarParameters::ControlDelay];
-//    if(totalDelay > 0 && m_pFunctor->GetPreviousCommand().size() != 0){
-//        CommandList::iterator it  = m_pFunctor->GetPreviousCommand().begin();
-//        while(totalDelay > 0 && it != m_pFunctor->GetPreviousCommand().end()){
-//            vCommands.push_back(ControlCommands(0,0,Eigen::Vector3d::Zero(),m_dT,0));
-//            totalDelay -= m_dT;
-//            ++it;
-//        }
-//    }
 }
 
 
@@ -790,15 +947,17 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
                                                  const int iWorld /*= 0*/,
                                                  const bool& bBestSolution /* = false */)
 {
-    ROS_INFO("Simulating trajectory (%d)", iWorld);
+    ROS_DBG("Simulating trajectory (%d)", iWorld);
     double t0 = Tic();
 
     sample.Clear();
     bool bUsingBestSolution = false;
     if(bBestSolution && m_pBestSolution != NULL && m_pBestSolution->m_Sample.m_vCommands.size() != 0){
+        ROS_DBG(" with best solution.");
         bUsingBestSolution = true;
         sample.m_vCommands = m_pBestSolution->m_Sample.m_vCommands;
     }else{
+        ROS_DBG(" with new solution.");
         // calc sample.commands from problem velocity profile
         SampleAcceleration(sample.m_vCommands);
     }
@@ -810,12 +969,12 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
         // augment sample.commands with compensation (gravity, steering, friction) for RaycastVehicle 
         // and use with BulletCarModel::UpdateState to populate sample.states
 
-        DLOG(INFO) << "Commands(" << sample.m_vCommands.size() << "):";
-        for(uint i=0; i<sample.m_vCommands.size(); i++) {
-            DLOG(INFO) << "  " << sample.m_vCommands[i].m_dForce << " " << sample.m_vCommands[i].m_dCurvature << " " << sample.m_vCommands[i].m_dT << " " << sample.m_vCommands[i].m_dPhi << " " << sample.m_vCommands[i].m_dTorque.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " " << sample.m_vCommands[i].m_dTime;
-        }
+        // DLOG(INFO) << "Commands(" << sample.m_vCommands.size() << "):";
+        // for(uint i=0; i<sample.m_vCommands.size(); i++) {
+        //     DLOG(INFO) << "  " << sample.m_vCommands[i].m_dForce << " " << sample.m_vCommands[i].m_dCurvature << " " << sample.m_vCommands[i].m_dT << " " << sample.m_vCommands[i].m_dPhi << " " << sample.m_vCommands[i].m_dTorque.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) << " " << sample.m_vCommands[i].m_dTime;
+        // }
 
-        ApplyVelocities( m_StartState, sample, iWorld, bUsingBestSolution);
+        ApplyVelocities( m_StartState, sample, iWorld, bUsingBestSolution, m_bNoDelay);
 
 
         // DLOG(INFO) << "States(" << sample.m_vStates.size() << "):";
@@ -829,26 +988,46 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
             vState = VehicleState();
     }
 
-    double t1 = Tic();
-    Eigen::VectorXd finalState = sample.m_vStates.back().ToXYZTCV();
-    Eigen::VectorXd finalParams = m_CurrentSolution.m_dOptParams;
-    double minTrajTime;
-    Eigen::VectorXd finalErrors = _CalculateSampleError(sample, minTrajTime);
-    double finalNorm = _CalculateErrorNorm(finalErrors);
-    ROS_INFO("Simulated trajectory for world %d\n final pose [%s],\n opt params [%s],\n error [%s],\n norm %f, took %fs for %d states (%fs/state)",
-        iWorld,
-        convertEigenMatrix2String(finalState.transpose()).c_str(), 
-        convertEigenMatrix2String(finalParams.transpose()).c_str(),
-        convertEigenMatrix2String(finalErrors.transpose()).c_str(),
-        finalNorm,
-        t1-t0, 
-        sample.m_vStates.size(),
-        (t1-t0)/sample.m_vStates.size());
+    // double t1 = Tic();
+    // Eigen::VectorXd finalState = sample.m_vStates.back().ToXYZTCV();
+    // Eigen::VectorXd finalParams = m_CurrentSolution.m_dOptParams;
+    // double minTrajTime;
+    // Eigen::VectorXd finalErrors = _CalculateSampleError(sample, minTrajTime);
+    // double finalNorm = _CalculateErrorNorm(finalErrors);
+    // ROS_INFO("Simulated trajectory for world %d\n final pose [%s],\n opt params [%s],\n error [%s],\n norm %f, took %fs for %d states (%fs/state)",
+    //     iWorld,
+    //     convertEigenMatrix2String(finalState.transpose()).c_str(), 
+    //     convertEigenMatrix2String(finalParams.transpose()).c_str(),
+    //     convertEigenMatrix2String(finalErrors.transpose()).c_str(),
+    //     finalNorm,
+    //     t1-t0, 
+    //     sample.m_vStates.size(),
+    //     (t1-t0)/sample.m_vStates.size());
 
     //transform the result back
     Eigen::Vector6d dRes = _Transform3dGoalPose(vState);
     return dRes;
 }
+
+// Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
+//                                                  const int iWorld /*= 0*/,
+//                                                  const bool& bBestSolution /* = false */)
+// {
+//     ROS_DBG("Simulating trajectory (%d)", iWorld);
+//     double t0 = Tic();
+
+//     sample.Clear();
+//     bool bUsingBestSolution = false;
+//     if(bBestSolution && m_pBestSolution != NULL && m_pBestSolution->m_Sample.m_vCommands.size() != 0){
+//         ROS_DBG(" with best solution.");
+//         bUsingBestSolution = true;
+//         sample.m_vCommands = m_pBestSolution->m_Sample.m_vCommands;
+//     }else{
+//         ROS_DBG(" with new solution.");
+//         // calc sample.commands from problem velocity profile
+//         SampleAcceleration(sample.m_vCommands);
+//     }
+// }
 
 ///////////////////////////////////////////////////////////////////////
 void MochaProblem::_GetAccelerationProfile() 
@@ -911,7 +1090,8 @@ void MochaProblem::_GetAccelerationProfile()
 bool MochaProblem::ApplyVelocities(const VehicleState& startState,
                                                       MotionSample& sample,
                                                       int nWorldId /*= 0*/,
-                                                      bool noCompensation /*= false*/) {
+                                                      bool noCompensation /*= false*/,
+                                                      bool noDelay /*=false*/) {
     // ApplyVelocities(startState,
     //                 sample.m_vCommands,
     //                 sample.m_vStates,
@@ -926,14 +1106,18 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
 
     // ROS_INFO("ApplyVelocities for world %d started", nWorldId);
 
-    ROS_INFO("Applying velocities (%d)", nWorldId);
+    // ROS_INFO("Applying velocities (%d)", nWorldId);
 
-    double t0 = Tic();
+    // double t0 = Tic();
 
-    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> actionApplyVelocities_client("vehicle/"+std::to_string(nWorldId)+"/apply_velocities",true);
-    actionApplyVelocities_client.waitForServer();
-
-    double t1 = Tic();
+    // if (nWorldId >= m_clientsApplyVelocities.size())
+    // {
+    //     ROS_ERROR("ApplyVelocities client %d doens't exist.",nWorldId);
+    //     return false;
+    // }
+    // ApplyVelocitiesClient* client = m_clientsApplyVelocities[nWorldId];
+    ApplyVelocitiesClient client("vehicle/"+std::to_string(nWorldId)+"/apply_velocities",true);
+    client.waitForServer();
 
     carplanner_msgs::ApplyVelocitiesGoal goal;
     carplanner_msgs::ApplyVelocitiesResultConstPtr result;
@@ -942,8 +1126,11 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     goal.initial_motion_sample = sample.toROS();
     goal.world_id = nWorldId;
     goal.no_compensation = noCompensation;
-    // ROS_INFO("Sending goal %d with %d states at %.2fs", nWorldId, goal.initial_motion_sample.states.size(), ros::Time::now().toSec());
-    actionApplyVelocities_client.sendGoal(goal
+    goal.no_delay = noDelay;
+
+    double t1 = Tic();
+    ROS_DBG("Sending AV (%d) goal with %d commands", nWorldId, goal.initial_motion_sample.commands.size());
+    client.sendGoal(goal
         // , boost::bind(&MochaProblem::ApplyVelocitiesDoneCb, this, _1, _2)
         // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleActiveCallback()
         // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleFeedbackCallback()
@@ -965,18 +1152,56 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     bool success;
 
     float timeout(15.0);
-    timeout = 0.1 * goal.initial_motion_sample.states.size();
-    bool finished_before_timeout = actionApplyVelocities_client.waitForResult(ros::Duration(timeout));
+    timeout = 0.1 * goal.initial_motion_sample.commands.size();
+    bool finished_before_timeout = client.waitForResult(ros::Duration(timeout));
+    // while ( ros::ok() )
+    // {
+    //     if (client->getState()==actionlib::SimpleClientGoalState::SUCCEEDED) 
+    //     {
+    //         ROS_DBG("Got AV (%d) result. Succeeded.", nWorldId);
+    //         result = client->getResult();
+    //         sample.fromROS(result->motion_sample);
+    //         return true;
+    //     }
+    //     if (Toc(t2)>timeout)
+    //     {
+    //         ROS_ERROR("Got AV (%d) result. Did not finish before the %.1fs timeout.", nWorldId, timeout);
+    //         return false;
+    //     }
+    //     if (client->getState()==actionlib::SimpleClientGoalState::ABORTED)
+    //     {
+    //         ROS_ERROR("Got AV (%d) result. Aborted.", nWorldId);
+    //         return false;
+    //     } 
+    //     if (client->getState()==actionlib::SimpleClientGoalState::PREEMPTED)
+    //     {
+    //         ROS_ERROR("Got AV (%d) result. Preempted.", nWorldId);
+    //         return false;
+    //     } 
+    //     if (client->getState()==actionlib::SimpleClientGoalState::RECALLED)
+    //     {
+    //         ROS_ERROR("Got AV (%d) result. Recalled.", nWorldId);
+    //         return false;
+    //     } 
+    //     if (client->getState()==actionlib::SimpleClientGoalState::REJECTED)
+    //     {
+    //         ROS_ERROR("Got AV (%d) result. Rejected.", nWorldId);
+    //         return false;
+    //     } 
+    //     usleep(0.001e6);
+    // }
+
     double t3 = Tic();
+    ROS_DBG("Got goal result (%d), took %fs", nWorldId, t3-t1);
     if (finished_before_timeout)
     {
         success = true;
-        actionlib::SimpleClientGoalState state = actionApplyVelocities_client.getState();
+        actionlib::SimpleClientGoalState state = client.getState();
         // DLOG(INFO) << "ApplyVelocities finished: " << state.toString();
 
-        ROS_INFO("Applying velocities (%d) succeeded, took %.2fs.", nWorldId, t3-t1);
+        // ROS_INFO("Applying velocities (%d) succeeded, took %.2fs.", nWorldId, t3-t1);
 
-        result = actionApplyVelocities_client.getResult();
+        result = client.getResult();
         sample.fromROS(result->motion_sample);
     }
     else
@@ -985,7 +1210,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
         ROS_ERROR("ApplyVelocities (%d) did not finish before the %fs timeout.", nWorldId, timeout);
     }
 
-    double t4 = Tic();
+    // double t4 = Tic();
     // ROS_INFO("Result %d received at %.2fs", nWorldId, ros::Time::now().toSec());
 
     // spin_thread.join();
@@ -1024,93 +1249,93 @@ void MochaProblem::GetPotentialPaths(std::vector<MotionSample>& paths)
     m_vPotentialPaths.clear();
 }
 
-double MochaProblem::GetControlDelay(int nWorldId)
-{
-    double valOut;
+// double MochaProblem::GetControlDelay(int nWorldId)
+// {
+//     double valOut;
 
-    actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction> actionGetControlDelay_client("vehicle/manager/get_control_delay",true);
+//     actionlib::SimpleActionClient<carplanner_msgs::GetControlDelayAction> actionGetControlDelay_client("vehicle/manager/get_control_delay",true);
 
-    carplanner_msgs::GetControlDelayGoal goal;
-    carplanner_msgs::GetControlDelayResultConstPtr result;
+//     carplanner_msgs::GetControlDelayGoal goal;
+//     carplanner_msgs::GetControlDelayResultConstPtr result;
     
-    goal.worldId = nWorldId;
-    actionGetControlDelay_client.sendGoal(goal);
+//     goal.worldId = nWorldId;
+//     actionGetControlDelay_client.sendGoal(goal);
 
-    bool finished_before_timeout = actionGetControlDelay_client.waitForResult(ros::Duration(0.5));
-    if (finished_before_timeout)
-    {
-        actionlib::SimpleClientGoalState state = actionGetControlDelay_client.getState();
-        // ROS_INFO("GetControlDelay Action finished: %s", state.toString().c_str());
+//     bool finished_before_timeout = actionGetControlDelay_client.waitForResult(ros::Duration(0.5));
+//     if (finished_before_timeout)
+//     {
+//         actionlib::SimpleClientGoalState state = actionGetControlDelay_client.getState();
+//         // ROS_INFO("GetControlDelay Action finished: %s", state.toString().c_str());
 
-        result = actionGetControlDelay_client.getResult();
-        valOut = result->val;
-    }
-    else
-        ROS_INFO("GetControlDelay Action did not finish before the time out.");
+//         result = actionGetControlDelay_client.getResult();
+//         valOut = result->val;
+//     }
+//     else
+//         ROS_WARN("GetControlDelay Action did not finish before the time out.");
 
-    return valOut;
+//     return valOut;
 
-    // m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::ControlDelay];
-}
+//     // m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::ControlDelay];
+// }
 
-const Eigen::Vector3d MochaProblem::GetInertiaTensor(int nWorldId)
-{ 
-    actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction> actionGetInertiaTensor_client("vehicle/manager/get_inertia_tensor",true);
-    carplanner_msgs::GetInertiaTensorGoal goal;
-    carplanner_msgs::GetInertiaTensorResultConstPtr result;
+// const Eigen::Vector3d MochaProblem::GetInertiaTensor(int nWorldId)
+// { 
+//     actionlib::SimpleActionClient<carplanner_msgs::GetInertiaTensorAction> actionGetInertiaTensor_client("vehicle/manager/get_inertia_tensor",true);
+//     carplanner_msgs::GetInertiaTensorGoal goal;
+//     carplanner_msgs::GetInertiaTensorResultConstPtr result;
 
-    actionGetInertiaTensor_client.waitForServer();
+//     actionGetInertiaTensor_client.waitForServer();
 
-    goal.world_id = nWorldId;
-    actionGetInertiaTensor_client.sendGoal(goal);
+//     goal.world_id = nWorldId;
+//     actionGetInertiaTensor_client.sendGoal(goal);
 
-    bool finished_before_timeout = actionGetInertiaTensor_client.waitForResult(ros::Duration(0.5));
-    if (finished_before_timeout)
-    {
-        actionlib::SimpleClientGoalState state = actionGetInertiaTensor_client.getState();
-        // ROS_INFO("GetInertiaTensor Action finished: %s", state.toString().c_str());
+//     bool finished_before_timeout = actionGetInertiaTensor_client.waitForResult(ros::Duration(0.5));
+//     if (finished_before_timeout)
+//     {
+//         actionlib::SimpleClientGoalState state = actionGetInertiaTensor_client.getState();
+//         // ROS_INFO("GetInertiaTensor Action finished: %s", state.toString().c_str());
 
-        result = actionGetInertiaTensor_client.getResult();
-    }
-    else
-    {
-        ROS_INFO("GetInertiaTensor Action did not finish before the time out.");
-        return Eigen::Vector3d();
-    }
+//         result = actionGetInertiaTensor_client.getResult();
+//     }
+//     else
+//     {
+//         ROS_WARN("GetInertiaTensor Action did not finish before the time out.");
+//         return Eigen::Vector3d();
+//     }
 
-    const Eigen::Vector3d valsOut(result->vals[0], result->vals[1], result->vals[2]);
-    return valsOut;
-}
+//     const Eigen::Vector3d valsOut(result->vals[0], result->vals[1], result->vals[2]);
+//     return valsOut;
+// }
 
-void MochaProblem::SetNoDelay(bool no_delay)
-{
-    actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> actionSetNoDelay_client("vehicle/manager/set_no_delay",true);
-    carplanner_msgs::SetNoDelayGoal goal;
-    carplanner_msgs::SetNoDelayResultConstPtr result;
+// void MochaProblem::SetNoDelay(bool no_delay)
+// {
+//     actionlib::SimpleActionClient<carplanner_msgs::SetNoDelayAction> actionSetNoDelay_client("vehicle/manager/set_no_delay",true);
+//     carplanner_msgs::SetNoDelayGoal goal;
+//     carplanner_msgs::SetNoDelayResultConstPtr result;
 
-    goal.no_delay = no_delay;
-    actionSetNoDelay_client.sendGoal(goal);
+//     goal.no_delay = no_delay;
+//     actionSetNoDelay_client.sendGoal(goal);
 
-    bool finished_before_timeout = actionSetNoDelay_client.waitForResult(ros::Duration(0.5));
-    if (finished_before_timeout)
-    {
-        actionlib::SimpleClientGoalState state = actionSetNoDelay_client.getState();
-        // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
+//     bool finished_before_timeout = actionSetNoDelay_client.waitForResult(ros::Duration(0.5));
+//     if (finished_before_timeout)
+//     {
+//         actionlib::SimpleClientGoalState state = actionSetNoDelay_client.getState();
+//         // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
 
-    }
-    else
-    {
-        ROS_INFO("SetNoDelay Action did not finish before the time out.");
-    }
-    return;
-}
+//     }
+//     else
+//     {
+//         ROS_WARN("SetNoDelay Action did not finish before the time out.");
+//     }
+//     return;
+// }
 
 ///////////////////////////////////////////////////////////////////////
 bool MochaProblem::Initialize(const double dStartTime,
                                           const VelocityProfile* pVelProfile /* = NULL*/,
                                           CostMode eCostMode /*= eCostPoint */)
 {
-    ROS_INFO("Initializing problem %s starting %f",m_problemName.c_str(), dStartTime);
+    ROS_DBG("Initializing problem %s starting %f",m_problemName.c_str(), dStartTime);
     boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
 
     Reset();
@@ -1137,7 +1362,8 @@ bool MochaProblem::Initialize(const double dStartTime,
     //regardless of the delay, for local planning we always want to proceed with no delay and with no previous commands
     //as the previous section should take care of that
     // m_pFunctor->ResetPreviousCommands();
-    SetNoDelay(true);
+    // SetNoDelay(true);
+    m_bNoDelay = true;
 
     Sophus::SE3d dTranslation(Sophus::SO3d(),-m_StartState.m_dTwv.translation());
 
@@ -1209,6 +1435,7 @@ bool MochaProblem::Initialize(const double dStartTime,
 
     //this puts the result in m_dP
     // ROS_INFO("Solving 2D problem.");
+    ROS_DBG("Solving boundary problem.");
     m_pBoundarySovler->Solve(&m_BoundaryProblem);
     _GetAccelerationProfile();
 
@@ -1239,7 +1466,7 @@ bool MochaProblem::Initialize(const double dStartTime,
 ///////////////////////////////////////////////////////////////////////
 bool MochaProblem::Iterate()
 {
-    ROS_INFO("Iterating problem %s id %d", m_problemName.c_str(), m_nPlanId);
+    ROS_DBG("Iterating problem %s id %d", m_problemName.c_str(), m_nPlanId);
     try
     {
                 //get the current state and norm for the first iteration
@@ -1281,6 +1508,7 @@ bool MochaProblem::Iterate()
 
 void MochaProblem::CalculateTorqueCoefficients(MotionSample& pSample)
 {
+    ROS_DBG("Calculating torque coefficients.");
     //find the last air section and record its duration
     double dAirTime = 0;
     int nStartIndex = -1;
@@ -1320,6 +1548,7 @@ void MochaProblem::CalculateTorqueCoefficients(MotionSample& pSample)
 
     //now calcualte the coefficients for this maneuver based on the angle error
     if(dAirTime > 0.05){
+        ROS_DBG("Got air time! Calculating torques.");
         //find the goal state based on the cost type
         Sophus::SO3d dGoalState;
         if(m_eCostMode == eCostPoint){
@@ -1349,7 +1578,7 @@ void MochaProblem::CalculateTorqueCoefficients(MotionSample& pSample)
                                      0);// = Rinit_dest.log();
 
         // const Eigen::Vector3d dInertia = m_pFunctor->GetCarModel()->GetVehicleInertiaTensor(0);
-        const Eigen::Vector3d dInertia = GetInertiaTensor(0);
+        const Eigen::Vector3d dInertia = Eigen::Vector3d(0,0,0);//GetInertiaTensor(0);
 
         //Eigen::Vector3d currentV = pSample.m_vStates[nStartIndex].m_dV;
         const Sophus::SO3d Rwv = pSample.m_vStates[nStartIndex].m_dTwv.so3();
@@ -1420,6 +1649,8 @@ void MochaProblem::CalculateTorqueCoefficients(MotionSample& pSample)
 ///////////////////////////////////////////////////////////////////////
 bool MochaProblem::_IterateGaussNewton()
 {
+    ROS_DBG("Iterating Gauss Newton.");
+
     Eigen::IOFormat CleanFmt(8, 0, ", ", "\n", "[", "]");
     Eigen::VectorXd dDeltaP;
     //        DLOG(INFO) << "Entered gauss-newton search with e = " << m_dCurrentEps;
@@ -1469,10 +1700,12 @@ bool MochaProblem::_IterateGaussNewton()
     if(bZeroCols) {
         JtJ += Eigen::Matrix<double,OPT_DIM,OPT_DIM>::Identity();
     }
+    ROS_DBG("Solving for delta P.");
     (JtJ).llt().solveInPlace(dDeltaP);
 
     //this is a hack for now, but it should take care of large deltas
     if(dDeltaP.norm() > 100 ){
+        ROS_WARN("Large delta P detected. Hacking...");
         JtJ += Eigen::Matrix<double,OPT_DIM,OPT_DIM>::Identity();
         dDeltaP = J.transpose()*dW*error;
         (JtJ).llt().solveInPlace(dDeltaP);
@@ -1481,16 +1714,16 @@ bool MochaProblem::_IterateGaussNewton()
     // if(g_bVerbose){
     //     DLOG(INFO) << "Gauss newton delta: [" << dDeltaP.transpose().format(CleanFmt) << "]";
     // }
-    ROS_INFO("Gauss newton delta [%s]", convertEigenMatrix2String(dDeltaP.transpose()).c_str());
+    // ROS_INFO("Gauss newton delta [%s]", convertEigenMatrix2String(dDeltaP.transpose()).c_str());
 
 
     if(std::isfinite(dDeltaP.norm()) == false){
-        DLOG(ERROR) << m_nPlanId << ":Deltas are NAN. Dump => J:" << J.format(CleanFmt) << std::endl << "b:" << error.transpose().format(CleanFmt) << std::endl;
+        ROS_ERROR("%f:Deltas are NAN. Dump => \nJ: %s\nb: %s",m_nPlanId, J.format(CleanFmt), error.transpose().format(CleanFmt));
         m_eError = eDeltaNan;
         return false;
     }
 
-    ROS_INFO("Finished GN with norm %f, opts [%s]", m_CurrentSolution.m_dNorm, convertEigenMatrix2String(m_CurrentSolution.m_dOptParams.transpose()).c_str());
+    ROS_DBG("Finished CD with norm %f, opts [%s]", m_CurrentSolution.m_dNorm, convertEigenMatrix2String(m_CurrentSolution.m_dOptParams.transpose()).c_str());
 
     //if no damping is required, just pick the result of the gauss newton
     if(g_bDisableDamping == true){
@@ -1498,13 +1731,14 @@ bool MochaProblem::_IterateGaussNewton()
 //        m_BoundaryProblem->m_dGoalPose.head(3) = m_CurrentSolution.m_dOptParams.head(3);
 //        m_BoundaryProblem->m_dAggressiveness = m_CurrentSolution.m_dOptParams[OPT_AGGR_DIM];
         UpdateOptParams(m_CurrentSolution.m_dOptParams.head(OPT_DIM) + dDeltaP);
+        ROS_DBG("Solving boundary problem.");
         m_pBoundarySovler->Solve(&m_BoundaryProblem);
         SimulateTrajectory(m_CurrentSolution.m_Sample);
         m_CurrentSolution.m_dNorm = _CalculateErrorNorm(_CalculateSampleError());
         m_lSolutions.push_back(m_CurrentSolution);
         m_pBestSolution = &m_lSolutions.back();
         // DLOG(INFO) << "Iteration with no damping finished with norm " << m_CurrentSolution.m_dNorm << " and opts "<< m_CurrentSolution.m_dOptParams.transpose().format(CleanFmt);
-        ROS_INFO("Finished GN without dampening.");
+        ROS_DBG("Finished Gauss Newton iteration without dampening.");
         return true;
     }
 
@@ -1518,24 +1752,25 @@ bool MochaProblem::_IterateGaussNewton()
     Eigen::VectorXd pDampingErrors[DAMPING_STEPS];
     //Eigen::VectorOpt pHypePs[DAMPING_STEPS];
     std::vector<std::shared_ptr<MochaProblem> > vCubicProblems;
-    std::vector<std::shared_ptr<mochapc::ApplyCommandsThreadFunctor> >vFunctors;
+    std::vector<std::shared_ptr<ApplyCommandsThreadFunctor> >vFunctors;
     vCubicProblems.resize(DAMPING_STEPS);
     vFunctors.resize(DAMPING_STEPS);
     double dampings[DAMPING_STEPS];
     damping = 1.0;
 
-    ROS_INFO("Running ACF on %d threads to dampen current solution.", DAMPING_STEPS);
+    ROS_DBG("Calculating damped soln on %d threads", DAMPING_STEPS);
 
     Solution dampedSolution;
     dampedSolution.m_dNorm = DBL_MAX;
     if(std::isfinite(dDeltaP[0]) ){
         //create the damped problems and run the thread queue to sample them
+        double t0 = Tic();
         for(int ii = 0 ; ii < DAMPING_STEPS ; ii++) {
             dampings[ii] = damping;
             Eigen::VectorXd delta = dDeltaP *damping;
             vCubicProblems[ii] = std::make_shared<MochaProblem>(*this);
             vCubicProblems[ii]->UpdateOptParams(vCubicProblems[ii]->m_CurrentSolution.m_dOptParams.head(OPT_DIM)+delta);
-            vFunctors[ii] = std::make_shared<mochapc::ApplyCommandsThreadFunctor>(
+            vFunctors[ii] = std::make_shared<ApplyCommandsThreadFunctor>(
                                                                          vCubicProblems[ii],
                                                                          ii,
                                                                          pDampingStates[ii],
@@ -1546,6 +1781,7 @@ bool MochaProblem::_IterateGaussNewton()
             damping/= DAMPING_DIVISOR;
         }
         m_ThreadPool.wait();
+        ROS_DBG("Applied commands, took %fs.", Toc(t0));
 
         // ROS_INFO("Pubbing potential paths viz from Damped Solution.");
         m_vPotentialPaths.push_back(this->m_CurrentSolution.m_Sample);
@@ -1582,7 +1818,7 @@ bool MochaProblem::_IterateGaussNewton()
 
     }else{
         Eigen::IOFormat CleanFmt(2, 0, ", ", "\n", "[", "]");
-        DLOG(ERROR) << m_nPlanId << ":Deltas are NAN. Dump => J:" << J.format(CleanFmt) << std::endl;
+        ROS_ERROR("%d:Deltas are NAN. Dump => J:%s", m_nPlanId, J.format(CleanFmt));
         m_eError = eDeltaNan;
         return false;
     }
@@ -1610,7 +1846,7 @@ bool MochaProblem::_IterateGaussNewton()
     //update the best solution if necessary
     if(m_bInLocalMinimum == false){
         if(newSolution.m_dNorm < m_CurrentSolution.m_dNorm){
-            ROS_INFO("Updating best solution for plan %d with norm %f.", m_nPlanId, newSolution.m_dNorm);
+            ROS_DBG("Updating best solution for plan %d with norm %f.", m_nPlanId, newSolution.m_dNorm);
             //add this solution to the list
             m_lSolutions.push_back(newSolution);
             m_pBestSolution = &m_lSolutions.back();
@@ -1619,12 +1855,18 @@ bool MochaProblem::_IterateGaussNewton()
         }
         m_CurrentSolution = newSolution;
     }
+    else
+    {
+        ROS_DBG("Local minimum detected.");
+    }
+    
     //m_CurrentSolution.m_Sample = newSolution.m_Sample;
 
 
     // ROS_INFO("Finished GN dampening for plan %d with coordinated descent solution, final state [%s], errors [%s]", m_nPlanId, newSolution.m_dNorm, convertEigenMatrix2String(pDampingStates[ii].transpose()).c_str(), convertEigenMatrix2String(pDampingErrors[ii].transpose()).c_str());
 
     UpdateOptParams(m_CurrentSolution.m_dOptParams.head(OPT_DIM));
+    ROS_DBG("Solving boundary problem.");
     m_pBoundarySovler->Solve(&m_BoundaryProblem);
 
 //    if(m_pCurrentMotionSample == NULL) {

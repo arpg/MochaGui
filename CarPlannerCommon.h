@@ -38,6 +38,9 @@
 #define dout(str)
 #endif
 
+#define DBG 0
+#define ROS_DBG(...) if(DBG) std::cout<<"DBG ";  if(DBG) ROS_INFO(__VA_ARGS__)
+
 //#define CAR_HEIGHT_OFFSET 0.06
 #define LOCALIZER_CAR_HEIGHT_OFFSET 0.02
 

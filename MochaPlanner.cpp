@@ -9,8 +9,9 @@ static bool& g_bMonotonicCost(CVarUtils::CreateGetUnsavedCVar("debug.MonotonicCo
 static bool& g_bVerbose(CVarUtils::CreateGetUnsavedCVar("debug.Verbose", false,""));
 static bool& g_bTrajectoryCost(CVarUtils::CreateGetUnsavedCVar("debug.TrajectoryCost", true,""));
 static int& g_nTrajectoryCostSegments(CVarUtils::CreateGetUnsavedCVar("debug.TrajectoryCostSegments", 10,""));
-static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.IterationLimit", 10, "");
-static double& g_dSuccessNorm = CVarUtils::CreateGetUnsavedCVar("debug.SuccessNorm",2.0);
+static int& g_nIterationLimit = CVarUtils::CreateGetUnsavedCVar("planner.IterationLimit", 100, "");
+static double& g_dSuccessNorm = CVarUtils::CreateGetUnsavedCVar("debug.SuccessNorm", 5.0);
+static double& g_dImprovementNorm = CVarUtils::CreateGetUnsavedCVar("debug.ImprovementNorm", false);
 
 
 // inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1,const Eigen::Vector6d& line2, const Eigen::Vector6d& point, double& dInterpolationFactor)
@@ -55,13 +56,13 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_dPointWeight(CVarUtils::CreateUnsavedCVar("planner.PointCostWeights",Eigen::MatrixXd(1,1))),
     m_dTrajWeight(CVarUtils::CreateUnsavedCVar("planner.TrajCostWeights",Eigen::MatrixXd(1,1))),
     m_nPlanCounter(0),
-    m_dTimeInterval(CVarUtils::CreateCVar("planner.TimeInterval", 0.05, "") ),
-    // m_actionApplyVelocities_client("vehicle/manager/apply_velocities",true),
-    // m_actionGetInertiaTensor_client("vehicle/manager/get_inertia_tensor",true),
-    m_actionSetNoDelay_client("vehicle/manager/set_no_delay",true),
-    m_actionRaycast_client("vehicle/manager/raycast",true),
-    m_actionSetState_client("vehicle/manager/set_state",true),
-    m_actionGetState_client("vehicle/manager/get_state",true),
+    m_dTimeInterval(CVarUtils::CreateCVar("planner.TimeInterval", 0.02, "") ),
+    // m_actionApplyVelocities_client("vehicle/apply_velocities",true),
+    // m_actionGetInertiaTensor_client("vehicle/get_inertia_tensor",true),
+    // m_actionSetNoDelay_client("vehicle/set_no_delay",true),
+    m_actionRaycast_client("vehicle/raycast",true),
+    m_actionSetState_client("vehicle/set_state",true),
+    m_actionGetState_client("vehicle/get_state",true),
     m_bServersInitialized(false),
     m_bSubToVehicleWp(true), 
     m_dWpLookupDuration(5.0)
@@ -150,8 +151,8 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
         // m_actionApplyVelocities_client.isServerConnected()
         // && m_actionGetControlDelay_client->isServerConnected()  
         // m_actionGetInertiaTensor_client.isServerConnected() 
-        m_actionRaycast_client.isServerConnected()
-        && m_actionSetNoDelay_client.isServerConnected(); 
+        m_actionRaycast_client.isServerConnected();
+        // && m_actionSetNoDelay_client.isServerConnected(); 
 
         // if (!m_actionApplyVelocities_client.isServerConnected()) 
         // {
@@ -169,10 +170,10 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
         {
             DLOG(INFO) << "Waiting for Raycast Server";
         }
-        if (!m_actionSetNoDelay_client.isServerConnected()) 
-        {
-            DLOG(INFO) << "Waiting for SetNoDelay Server";
-        }
+        // if (!m_actionSetNoDelay_client.isServerConnected()) 
+        // {
+        //     DLOG(INFO) << "Waiting for SetNoDelay Server";
+        // }
         
         ros::Duration(1).sleep();
     }
@@ -197,8 +198,10 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     
         {
             Sophus::SE3d pose;
-            pose.translation()[0] = 0.75;
-            pose.translation()[1] = -1.25;
+            // pose.translation()[0] = 1.75;
+            // pose.translation()[1] = -1.75;
+            pose.translation()[0] = 0;
+            pose.translation()[1] = -1;
             pose.translation()[2] = 0;
             pose.setQuaternion(Eigen::Quaterniond(0.707, 0, 0, 0.707)); // w x y z
         
@@ -211,8 +214,10 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
         }
         {
             Sophus::SE3d pose;
-            pose.translation()[0] = 1.25;
-            pose.translation()[1] = 0;
+            // pose.translation()[0] = 1.0;
+            // pose.translation()[1] = 1.75;
+            pose.translation()[0] = 0;
+            pose.translation()[1] = 1;
             pose.translation()[2] = 0;
             pose.setQuaternion(Eigen::Quaterniond(0.707, 0, 0, 0.707));
         
@@ -236,6 +241,10 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_nh.param("contact_weight",   m_dPointWeight(6), m_dPointWeight(6));
     m_nh.param("eps",              m_dEps           , m_dEps           );
     m_nh.param("dt",               m_dTimeInterval  , m_dTimeInterval  );
+    m_nh.param("iteration_limit",  g_nIterationLimit, g_nIterationLimit  );
+    m_nh.param("success_norm",     g_dSuccessNorm,    g_dSuccessNorm  );
+    m_nh.param("disable_damping",  g_bDisableDamping, g_bDisableDamping);
+    m_nh.param("improvement_norm", g_dImprovementNorm, g_dImprovementNorm);
 
     m_dynReconfig_server.setCallback(boost::bind(&MochaPlanner::dynReconfigCb, this, _1, _2));
 
@@ -267,6 +276,10 @@ void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, ui
     m_dPointWeight(6) = config.contact_weight;
     m_dEps = config.eps;
     m_dTimeInterval = config.dt;
+    g_nIterationLimit = config.iteration_limit;
+    g_dSuccessNorm = config.success_norm;
+    g_bDisableDamping = config.disable_damping;
+    g_dImprovementNorm = config.improvement_norm;
 }
 
 // virtual void MochaPlanner::onInit()
@@ -683,7 +696,7 @@ void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, ui
 //         //     str << dCurrentErrorVec.format(Eigen::IOFormat(8, 0, ", ", "; ", "[", "]")) ;
 //         //     str += " dEps " + std::to_string(dEps) ;
 //         // }
-//         // ROS_DEBUG(str);
+//         // ROS_DBG(str);
 
 //         J.col(ii) = -col;
 //         //if this term is NAN, sound the alarm
@@ -1017,32 +1030,32 @@ void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, ui
 //     return success;
 // }
 
-double MochaPlanner::GetControlDelay(int nWorldId)
-{
-    double valOut;
+// double MochaPlanner::GetControlDelay(int nWorldId)
+// {
+//     double valOut;
 
-    carplanner_msgs::GetControlDelayGoal goal;
-    carplanner_msgs::GetControlDelayResultConstPtr result;
+//     carplanner_msgs::GetControlDelayGoal goal;
+//     carplanner_msgs::GetControlDelayResultConstPtr result;
     
-    goal.worldId = nWorldId;
-    m_actionGetControlDelay_client->sendGoal(goal);
+//     goal.worldId = nWorldId;
+//     m_actionGetControlDelay_client->sendGoal(goal);
 
-    bool finished_before_timeout = m_actionGetControlDelay_client->waitForResult(ros::Duration(0.5));
-    if (finished_before_timeout)
-    {
-        actionlib::SimpleClientGoalState state = m_actionGetControlDelay_client->getState();
-        // ROS_INFO("GetControlDelay Action finished: %s", state.toString().c_str());
+//     bool finished_before_timeout = m_actionGetControlDelay_client->waitForResult(ros::Duration(0.5));
+//     if (finished_before_timeout)
+//     {
+//         actionlib::SimpleClientGoalState state = m_actionGetControlDelay_client->getState();
+//         // ROS_INFO("GetControlDelay Action finished: %s", state.toString().c_str());
 
-        result = m_actionGetControlDelay_client->getResult();
-        valOut = result->val;
-    }
-    else
-        ROS_INFO("GetControlDelay Action did not finish before the time out.");
+//         result = m_actionGetControlDelay_client->getResult();
+//         valOut = result->val;
+//     }
+//     else
+//         ROS_WARN("GetControlDelay Action did not finish before the time out.");
 
-    return valOut;
+//     return valOut;
 
-    // problem.m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::ControlDelay];
-}
+//     // problem.m_pFunctor->GetCarModel()->GetParameters(0)[CarParameters::ControlDelay];
+// }
 
 // const Eigen::Vector3d MochaPlanner::GetInertiaTensor(int nWorldId)
 // {
@@ -1070,27 +1083,27 @@ double MochaPlanner::GetControlDelay(int nWorldId)
 //     return valsOut;
 // }
 
-void MochaPlanner::SetNoDelay(bool no_delay)
-{
-    carplanner_msgs::SetNoDelayGoal goal;
-    carplanner_msgs::SetNoDelayResultConstPtr result;
+// void MochaPlanner::SetNoDelay(bool no_delay)
+// {
+//     carplanner_msgs::SetNoDelayGoal goal;
+//     carplanner_msgs::SetNoDelayResultConstPtr result;
 
-    goal.no_delay = no_delay;
-    m_actionSetNoDelay_client.sendGoal(goal);
+//     goal.no_delay = no_delay;
+//     m_actionSetNoDelay_client.sendGoal(goal);
 
-    bool finished_before_timeout = m_actionSetNoDelay_client.waitForResult(ros::Duration(0.5));
-    if (finished_before_timeout)
-    {
-        actionlib::SimpleClientGoalState state = m_actionSetNoDelay_client.getState();
-        // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
+//     bool finished_before_timeout = m_actionSetNoDelay_client.waitForResult(ros::Duration(0.5));
+//     if (finished_before_timeout)
+//     {
+//         actionlib::SimpleClientGoalState state = m_actionSetNoDelay_client.getState();
+//         // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
 
-    }
-    else
-    {
-        ROS_INFO("SetNoDelay Action did not finish before the time out.");
-    }
-    return;
-}
+//     }
+//     else
+//     {
+//         ROS_WARN("SetNoDelay Action did not finish before the time out.");
+//     }
+//     return;
+// }
 
 bool MochaPlanner::EnableTerrainPlanningSvcCb(carplanner_msgs::EnableTerrainPlanning::Request &req, carplanner_msgs::EnableTerrainPlanning::Response &res)
 {   
@@ -1160,14 +1173,14 @@ bool MochaPlanner::Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d
         }
         else
         {
-            ROS_INFO("Raycast Action failed.");
+            ROS_WARN("Raycast Action failed.");
             return false;
         }
 
     }
     else
     {
-        ROS_INFO("Raycast Action did not finish before the time out.");
+        ROS_WARN("Raycast Action did not finish before the time out.");
         return false;
     }
 }
@@ -1190,7 +1203,11 @@ void MochaPlanner::replay(float rate)
     double est_time = last_state_of_last_segment.m_dTime*(1.f/rate);
     ROS_INFO("Replaying motion trajectories at %f Hz, est time %f sec.", rate, est_time);
 
-    VehicleState origState = GetVehicleState(0);
+    // VehicleState origState;
+    // if(!GetVehicleState(0, origState))
+    // {
+    //     return;
+    // }
 
     ros::Time t0, t1;
 
@@ -1215,6 +1232,10 @@ void MochaPlanner::replay(float rate)
                 t0 = ros::Time::now();
                 
                 VehicleState stateIn = seg.m_vStates[i_motion];
+                // {int jj=0; ROS_INFO("Setting wheel %d %f %f %f", jj, stateIn.m_vWheelStates[jj].translation().x(), stateIn.m_vWheelStates[jj].translation().y(), stateIn.m_vWheelStates[jj].translation().z());}
+                // {int jj=1; ROS_INFO("Setting wheel %d %f %f %f", jj, stateIn.m_vWheelStates[jj].translation().x(), stateIn.m_vWheelStates[jj].translation().y(), stateIn.m_vWheelStates[jj].translation().z());}
+                // {int jj=2; ROS_INFO("Setting wheel %d %f %f %f", jj, stateIn.m_vWheelStates[jj].translation().x(), stateIn.m_vWheelStates[jj].translation().y(), stateIn.m_vWheelStates[jj].translation().z());}
+                // {int jj=3; ROS_INFO("Setting wheel %d %f %f %f", jj, stateIn.m_vWheelStates[jj].translation().x(), stateIn.m_vWheelStates[jj].translation().y(), stateIn.m_vWheelStates[jj].translation().z());}
                 SetVehicleState(stateIn, 0);
             
                 t1 = ros::Time::now();
@@ -1235,17 +1256,21 @@ void MochaPlanner::replay(float rate)
         }
     }
 
-    SetVehicleState(origState, 0);
+    // SetVehicleState(origState, 0);
 }
 
-VehicleState MochaPlanner::SetVehicleState(VehicleState stateIn, int worldId)
+bool MochaPlanner::SetVehicleState(VehicleState stateIn, int worldId)
 {
     carplanner_msgs::SetStateGoal goal;
     carplanner_msgs::SetStateResultConstPtr result;
-    VehicleState stateOut;
+    // VehicleState stateOut;
 
     goal.world_id = worldId;
-    goal.state_in = stateIn.toROS();
+    goal.state_in = stateIn.toROS();    
+    // {int jj=0; ROS_INFO("Setting wheel %d %f %f %f", jj, goal.state_in.wheel_poses[jj].transform.translation.x, goal.state_in.wheel_poses[jj].transform.translation.y, goal.state_in.wheel_poses[jj].transform.translation.z);}
+    // {int jj=1; ROS_INFO("Setting wheel %d %f %f %f", jj, goal.state_in.wheel_poses[jj].transform.translation.x, goal.state_in.wheel_poses[jj].transform.translation.y, goal.state_in.wheel_poses[jj].transform.translation.z);}
+    // {int jj=2; ROS_INFO("Setting wheel %d %f %f %f", jj, goal.state_in.wheel_poses[jj].transform.translation.x, goal.state_in.wheel_poses[jj].transform.translation.y, goal.state_in.wheel_poses[jj].transform.translation.z);}
+    // {int jj=3; ROS_INFO("Setting wheel %d %f %f %f", jj, goal.state_in.wheel_poses[jj].transform.translation.x, goal.state_in.wheel_poses[jj].transform.translation.y, goal.state_in.wheel_poses[jj].transform.translation.z);}
     m_actionSetState_client.sendGoal(goal);
 
     bool finished_before_timeout = m_actionSetState_client.waitForResult(ros::Duration(0.5));
@@ -1255,33 +1280,33 @@ VehicleState MochaPlanner::SetVehicleState(VehicleState stateIn, int worldId)
         // ROS_INFO("SetNoDelay Action finished: %s", state.toString().c_str());
         if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
         {
-            result = m_actionSetState_client.getResult();
-            stateOut.fromROS(result->state_out);
-            return stateOut;
+            // result = m_actionSetState_client.getResult();
+            // stateOut.fromROS(result->state_out);
+            return true;
         }
         else
         {
-            ROS_INFO("SetState Action failed.");
-            return stateOut;
+            ROS_WARN("SetState Action failed.");
+            return false;
         }
     }
     else
     {
-        ROS_INFO("SetState Action did not finish before the time out.");
-        return stateOut;
+        ROS_WARN("SetState Action did not finish before the time out.");
+        return false;
     }
 }
 
-VehicleState MochaPlanner::GetVehicleState(int worldId)
+bool MochaPlanner::GetVehicleState(VehicleState& stateOut, int worldId)
 {
     carplanner_msgs::GetStateGoal goal;
     carplanner_msgs::GetStateResultConstPtr result;
-    VehicleState stateOut;
+    // VehicleState stateOut;
 
     goal.world_id = worldId;
     m_actionGetState_client.sendGoal(goal);
 
-    bool finished_before_timeout = m_actionGetState_client.waitForResult(ros::Duration(0.5));
+    bool finished_before_timeout = m_actionGetState_client.waitForResult(ros::Duration(1.0));
     if (finished_before_timeout)
     {
         actionlib::SimpleClientGoalState state = m_actionGetState_client.getState();
@@ -1290,18 +1315,21 @@ VehicleState MochaPlanner::GetVehicleState(int worldId)
         {
             result = m_actionGetState_client.getResult();
             stateOut.fromROS(result->state_out);
-            return stateOut;
+            // return stateOut;
+            return true;
         }
         else
         {
-            ROS_INFO("GetState Action failed.");
-            return stateOut;
+            ROS_WARN("GetState Action failed.");
+            // return stateOut;
+            return false;
         }
     }
     else
     {
-        ROS_INFO("GetState Action did not finish before the time out.");
-        return stateOut;
+        ROS_WARN("GetState Action did not finish before the time out.");
+        // return stateOut;
+        return false;
     }
 }
 
@@ -1977,6 +2005,13 @@ void MochaPlanner::AddWaypoint(Waypoint& wp)
     }
 
     m_vWaypoints.push_back(wp_ptr);
+
+    ROS_INFO("Added %dth waypoint:\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
+        m_vWaypoints.size(), 
+        wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
+        wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
+        wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
+        wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
 }
 
 void MochaPlanner::SetWaypoint(int idx, Waypoint& wp)
@@ -2002,6 +2037,13 @@ void MochaPlanner::SetWaypoint(int idx, Waypoint& wp)
         // delete m_vWaypoints[idx];
     // }
     m_vWaypoints[idx] = wp_ptr;
+
+    ROS_INFO("Setting %dth waypoint to\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
+        idx+1, 
+        wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
+        wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
+        wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
+        wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
 }
 
 // m_vWaypoints.resize(2);
@@ -2227,8 +2269,6 @@ bool MochaPlanner::replan()
 
         m_vSegmentSamples.resize(m_vWaypoints.size()-1);
 
-        DLOG(INFO) << "Replanning...";
-
         boost::mutex::scoped_lock planningMutex(m_mutexPlanning);
         m_bPlanning = true;
 
@@ -2283,6 +2323,9 @@ bool MochaPlanner::replan()
                 goalState = b->state;
             }
 
+            ROS_INFO("Replanning.");
+            // ROS_INFO_NAMED("Planner","Replanning\n from %s\n to   %s", startState.toString().c_str(), goalState.toString().c_str());
+
     //                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
     //                GLWayPoint* pPrevWaypoint = &m_Gui.GetWaypoint((iSegment ==  0) ? m_Path[m_Path.size()-2] : m_Path[iSegment-1])->m_Waypoint;
     //                VehicleState prevState = VehicleState(Sophus::SE3d(pPrevWaypoint->GetPose4x4_po()),pPrevWaypoint->GetVelocity());
@@ -2309,7 +2352,7 @@ bool MochaPlanner::replan()
             // }
 
             // ApplyVelocitiesFunctor5d f(Eigen::Vector3d::Zero(), NULL);
-            SetNoDelay(true);
+            // SetNoDelay(true);
             // ApplyVelocitiesClientFunctor avf(m_nh);
             MochaProblem problem("PlanProblem", startState,goalState,m_dTimeInterval);
             problem.Initialize(0,NULL,eCostPoint);
@@ -2317,6 +2360,7 @@ bool MochaPlanner::replan()
             problem.SetPointWeights(m_dPointWeight);
             problem.SetTrajWeights(m_dTrajWeight);
             problem.m_bInertialControlActive = false;//g_bInertialControl;
+            // ROS_INFO("time interval %f", m_dTimeInterval);
             //problem.m_lPreviousCommands = previousCommands;
             
             bool success = false;
@@ -2327,7 +2371,7 @@ bool MochaPlanner::replan()
             {
                 // DLOG(INFO) << "Iteration " << std::to_string(numIterations+1);
 
-                if(numIterations+1 > g_nIterationLimit)
+                if(numIterations+1 > 100)
                 {
                     // dout("Reached iteration limit. Skipping");
                     ROS_INFO("Reached iteration limit. Skipping.");
@@ -2336,11 +2380,11 @@ bool MochaPlanner::replan()
                 else if(problem.m_CurrentSolution.m_dNorm < g_dSuccessNorm) 
                 {
                     // DLOG(INFO) << problem.m_nPlanId << ":Succeeded to plan. Norm = " << problem.m_CurrentSolution.m_dNorm;
-                    // ROS_DEBUG("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
+                    // ROS_DBG("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
                     ROS_INFO("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
                     success = true;
                 }
-                else if(fabs(this_norm - last_norm)<norm_eps)
+                else if(fabs(this_norm - last_norm)<g_dImprovementNorm)
                 {
                     ROS_INFO("Norm not improving. Skipping.");
                     success = true;
@@ -2351,7 +2395,7 @@ bool MochaPlanner::replan()
                     // m_vActualTrajectory.clear();
                     // m_vControlTrajectory.clear();
                     last_norm = this_norm;
-                    ROS_INFO("Iterating planner.");
+                    ROS_DBG("Iterating planner.");
                     double t0 = Tic();
                     success = _IteratePlanner(problem, m_vSegmentSamples[dirtySegmentId], m_vActualTrajectory, m_vControlTrajectory);
                     double t1 = Tic();
@@ -2401,14 +2445,13 @@ bool MochaPlanner::replan()
             // ROS_INFO("Best soln overall: id %d, norm %f", bestProblem.m_nPlanId, bestProblem.m_CurrentSolution.m_dNorm);
         }
         
-        ROS_INFO("Replan done.");
+        // ROS_INFO("Replan done.");
         m_bPlanning = false;
 
         // *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
 
 
         _pubPlan(m_vSegmentSamples);
-        ROS_INFO("Published new plan.");
 
         return true;
     // }
@@ -2440,7 +2483,7 @@ bool MochaPlanner::_IteratePlanner(
         if( m_bIterateGN == true ) // planner on && sim off
         {
             // run full Gauss-Newton minimization and calc best solution
-            printf("Running full sim.\n");
+            // printf("Running full sim.\n");
             res = problem.Iterate();
             if(problem.m_bInertialControlActive){
                 problem.CalculateTorqueCoefficients(problem.m_CurrentSolution.m_Sample);
@@ -2454,7 +2497,7 @@ bool MochaPlanner::_IteratePlanner(
         else
         {
             // run simulation using best solution
-            printf("Running simple sim with best solution.\n");
+            // printf("Running simple sim with best solution.\n");
             res = true;
             problem.SimulateTrajectory(sample,0,true);
             if(problem.m_bInertialControlActive)
@@ -2525,6 +2568,7 @@ void MochaPlanner::_pubPlan(std::vector<MotionSample>& path_in)
 
     m_pubPlan.publish(plan_msg);
     ros::spinOnce();
+    ROS_INFO("Published new plan.");
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
