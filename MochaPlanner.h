@@ -14,8 +14,8 @@
 #include "BulletDynamics/ConstraintSolver/btTypedConstraint.h"
 #include <sophus/se3.hpp>
 #include <sophus/se2.hpp>
-#include "CVarHelpers.h"
-#include "cvars/CVar.h"
+// #include "CVarHelpers.h"
+// #include "cvars/CVar.h"
 
 #include <nodelet/nodelet.h>
 
@@ -107,7 +107,15 @@ struct Waypoint
     }
 };
 
-void spinThread() { ros::spin(); }   
+// struct PlannerSettings
+// {
+//     ProblemSettings problem_settings;
+//     double eps; // perturbation to params during Gauss Newton
+//     double dt; // time interval of simulation
+//     double success_norm; // norm under which a plan is successful and planning ends, INF=disable
+//     double improvement_norm; // delta norm under which a plan is not improving and is thus aborted, INF=disable
+//     int iteration_limit; // number of Gauss Newton iterations after which a plan fails and is aborted, INF=disable
+// };  
 
 class MochaPlanner
 {
@@ -223,12 +231,26 @@ private:
 
     std::vector<MotionSample> m_vPotentialPaths;
     ros::Publisher m_pubPotentialPaths;
+    std::vector<double> m_vPotentialNorms;
+    ros::Publisher m_pubPotentialNorms;
     void pubPotentialPathsViz();
+    void clearPotentialPathsViz();
 
     // boost::mutex m_mutexApplyVelocitiesInfo;
     // std::vector<actionlib::GoalID> m_vApplyVelocitiesGoalIds;
     // std::vector<MotionSample*> m_vApplyVelocitiesMotionSamples;
     
+    bool g_bUseCentralDifferences = true;
+    double g_dTimeTarget = 0.0;
+    //bool& g_bUseGoalPoseStepping = CVarUtils::CreateGetCVar("debug.UseGoalPoseStepping",false);
+    bool g_bDisableDamping = false;
+    bool g_bMonotonicCost = true;
+    bool g_bVerbose = false;
+    bool g_bTrajectoryCost = true;
+    int g_nTrajectoryCostSegments = 10;
+    int g_nIterationLimit = 10;
+    double g_dSuccessNorm = 50;
+    double g_dImprovementNorm = 0.1;
 
 public:
     /// Initializes the Problem structu which is passed in using the given parameters
@@ -291,13 +313,13 @@ private:
     // Eigen::Vector6d _Transform3dGoalPose(const VehicleState& state, const Problem &problem) const;
 
     // boost::threadpool::pool m_ThreadPool;                       //< Threadpool for multitasking in jacobians and damping calculation
-    double& m_dEps;                                              //< The epsilon used in the calculation of the finite difference jacobian
+    double m_dEps;                                              //< The epsilon used in the calculation of the finite difference jacobian
 
 
     // BezierBoundarySolver m_BoundarySolver;                      //< The boundary value problem solver
 
-    Eigen::MatrixXd& m_dPointWeight;                                       //< The matrix which holds the weighted Gauss-Newton weights
-    Eigen::MatrixXd& m_dTrajWeight;
+    Eigen::MatrixXd m_dPointWeight;                                       //< The matrix which holds the weighted Gauss-Newton weights
+    Eigen::MatrixXd m_dTrajWeight;
     int m_nPlanCounter;
 };
 

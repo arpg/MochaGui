@@ -5,7 +5,7 @@
 #include "nodelet/nodelet.h"
 
 #include "CarPlannerCommon.h"
-#include "CVarHelpers.h"
+// #include "CVarHelpers.h"
 #include "MochaProblem.h"
 // #include "MochaPlanner.h"
 // #include "MochaVehicle.h"
@@ -24,17 +24,17 @@
 #define CURV_WEIGHT 0.001
 #define TILT_WEIGHT 1.5 // dRoll
 #define CONTACT_WEIGHT 0.1 
-#define BADNESS_WEIGHT 5e-8;
-#define DAMPING_STEPS 7
-#define DAMPING_DIVISOR 1.3
+// #define BADNESS_WEIGHT 5e-8;
+// #define DAMPING_STEPS 7
+// #define DAMPING_DIVISOR 1.3
 
-#define POINT_COST_ERROR_TERMS 7
-#define TRAJ_EXTRA_ERROR_TERMS 2
-#define TRAJ_UNIT_ERROR_TERMS 5
+// #define POINT_COST_ERROR_TERMS 7
+// #define TRAJ_EXTRA_ERROR_TERMS 2
+// #define TRAJ_UNIT_ERROR_TERMS 5
 
-#define OPT_ACCEL_DIM 3
-#define OPT_AGGR_DIM 4
-#define OPT_DIM 4
+// #define OPT_ACCEL_DIM 3
+// #define OPT_AGGR_DIM 4
+// #define OPT_DIM 4
 
 class ControlPlan
 {
@@ -106,13 +106,29 @@ public:
                                        int& sampleIndex,
                                        int lowerLimit = 100,
                                        int upperLimit = 100);
-    static void PrepareLookaheadTrajectory(const std::vector<MotionSample>& vSegmentSamples,
+    void PrepareLookaheadTrajectory(const std::vector<MotionSample>& vSegmentSamples,
                                            ControlPlan *pPlan, VelocityProfile &trajectoryProfile, MotionSample &trajectorySample, const double dLookaheadTime);
     static bool ApplyVelocities(const VehicleState& startState,
                                                       MotionSample& sample,
                                                       int nWorldId=0,
                                                       bool noCompensation=false,
                                                       bool noDelay=false);
+
+    bool g_bShow2DResult = false;
+    bool g_bOptimize2DOnly = false;
+    bool g_bForceZeroStartingCurvature = false;
+    double g_dMinLookaheadTime = 0.05;
+    double g_dMaxLookaheadTime = 2.0;
+    double g_dInitialLookaheadTime = 1.0;
+    double g_dMaxPlanTimeLimit = 1.0;
+    double g_dLookaheadEmaWeight = 1.0;
+    // static bool& g_bFreezeControl FreezeControl",false,""));
+    bool g_bPointCost = true;
+    bool g_bInertialControl = false;
+    bool g_bInfiniteTime = false;
+    bool g_bFrontFlip = false;
+    double g_dMaxPlanNorm = 50;
+
 private:
     ros::NodeHandle m_private_nh;
     ros::NodeHandle m_nh;
@@ -162,8 +178,8 @@ private:
     bool m_bFirstPose;
     bool m_bStillRun;
 
-    float& m_dMaxControlPlanTime;
-    float& m_dLookaheadTime; 
+    float m_dMaxControlPlanTime;
+    float m_dLookaheadTime; 
 
     boost::thread* m_pControlPlannerThread;
 
@@ -179,7 +195,7 @@ private:
 
     Eigen::Vector5d m_dLastDelta;
 
-    Eigen::MatrixXd& m_dTrajWeight;
+    Eigen::MatrixXd m_dTrajWeight;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

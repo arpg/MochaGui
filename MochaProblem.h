@@ -13,8 +13,8 @@
 #include "BezierBoundarySolver.h"
 #include <sophus/se3.hpp>
 #include <sophus/se2.hpp>
-#include "CVarHelpers.h"
-#include "cvars/CVar.h"
+// #include "CVarHelpers.h"
+// #include "cvars/CVar.h"
 
 #include <nodelet/nodelet.h>
 
@@ -60,7 +60,7 @@
 #define DAMPING_STEPS 7
 #define DAMPING_DIVISOR 1.3
 
-#define POINT_COST_ERROR_TERMS 7
+#define POINT_COST_ERROR_TERMS 8
 #define TRAJ_EXTRA_ERROR_TERMS 2
 #define TRAJ_UNIT_ERROR_TERMS 5
 
@@ -132,6 +132,26 @@ enum CostMode
 };
 
 inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1, const Eigen::Vector6d& line2, const Eigen::Vector6d& point, double &dInterpolationFactor);
+
+// struct ProblemSettings
+// {
+//     CostMode cost_mode;
+//     double x_pt_weight, 
+//            y_pt_weight, 
+//            z_pt_weight, 
+//            theta_pt_weight, 
+//            speed_pt_weight, 
+//            roll_vel_traj_weight, 
+//            pitch_vel_traj_weight, 
+//            yaw_vel_traj_weight, 
+//            contact_traj_weight, 
+//            collision_traj_weight, 
+//            time_pt_weight;
+    
+//     bool enable_damping;
+//     int num_damping_steps;
+//     double damping_divisor;
+// };  
 
 class MochaProblem
 {
@@ -215,6 +235,20 @@ public:
                                                       int nWorldId=0,
                                                       bool noCompensation=false,
                                                       bool noDelay=false);
+
+    
+    bool g_bUseCentralDifferences = true;
+    double g_dTimeTarget = 0.00;
+    // bool g_bUseGoalPoseStepping = bug.UseGoalPoseStepping",false);
+    bool g_bDisableDamping = false;
+    bool g_bMonotonicCost = true;
+    bool g_bVerbose = false;
+    bool g_bTrajectoryCost = true;
+    int g_nTrajectoryCostSegments = 10;
+    int g_nIterationLimit = 10;
+    double g_dSuccessNorm = 2.0;
+    bool bFlatten2Dcurves = false;
+
 private:
 
     bool m_bServersInitialized = false;

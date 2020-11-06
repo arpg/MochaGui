@@ -21,6 +21,7 @@
 #include <carplanner_msgs/ResetMesh.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <carplanner_msgs/SetDriveMode.h>
 
@@ -466,13 +467,15 @@ struct VehicleState
       return pose;
     }
 
-    std::vector<Eigen::Vector7d> GetWheelPoses() const
+    uint GetNumWheels() const
     {
-      std::vector<Eigen::Vector7d> poses;
+        assert(m_vWheelStates.size()==m_vWheelContacts.size());
+        return m_vWheelStates.size();
+    }
 
-      for(uint ii=0; ii<m_vWheelStates.size(); ii++)
-      {
-        Sophus::SE3d state = m_vWheelStates[ii];
+    Eigen::Vector7d GetWheelPose(uint i) const
+    {
+        Sophus::SE3d state = m_vWheelStates[i];
         Eigen::Vector3d trans = state.translation();
         Eigen::Quaterniond quat = state.unit_quaternion();
 
@@ -485,10 +488,71 @@ struct VehicleState
                 quat.z(),
                 quat.w();
 
-        poses.push_back(pose);
+      return pose;
+    }
+
+    std::vector<Eigen::Vector7d> GetWheelPoses() const
+    {
+      std::vector<Eigen::Vector7d> poses;
+
+      for(uint ii=0; ii<m_vWheelStates.size(); ii++)
+      {
+        poses.push_back(GetWheelPose(ii));
       }
 
       return poses;
+    }
+
+    Eigen::Vector7d GetWheelPoseCS(uint i) const
+    {
+        Sophus::SE3d state = m_vWheelStates[i];
+        state = m_dTwv.inverse() * state;
+        Eigen::Vector3d trans = state.translation();
+        Eigen::Quaterniond quat = state.unit_quaternion();
+
+        Eigen::Vector7d pose;
+        pose << trans[0],
+                trans[1],
+                trans[2],
+                quat.x(),
+                quat.y(),
+                quat.z(),
+                quat.w();
+
+        return pose;
+    }
+
+    std::vector<Eigen::Vector7d> GetWheelPosesCS() const
+    {
+      std::vector<Eigen::Vector7d> poses;
+
+      for(uint ii=0; ii<m_vWheelStates.size(); ii++)
+      {
+        poses.push_back(GetWheelPoseCS(ii));
+      }
+
+      return poses;
+    }
+
+    std::string GetWheelFrame(uint i) const
+    {
+        std::string frame;
+        Eigen::Vector7d pose = GetWheelPoseCS(i);
+        if (pose[0]>0)
+            frame += "front";
+        else
+            frame += "back";
+        if (pose[1]>0)
+            frame += "_left";
+        else
+            frame += "_right";
+        frame += "_wheel";
+        return frame;
+    }
+
+    bool IsWheelInContact(uint i) const
+    {
+        return m_vWheelContacts[i];
     }
 
     std::vector<bool> GetWheelContacts() const
@@ -502,6 +566,11 @@ struct VehicleState
       }
 
       return contacts;
+    }
+
+    bool IsChassisInCollision() const
+    {
+        return m_bChassisInCollision;
     }
 
     double GetCurvature() const
@@ -550,7 +619,7 @@ struct VehicleState
         state->m_dV[0]                       = odom_msg.twist.twist.linear.x;
         state->m_dV[1]                       = odom_msg.twist.twist.linear.y;
         state->m_dV[2]                       = odom_msg.twist.twist.linear.z;
-        // state->m_dV = state->m_dTwv.so3() * state->m_dV;
+        state->m_dV = state->m_dTwv.so3() * state->m_dV;
 
         // Eigen::Vector3d linvel_cs(odom_msg.twist.twist.linear.x, odom_msg.twist.twist.linear.y, odom_msg.twist.twist.linear.z);
         // Eigen::Vector3d linvel_ws = state->m_dTwv.so3() * linvel_cs;
@@ -587,6 +656,7 @@ struct VehicleState
         state.m_dV[0]                       = (state.m_dTwv.translation()[0] - last_state.m_dTwv.translation()[0])/(state.m_dTime - last_state.m_dTime);
         state.m_dV[1]                       = (state.m_dTwv.translation()[1] - last_state.m_dTwv.translation()[1])/(state.m_dTime - last_state.m_dTime);
         state.m_dV[2]                       = (state.m_dTwv.translation()[2] - last_state.m_dTwv.translation()[2])/(state.m_dTime - last_state.m_dTime);
+        // state.m_dV = state.m_dTwv.so3() * state.m_dV;
 
         Eigen::Quaterniond dq((state.m_dTwv.unit_quaternion().w() - last_state.m_dTwv.unit_quaternion().w())/(state.m_dTime - last_state.m_dTime),
                               (state.m_dTwv.unit_quaternion().x() - last_state.m_dTwv.unit_quaternion().x())/(state.m_dTime - last_state.m_dTime),
@@ -672,6 +742,8 @@ struct VehicleState
         state_msg.wheel_contacts.push_back(contact);
       }
 
+      state_msg.chassis_collision = m_bChassisInCollision;
+
       Eigen::Vector6d vels = (*this).GetVels();
       state_msg.lin_vel.x = vels[0];
       state_msg.lin_vel.y = vels[1];
@@ -718,6 +790,7 @@ struct VehicleState
         {
             m_vWheelContacts[i] = msg.wheel_contacts[i];
         }
+        m_bChassisInCollision = msg.chassis_collision;
 
         (*this).m_dV[0] = msg.lin_vel.x;
         (*this).m_dV[1] = msg.lin_vel.y;
@@ -747,6 +820,7 @@ struct VehicleState
     Sophus::SE3d m_dTwv;                     //< 4x4 matrix denoting the state of the car
     std::vector<Sophus::SE3d> m_vWheelStates;   //< 4x4 matrices which denote the pose of each wheel
     std::vector<bool> m_vWheelContacts;         //< Angular velocity of the vehicle in world coordinates
+    bool m_bChassisInCollision;
 
     Eigen::Vector3d m_dV;                       //< Linear velocity of the vehicle in world coordinates
     Eigen::Vector3d m_dW;                       //< Angular velocity of the vehicle in world coordinates
@@ -947,16 +1021,31 @@ struct MotionSample
         //         //cost += fabs(state.m_dSteering);
         //     }
         //     cost /= GetDistance();
-        // }
+        // }      
 
         for(size_t ii = 1; ii < m_vStates.size() ; ii++){
-            const VehicleState& state = m_vStates[ii];
-            Eigen::Vector3d dWCS(state.m_dW.transpose() * state.m_dTwv.rotationMatrix());
-            Eigen::Vector3d error_weights(1,.3,0); // roll pitch yaw
-            cost += error_weights.dot(dWCS);
-            // cost += fabs(state.m_dW[0]);
+            // Eigen::Vector3d error_weights(1,.25,0); // roll pitch yaw
+
+            // const VehicleState& state = m_vStates[ii];
+            Eigen::Vector3d dWCS(m_vStates[ii].m_dW.transpose() * m_vStates[ii].m_dTwv.rotationMatrix());
+            Eigen::Vector3d last_dWCS(m_vStates[ii-1].m_dW.transpose() * m_vStates[ii-1].m_dTwv.rotationMatrix());
+            // for(uint i=0; i<dWCS.size(); i++) { dWCS[i] = fabs(dWCS[i]); } 
+            // cost += error_weights.dot(dWCS);
+            cost += fabs(dWCS[0]-last_dWCS[0]);
+            // cost += dWCS[1]*0.5;
+            // cost += dWCS[0]*dWCS[0];
+
+            // Eigen::Vector3d z_proj = (m_vStates[0].m_dTwv.inverse() * state.m_dTwv).rotationMatrix().col(2);
+            // double off_up_normal = 
+            // cost += z_proj[1]*z_proj[1]; //fabs(z_proj[1]); // roll only
+            // ROS_INFO("z proj cost of %f %f %f",z_proj[0],z_proj[1],z_proj[2]);
         }
+        // ROS_INFO("total z proj %f", cost);
+
         cost /= GetDistance();
+        // cost /= m_vStates.size();
+
+        // ROS_INFO("final z proj %f", cost);
 
         return cost;
     }
@@ -979,7 +1068,7 @@ struct MotionSample
         //     cost /= GetDistance();
         // }
 
-        for(size_t ii = 1; ii < m_vStates.size() ; ii++){
+        for(size_t ii = 0; ii < m_vStates.size() ; ii++){
             const VehicleState& state = m_vStates[ii];
             // Eigen::Vector3d dWCS(state.m_dW.transpose() * state.m_dTwv.rotationMatrix());
             // Eigen::Vector3d error_weights(1,.8,.4); // roll pitch yaw
@@ -987,12 +1076,26 @@ struct MotionSample
             // cost += fabs(state.m_dW[0]);
             for(size_t jj = 0; jj < state.m_vWheelContacts.size(); jj++)
             {
-                cost += (state.m_vWheelContacts[jj] ? 0.0 : 1.0);
+                cost += (state.m_vWheelContacts[jj] ? 0.0 : 1.0/state.m_vWheelContacts.size()); // add cost normalized by num wheels
             }
         }
-        cost /= GetDistance();
+        // cost /= GetDistance();
+        cost /= m_vStates.size();
 
         return cost;
+    }
+
+    double GetCollisionCost() const
+    {
+        for(size_t ii = 0; ii < m_vStates.size() ; ii++){
+            const VehicleState& state = m_vStates[ii];
+            if (state.m_bChassisInCollision)
+            {
+                // ROS_INFO("Detected collsion at state %d", ii);
+                return 1;
+            }
+        }
+        return 0;
     }
 
     double GetDistance() const
@@ -1116,7 +1219,7 @@ public:
     tf::TransformListener m_tflistener;
     // tf2_ros::Buffer m_tfbuffer;
     // tf2_ros::TransformListener m_tflistener(m_tfbuffer);
-    ros::Publisher m_chassisMeshPub;
+    ros::Publisher m_vehiclePub;
     ros::Subscriber m_terrainMeshSub;
     bool reset_mesh_frame;
     // ros::ServiceServer m_resetmeshSrv;

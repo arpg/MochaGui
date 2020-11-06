@@ -1,6 +1,6 @@
-WheelBase,0.2720000000
-Width,0.21000000
-Height,0.130000000
+WheelBase,0.20000000
+Width,0.10000000
+Height,0.050000000
 DynamicFrictionCoef,0.166336000
 StaticSideFrictionCoef,1.353970000
 SlipCoefficient,0.000000000
@@ -10,7 +10,7 @@ WheelMass,1.0
 WheelRadius,0.1650000000
 WheelWidth,0.125000000
 TractionFriction,1000.000000000
-SuspConnectionHeight,0.095000000
+SuspConnectionHeight,-0.0000000
 Stiffness,200.000000000
 MaxSuspForce,4643.740080000
 MaxSuspTravel,0.02000000
@@ -18,12 +18,12 @@ SuspRestLength,0.0200000
 CompDamping,2.300000000
 ExpDamping,0.000000000
 RollInfluence,1.000000000
-SteeringCoef,1.500000000
+SteeringCoef,5.00000000
 MaxSteering,0.811927000
 MaxSteeringRate,13.000000000
 AccelOffset,0.469000000
 SteeringOffset,0.480091000
-StallTorqueCoef,20.102527000
+StallTorqueCoef,0.102527000
 TorqueSpeedSlope,1.363860000
 Magic_B,11.000000000
 Magic_C,0.725094000

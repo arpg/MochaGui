@@ -692,7 +692,7 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
 	// dynamic_cast<btDefaultHinge2Vehicle*>(pWorld->m_pVehicle)->spawn(pWorld->m_pDynamicsWorld);
 
     // spawn raycast vehicle
-    pWorld->m_pVehicleChassisShape = new btBoxShape(btVector3(pWorld->m_Parameters[CarParameters::WheelBase],pWorld->m_Parameters[CarParameters::Width],pWorld->m_Parameters[CarParameters::Height]));
+    pWorld->m_pVehicleChassisShape = new btBoxShape(btVector3(pWorld->m_Parameters[CarParameters::WheelBase]+pWorld->m_Parameters[CarParameters::WheelRadius],pWorld->m_Parameters[CarParameters::Width],pWorld->m_Parameters[CarParameters::Height]));
   // pWorld->m_pVehicleChassisShape = new btBoxShape(btVector3(0.5,0.7,0.7)*2);
     pWorld->m_vVehicleCollisionShapes.push_back(pWorld->m_pVehicleChassisShape);
     btTransform tr;
@@ -700,7 +700,7 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
     tr.setOrigin(btVector3(0,0,0));
     btVector3 vWheelDirectionCS0(0,0,-1); //wheel direction is z
     btVector3 vWheelAxleCS(0,-1,0); //wheel axle in y direction
-    pWorld->m_pCarChassis = _LocalAddRigidBody(pWorld,pWorld->m_Parameters[CarParameters::Mass],tr,pWorld->m_pVehicleChassisShape, COL_CAR,COL_NOTHING);//chassisShape);
+    pWorld->m_pCarChassis = _LocalAddRigidBody(pWorld,pWorld->m_Parameters[CarParameters::Mass],tr,pWorld->m_pVehicleChassisShape, COL_CAR,COL_GROUND);//chassisShape);
     pWorld->m_Tuning.m_frictionSlip = pWorld->m_Parameters[CarParameters::TractionFriction];
     pWorld->m_Tuning.m_suspensionCompression = pWorld->m_Parameters[CarParameters::CompDamping];
     pWorld->m_Tuning.m_suspensionStiffness = pWorld->m_Parameters[CarParameters::Stiffness];
@@ -714,17 +714,17 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
     pWorld->m_pDynamicsWorld->addVehicle(pWorld->m_pVehicle);
     // front right wheel
     bool bIsFrontWheel=true;
-    btVector3 connectionPointCS0(pWorld->m_Parameters[CarParameters::WheelBase]/2,-pWorld->m_Parameters[CarParameters::Width]/2+(0.3*pWorld->m_Parameters[CarParameters::WheelWidth]), -pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
+    btVector3 connectionPointCS0(pWorld->m_Parameters[CarParameters::WheelBase],-pWorld->m_Parameters[CarParameters::Width]-(0.5*pWorld->m_Parameters[CarParameters::WheelWidth]), -pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
     pWorld->m_pVehicle->addWheel(connectionPointCS0,vWheelDirectionCS0,vWheelAxleCS,pWorld->m_Parameters[CarParameters::SuspRestLength],pWorld->m_Parameters[CarParameters::WheelRadius],pWorld->m_Tuning,bIsFrontWheel);
     // front left wheel
-    connectionPointCS0 = btVector3(pWorld->m_Parameters[CarParameters::WheelBase]/2, pWorld->m_Parameters[CarParameters::Width]/2-(0.3*pWorld->m_Parameters[CarParameters::WheelWidth]),-pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
+    connectionPointCS0 = btVector3(pWorld->m_Parameters[CarParameters::WheelBase], pWorld->m_Parameters[CarParameters::Width]+(0.5*pWorld->m_Parameters[CarParameters::WheelWidth]),-pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
     pWorld->m_pVehicle->addWheel(connectionPointCS0,vWheelDirectionCS0,vWheelAxleCS,pWorld->m_Parameters[CarParameters::SuspRestLength],pWorld->m_Parameters[CarParameters::WheelRadius],pWorld->m_Tuning,bIsFrontWheel);
     // back left wheel
     bIsFrontWheel = false;
-    connectionPointCS0 = btVector3(-pWorld->m_Parameters[CarParameters::WheelBase]/2,pWorld->m_Parameters[CarParameters::Width]/2-(0.3*pWorld->m_Parameters[CarParameters::WheelWidth]), -pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
+    connectionPointCS0 = btVector3(-pWorld->m_Parameters[CarParameters::WheelBase],pWorld->m_Parameters[CarParameters::Width]+(0.5*pWorld->m_Parameters[CarParameters::WheelWidth]), -pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
     pWorld->m_pVehicle->addWheel(connectionPointCS0,vWheelDirectionCS0,vWheelAxleCS,pWorld->m_Parameters[CarParameters::SuspRestLength],pWorld->m_Parameters[CarParameters::WheelRadius],pWorld->m_Tuning,bIsFrontWheel);
     // back right wheel
-    connectionPointCS0 = btVector3(-pWorld->m_Parameters[CarParameters::WheelBase]/2,-pWorld->m_Parameters[CarParameters::Width]/2+(0.3*pWorld->m_Parameters[CarParameters::WheelWidth]), -pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
+    connectionPointCS0 = btVector3(-pWorld->m_Parameters[CarParameters::WheelBase],-pWorld->m_Parameters[CarParameters::Width]-(0.5*pWorld->m_Parameters[CarParameters::WheelWidth]), -pWorld->m_Parameters[CarParameters::SuspConnectionHeight]);
     pWorld->m_pVehicle->addWheel(connectionPointCS0,vWheelDirectionCS0,vWheelAxleCS,pWorld->m_Parameters[CarParameters::SuspRestLength],pWorld->m_Parameters[CarParameters::WheelRadius],pWorld->m_Tuning,bIsFrontWheel);
     for (size_t i=0;i<pWorld->m_pVehicle->getNumWheels();i++)
     {
@@ -781,7 +781,7 @@ void MochaVehicle::InitROS()
 
     // m_statePub = m_nh.advertise<carplanner_msgs::VehicleState>("state",1);
     m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/manager/output_terrain_mesh",1);
-    m_chassisMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/manager/output_chassis_mesh",1);
+    m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/manager/output_vehicle_shape",1);
     // m_meshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>(m_meshSubTopic, 1, boost::bind(&MochaVehicle::_meshCB, this, _1))
     // m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("input_terrain_mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
     // m_meshSub2 = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("/fake_mesh_publisher/mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
@@ -1630,6 +1630,8 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
         // ROS_INFO("New command: f %.2f p %.2f dt %f t %.2f %.2f %.2f", command.m_dForce, command.m_dPhi, command.m_dT, command.m_dTorque[0], command.m_dTorque[1], command.m_dTorque[2]);
         UpdateState(nWorldId,command,command.m_dT,noDelay);
         GetVehicleState(nWorldId,vStatesOut[iMotion-iMotionStart]);
+        // if (vStatesOut[iMotion-iMotionStart].m_bChassisInCollision)
+        //     ROS_INFO("* CHASSIS IN COLLISION *******");
         // ROS_INFO("New state: p %.2f %.2f %.2f v %.2f %.2f %.2f f %.2f %.2f %.2f", 
         //     vStatesOut[iMotion-iMotionStart].m_dTwv.translation().x(), vStatesOut[iMotion-iMotionStart].m_dTwv.translation().y(), vStatesOut[iMotion-iMotionStart].m_dTwv.translation().z(), 
         //     vStatesOut[iMotion-iMotionStart].m_dV[0], vStatesOut[iMotion-iMotionStart].m_dV[1], vStatesOut[iMotion-iMotionStart].m_dV[2],
@@ -1936,7 +1938,7 @@ void MochaVehicle::_PublisherFunc()
     while( ros::ok() )
     {
         _pubTFs(0);
-        // _pubVehicleMesh(0);
+        _pubVehicleMesh(0);
 
         // BulletWorldInstance* pWorld = GetWorldInstance(0);
         // _pubMesh(pWorld->m_pCarChassis->getCollisionShape(), &(pWorld->m_pCarChassis->getWorldTransform()), &m_chassisMeshPub);
@@ -1949,19 +1951,75 @@ void MochaVehicle::_pubVehicleMesh(uint nWorldId)
 {
     BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
     // boost::mutex::scoped_lock lock(*pWorld);
-    btCompoundShape* vehicle_shape = new btCompoundShape();
-    btTransform chassisTranWSinv = pWorld->m_pVehicle->getRigidBody()->getWorldTransform().inverse();
-    // for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
-    // {
-        // btTransform wheelTranCS = chassisTranWSinv * pWorld->m_pVehicle->getWheel(i)->getBody()->getWorldTransform();
-        // btTransform wheelTranCS = chassisTranWSinv * pWorld->m_pVehicle->getWheelTransformWS();
-        // btTransform wheelTranCS = chassisTranWSinv * pWorld->m_pVehicle->getWheelInfo(i).m_worldTransform;
-        // vehicle_shape->addChildShape(wheelTranCS, pWorld->m_pVehicle->getWheel(i)->getBody()->getCollisionShape());
-        // vehicle_shape->addChildShape(wheelTranCS, pWorld->m_pVehicle->getWheel(i)->getBody()->getWheelCollisionShape());
-        // vehicle_shape->addChildShape(wheelTranCS, pWorld->m_pVehicle->getWheel(i)->getBody()->getCollisionShape());
-    // }
-    vehicle_shape->addChildShape(btTransform(btQuaternion(0,0,0,1),btVector3(0,0,0)), pWorld->m_pVehicle->getRigidBody()->getCollisionShape());
-    _pubMesh(vehicle_shape, new btTransform(chassisTranWSinv.inverse()), &m_chassisMeshPub);
+    
+    // btCompoundShape* vehicle_shape = new btCompoundShape();
+    // btTransform chassisTranWSinv = pWorld->m_pVehicle->getRigidBody()->getWorldTransform().inverse();
+    // // for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
+    // // {
+    //     // btTransform wheelTranCS = chassisTranWSinv * pWorld->m_pVehicle->getWheel(i)->getBody()->getWorldTransform();
+    //     // btTransform wheelTranCS = chassisTranWSinv * pWorld->m_pVehicle->getWheelTransformWS();
+    //     // btTransform wheelTranCS = chassisTranWSinv * pWorld->m_pVehicle->getWheelInfo(i).m_worldTransform;
+    //     // vehicle_shape->addChildShape(wheelTranCS, pWorld->m_pVehicle->getWheel(i)->getBody()->getCollisionShape());
+    //     // vehicle_shape->addChildShape(wheelTranCS, pWorld->m_pVehicle->getWheel(i)->getBody()->getWheelCollisionShape());
+    //     // vehicle_shape->addChildShape(wheelTranCS, pWorld->m_pVehicle->getWheel(i)->getBody()->getCollisionShape());
+    // // }
+    // vehicle_shape->addChildShape(btTransform(btQuaternion(0,0,0,1),btVector3(0,0,0)), pWorld->m_pVehicle->getRigidBody()->getCollisionShape());
+    // _pubMesh(vehicle_shape, new btTransform(chassisTranWSinv.inverse()), &m_chassisMeshPub);
+    
+    visualization_msgs::MarkerArray veh_marker_array_msg;
+    // chassis
+    // Eigen::Vector7d Tchassis = pWorld->m_state.ToXYZQuat();
+    visualization_msgs::Marker chassis_marker_msg;
+    chassis_marker_msg.header.frame_id = "base_link/"+std::to_string(nWorldId);
+    chassis_marker_msg.header.stamp = ros::Time();
+    // chassis_marker_msg.ns = "chassis";
+    chassis_marker_msg.id = 0;
+    chassis_marker_msg.type = visualization_msgs::Marker::CUBE;
+    chassis_marker_msg.action = visualization_msgs::Marker::ADD;
+    chassis_marker_msg.pose.position.x    = 0; //Tchassis[0];
+    chassis_marker_msg.pose.position.y    = 0; //Tchassis[1];
+    chassis_marker_msg.pose.position.z    = 0; //Tchassis[2];
+    chassis_marker_msg.pose.orientation.x = 0; //Tchassis[3];
+    chassis_marker_msg.pose.orientation.y = 0; //Tchassis[4];
+    chassis_marker_msg.pose.orientation.z = 0; //Tchassis[5];
+    chassis_marker_msg.pose.orientation.w = 1; //Tchassis[6];
+    chassis_marker_msg.scale.x = (pWorld->m_Parameters[CarParameters::WheelBase]+pWorld->m_Parameters[CarParameters::WheelRadius])*2;
+    chassis_marker_msg.scale.y = pWorld->m_Parameters[CarParameters::Width]*2;
+    chassis_marker_msg.scale.z = pWorld->m_Parameters[CarParameters::Height]*2;
+    chassis_marker_msg.color.a = 1.0; // Don't forget to set the alpha!
+    chassis_marker_msg.color.r = (pWorld->m_state.IsChassisInCollision() ? 1.0 : 0.0);
+    chassis_marker_msg.color.g = (pWorld->m_state.IsChassisInCollision() ? 0.0 : 1.0);
+    chassis_marker_msg.color.b = 0.0;
+    veh_marker_array_msg.markers.push_back(chassis_marker_msg);
+    // wheels
+    for (uint i=0; i<pWorld->m_state.GetNumWheels(); i++)
+    {
+        // Eigen::Vector7d Twheel = pWorld->m_state.GetWheelPoseCS(i);
+        visualization_msgs::Marker wheel_marker_msg;
+        wheel_marker_msg.header.frame_id = pWorld->m_state.GetWheelFrame(i)+"/"+std::to_string(nWorldId);
+        wheel_marker_msg.header.stamp = ros::Time();
+        // wheel_marker_msg.ns = "wheel";
+        wheel_marker_msg.id = i+1;
+        wheel_marker_msg.type = visualization_msgs::Marker::CYLINDER;
+        wheel_marker_msg.action = visualization_msgs::Marker::ADD;
+        wheel_marker_msg.pose.position.x    = 0; //Twheel[0];
+        wheel_marker_msg.pose.position.y    = 0; //Twheel[1];
+        wheel_marker_msg.pose.position.z    = 0; //Twheel[2];
+        wheel_marker_msg.pose.orientation.x = 0.7; //Twheel[3];
+        wheel_marker_msg.pose.orientation.y = 0; //Twheel[4];
+        wheel_marker_msg.pose.orientation.z = 0; //Twheel[5];
+        wheel_marker_msg.pose.orientation.w = 0.7; //Twheel[6];
+        wheel_marker_msg.scale.x = pWorld->m_Parameters[CarParameters::WheelRadius]*2;
+        wheel_marker_msg.scale.y = pWorld->m_Parameters[CarParameters::WheelRadius]*2;
+        wheel_marker_msg.scale.z = pWorld->m_Parameters[CarParameters::WheelWidth];
+        wheel_marker_msg.color.a = 1.0; // Don't forget to set the alpha!
+        wheel_marker_msg.color.r = (pWorld->m_state.IsWheelInContact(i) ? 0.0 : 1.0);
+        wheel_marker_msg.color.g = 0.0;
+        wheel_marker_msg.color.b = (pWorld->m_state.IsWheelInContact(i) ? 1.0 : 0.0);
+        veh_marker_array_msg.markers.push_back(wheel_marker_msg);
+    }
+
+    m_vehiclePub.publish(veh_marker_array_msg);
     ros::spinOnce();
 }
 
@@ -2651,6 +2709,10 @@ void MochaVehicle::UpdateState(  const int& worldId,
       pWorld->m_pVehicle->getChassisWorldTransform().getOpenGLMatrix(Twv.data());
       pWorld->m_state.m_dTwv = Sophus::SE3d(Twv);
 
+      pWorld->m_state.m_bChassisInCollision = pWorld->m_pVehicle->m_bChassisInCollision;
+    //   if (pWorld->m_state.m_bChassisInCollision)
+    //     ROS_INFO("* CHASSIS IN COLLISION ****");
+
       if(pWorld->m_state.m_vWheelStates.size() != pWorld->m_pVehicle->getNumWheels()) {
         pWorld->m_state.m_vWheelStates.resize(pWorld->m_pVehicle->getNumWheels());
         pWorld->m_state.m_vWheelContacts.resize(pWorld->m_pVehicle->getNumWheels());
@@ -2671,12 +2733,12 @@ void MochaVehicle::UpdateState(  const int& worldId,
       pWorld->m_state.m_dSteering = pWorld->m_pVehicle->GetAckermanSteering();
     }
 
-    if (worldId==9)
-    {
-        _pubTFs(worldId);
-        // _pubVehicleMesh(nWorldId);
-        // _pubPreviousCommands(nWorldId);
-    }
+    // if (worldId==9)
+    // {
+    //     _pubTFs(worldId);
+    //     _pubVehicleMesh(nWorldId);
+    //     // _pubPreviousCommands(nWorldId);
+    // }
 
     // btVector3 force = pWorld->m_pVehicle->getRigidBody()->getTotalForce();
     // btVector3 force = pWorld->m_pVehicle->getRigidBody()->getWorldTransform().getRotation() * pWorld->m_pVehicle->getRigidBody()->getTotalForce();
@@ -3010,12 +3072,12 @@ void MochaVehicle::SetState( int nWorldId, VehicleState& state /* in ned */ , bo
     //     pWorld->m_pVehicle->getWheelInfo(2).m_worldTransform.getOrigin().getX(), pWorld->m_pVehicle->getWheelInfo(2).m_worldTransform.getOrigin().getY(), pWorld->m_pVehicle->getWheelInfo(2).m_worldTransform.getOrigin().getZ(),
     //     pWorld->m_pVehicle->getWheelInfo(3).m_worldTransform.getOrigin().getX(), pWorld->m_pVehicle->getWheelInfo(3).m_worldTransform.getOrigin().getY(), pWorld->m_pVehicle->getWheelInfo(3).m_worldTransform.getOrigin().getZ());
 
-    if (nWorldId==9)
-    {
-        _pubTFs(nWorldId);
-        // _pubVehicleMesh(nWorldId);
-        // _pubPreviousCommands(nWorldId);
-    }
+    // if (nWorldId==9)
+    // {
+    //     _pubTFs(nWorldId);
+    //     // _pubVehicleMesh(nWorldId);
+    //     // _pubPreviousCommands(nWorldId);
+    // }
 
     // ROS_INFO("New state: p %.2f %.2f %.2f  v %.2f %.2f %.2f  w %.2f %.2f %.2f c %s %s %s %s", 
     //     pWorld->m_state.m_dTwv.translation().x(), pWorld->m_state.m_dTwv.translation().y(), pWorld->m_state.m_dTwv.translation().z(), 

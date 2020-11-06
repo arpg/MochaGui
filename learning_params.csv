@@ -18,7 +18,7 @@ SuspRestLength,0.045000000
 CompDamping,10.000000000
 ExpDamping,0.000000000
 RollInfluence,1.000000000
-SteeringCoef,-1.200000000
+SteeringCoef,1.00000000
 MaxSteering,0.811927000
 MaxSteeringRate,13.000000000
 AccelOffset,0.469000000

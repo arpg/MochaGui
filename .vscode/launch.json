@@ -133,6 +133,37 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "Controller",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/opt/ros/melodic/lib/nodelet/nodelet",
+            "args": ["load","mochapc/MochaControllerNodelet", "mocha_manager", 
+                "__name:=mocha_controller"],
+            "logging": { "trace": true, "traceResponse": true },
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH", 
+                    "value": "/home/mike/code/mochapc/build/devel/lib"
+                },
+            ],
+            "additionalSOLibSearchPath": "/home/mike/code/mochapc/build/devel/lib",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Additional libs for gdb",
+                    "text": "set solib-search-path /home/mike/code/mochapc/build/devel/lib"
+                }
+            ]
         }
     ],
     "compounds": [

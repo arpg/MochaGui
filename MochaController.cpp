@@ -1,30 +1,15 @@
 #include "MochaController.h"
 
-static bool& g_bShow2DResult = CVarUtils::CreateGetUnsavedCVar("debug.Show2DResult",false);
-static bool& g_bOptimize2DOnly = CVarUtils::CreateGetUnsavedCVar("debug.Optimize2DOnly",false);
-static bool& g_bForceZeroStartingCurvature = CVarUtils::CreateGetUnsavedCVar("debug.ForceZeroStartingCurvature",false);
-static double& g_dMinLookaheadTime(CVarUtils::CreateGetUnsavedCVar("debug.MinLookaheadTime",(double)0.05,""));
-static double& g_dMaxLookaheadTime(CVarUtils::CreateGetUnsavedCVar("debug.MaxLookaheadTime",(double)2.0,""));
-static double& g_dInitialLookaheadTime(CVarUtils::CreateGetUnsavedCVar("debug.InitialLookaheadTime",(double)1.0,""));
-static double& g_dMaxPlanTimeLimit(CVarUtils::CreateGetUnsavedCVar("debug.MaxPlanTimeLimit",(double)1.0,""));
-static double& g_dLookaheadEmaWeight(CVarUtils::CreateGetUnsavedCVar("debug.LookaheadEmaWeight",1.0,""));
-// static bool& g_bFreezeControl(CVarUtils::CreateGetUnsavedCVar("debug.FreezeControl",false,""));
-static bool& g_bPointCost(CVarUtils::CreateGetUnsavedCVar("debug.PointCost",false,""));
-static bool& g_bInertialControl = CVarUtils::CreateGetUnsavedCVar("debug.InertialControl",false);
-static bool& g_bInfiniteTime = CVarUtils::CreateGetUnsavedCVar("debug.InfiniteTime",false);
-static bool& g_bFrontFlip = CVarUtils::CreateGetUnsavedCVar("debug.FrontFlip",false);
-static double& g_dMaxPlanNorm = CVarUtils::CreateGetUnsavedCVar("debug.MaxPlanNorm",5.0);
-
 // class MochaController;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 MochaController::MochaController(ros::NodeHandle& private_nh_, ros::NodeHandle& nh_) :
     m_private_nh(private_nh_),
     m_nh(nh_),
-    m_dTrajWeight(CVarUtils::CreateUnsavedCVar("planner.TrajCostWeights",Eigen::MatrixXd(1,1))),
+    m_dTrajWeight(Eigen::MatrixXd(1,1)),
     m_dControlRate(10),
-    m_dMaxControlPlanTime(CVarUtils::CreateGetCVar("controller.MaxControlPlanTime",(float)0.2,"")),
-    m_dLookaheadTime(CVarUtils::CreateUnsavedCVar("controller.LookaheadTime",(float)1.0,"")),
+    m_dMaxControlPlanTime(0.2),
+    m_dLookaheadTime(1.0),
     m_pControlPlannerThread(NULL),
     m_ControllerState(IDLE),
     m_dt(0.01)
@@ -896,6 +881,7 @@ void MochaController::pubCurrentCommand()
     ControlCommand command;
     double now = Tic();
     GetCurrentCommands(now, command);
+    // command.m_dT = m_dt;
     pubCommand(command);
     ROS_INFO("Published command at %f: force %f curv %f torque %f dt %f phi %f", now, command.m_dForce, command.m_dCurvature, command.m_dTorque.norm(), command.m_dT, command.m_dPhi);
 }

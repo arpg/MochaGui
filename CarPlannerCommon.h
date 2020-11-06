@@ -1,6 +1,8 @@
 #ifndef CARPLANNERCOMMON_H
 #define CARPLANNERCOMMON_H
-#define DEBUG 1
+
+// #define DEBUG 
+#define WITH_ROS 
 
 #include "Eigen/Eigen"
 #include <Eigen/Dense>
@@ -16,6 +18,10 @@
 #include <boost/format.hpp>
 #include <sophus/se3.hpp>
 
+#ifdef WITH_ROS
+#include <ros/ros.h>
+#endif
+
 
 #include "BulletDynamics/Dynamics/btDiscreteDynamicsWorld.h"
 #include "BulletDynamics/Vehicle/btVehicleRaycaster.h"
@@ -30,16 +36,20 @@
 #define SetThreadName(x) prctl(PR_SET_NAME,x,0,0,0);
 #endif
 
-#define DEBUG 1
-#ifdef DEBUG
-#define dout(str) DLOG(INFO) << __FUNCTION__ << " --  " << str
-#define dout_cond(str,x) if(x) DLOG(INFO) << __FUNCTION__ << " --  " << str
+#ifdef WITH_ROS
+    #ifdef DEBUG
+        #define ROS_DBG(...) std::cout<<"DBG ";  ROS_INFO(__VA_ARGS__)
+    #else
+        #define ROS_DBG(...) // do nothing
+    #endif
 #else
-#define dout(str)
+    #ifdef DEBUG
+        #define dout(str) DLOG(INFO) << __FUNCTION__ << " --  " << str
+        #define dout_cond(str,x) if(x) DLOG(INFO) << __FUNCTION__ << " --  " << str
+    #else
+        #define dout(str)
+    #endif
 #endif
-
-#define DBG 0
-#define ROS_DBG(...) if(DBG) std::cout<<"DBG ";  if(DBG) ROS_INFO(__VA_ARGS__)
 
 //#define CAR_HEIGHT_OFFSET 0.06
 #define LOCALIZER_CAR_HEIGHT_OFFSET 0.02
@@ -47,6 +57,11 @@
 template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
+
+#ifdef WITH_ROS
+static void spinThread() { ros::spin(); }  
+static void spinThreadOnce() { ros::spinOnce(); } 
+#endif
 
 class DefaultVehicleRaycaster : public btVehicleRaycaster
 {

@@ -18,12 +18,12 @@
 
 //static bool& g_bImuIntegrationOnly = CVarUtils::CreateUnsavedCVar("debug.ImuIntegrationOnly",false);
 
-#define DEBUG 1
-#ifdef DEBUG
-#define dout(str) std::cout << __FUNCTION__ << " --  " << str << std::endl
-#else
-#define dout(str)
-#endif
+// #define DEBUG 1
+// #ifdef DEBUG
+// #define dout(str) std::cout << __FUNCTION__ << " --  " << str << std::endl
+// #else
+// #define dout(str)
+// #endif
 
 
 namespace Eigen {

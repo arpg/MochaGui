@@ -322,6 +322,39 @@ const btTransform& RaycastVehicle::getChassisWorldTransform() const
     return getRigidBody()->getCenterOfMassTransform();
 }
 
+/////////////////////////////////////////////////////////////
+void RaycastVehicle::updateCollision(btCollisionWorld* world)
+{
+    // std::cout << "*** CHecking for collision (" << std::to_string(world->getDispatcher()->getNumManifolds()) << " manifolds) ** " << std::endl;
+    m_bChassisInCollision = false;
+	for (int i = 0; i < world->getDispatcher()->getNumManifolds(); i++)
+	{
+		btPersistentManifold* manifold = world->getDispatcher()->getManifoldByIndexInternal(i);
+		if (!manifold->getNumContacts())
+			continue;
+
+		btScalar minDist = 0.01f;
+		for (int v = 0; v < manifold->getNumContacts(); v++)
+		{
+			minDist = btMin(minDist, manifold->getContactPoint(v).getDistance());
+		}
+		if (minDist > 0.)
+			continue;
+
+        
+        // std::cout << "**** DETECte COLLISION " << std::to_string(manifold->getNumContacts()) << " ****" << std::endl;
+
+		btCollisionObject* colObj0 = (btCollisionObject*)manifold->getBody0();
+		btCollisionObject* colObj1 = (btCollisionObject*)manifold->getBody1();
+
+        if (colObj0==m_chassisBody || colObj1==m_chassisBody)
+        {
+            m_bChassisInCollision = true;
+            // std::cout << "***** CHASIS IN COLLISION ****" << std::endl;
+        }
+	}
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 void RaycastVehicle::updateVehicle( btScalar step )
 {
@@ -409,8 +442,6 @@ void RaycastVehicle::updateVehicle( btScalar step )
         wheel.m_deltaRotation *= btScalar(0.99);//damping of rotation when not in contact
 
     }
-
-
 
 }
 

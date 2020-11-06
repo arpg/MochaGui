@@ -126,10 +126,13 @@ public:
     ///btActionInterface interface
     virtual void updateAction( btCollisionWorld* collisionWorld, btScalar step)
     {
-        (void) collisionWorld;
+        // (void) collisionWorld;
+        updateCollision(collisionWorld);
         updateVehicle(step);
     }
 
+    void updateCollision(btCollisionWorld* world);
+    bool m_bChassisInCollision;
 
     ///btActionInterface interface
     void debugDraw(btIDebugDraw* debugDrawer);
