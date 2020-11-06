@@ -276,12 +276,12 @@ add_executable(  controller_standalone_nodelet MochaControllerStandaloneNodelet.
 target_link_libraries( controller_standalone_nodelet controller_nodelet )
 
 ### simulator ###
-add_executable( simulator
-  MochaSimulator.cpp
-)
-target_link_libraries( simulator
-  vehicle
-)
+#add_executable( simulator
+#  MochaSimulator.cpp
+#)
+#target_link_libraries( simulator
+#  vehicle
+#)
 
 # Generate config file for use in headers
 CONFIGURE_FILE(
