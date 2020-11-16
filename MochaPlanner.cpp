@@ -293,6 +293,7 @@ void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, ui
     g_dSuccessNorm = config.success_norm;
     g_bDisableDamping = config.disable_damping;
     g_dImprovementNorm = config.improvement_norm;
+    m_bPlanContinuously = config.plan_continuously;
 }
 
 // virtual void MochaPlanner::onInit()
