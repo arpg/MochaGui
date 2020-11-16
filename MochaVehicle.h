@@ -505,7 +505,7 @@ struct VehicleState
 
     Eigen::Vector7d GetWheelPoseCS(uint i) const
     {
-        assert(i<m_vWheelStates[i]);
+        assert(i<m_vWheelStates.size());
 
         Sophus::SE3d state = m_vWheelStates[i];
         state = m_dTwv.inverse() * state;
@@ -538,7 +538,7 @@ struct VehicleState
 
     std::string GetWheelFrame(uint i) const
     {
-        assert(i<m_vWheelStates[i]);
+        assert(i<m_vWheelStates.size());
 
         std::string frame;
         Eigen::Vector7d pose = GetWheelPoseCS(i);
