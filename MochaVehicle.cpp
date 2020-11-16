@@ -142,13 +142,14 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_actionSetState_server(m_nh, "vehicle/set_state", boost::bind(&MochaVehicle::SetStateService, this, _1), false),
     m_actionGetState_server(m_nh, "vehicle/get_state", boost::bind(&MochaVehicle::GetStateService, this, _1), false),
     m_actionUpdateState_server(m_nh, "vehicle/update_state", boost::bind(&MochaVehicle::UpdateStateService, this, _1), false),
-    m_actionGetInertiaTensor_server (m_nh, "vehicle/manager/get_inertia_tensor",  boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1), false),
+    // m_actionGetInertiaTensor_server (m_nh, "vehicle/manager/get_inertia_tensor",  boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1), false),
     // m_actionSetNoDelay_server(m_nh, "vehicle/manager/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1), false),
-    m_actionRaycast_server(m_nh, "vehicle/raycast", boost::bind(&MochaVehicle::RaycastService, this, _1), false)
+    m_actionRaycast_server(m_nh, "vehicle/raycast", boost::bind(&MochaVehicle::RaycastService, this, _1), false)//,
+    // m_dGravity(0,0,-BULLET_MODEL_GRAVITY)
 {
-    m_dGravity << 0,0,-BULLET_MODEL_GRAVITY;
-    // m_bNoDelay = true;
-    Init();
+    ROS_INFO("Vehicle constructed.");
+    // Init();
+    Initialize();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -312,6 +313,121 @@ void MochaVehicle::Init(const struct aiScene *pAIScene, CarParameterMap &paramet
     // Init(pCollisionShape, dMin, dMax, parameters, numWorlds, real);
 }
 
+void MochaVehicle::Initialize()
+{
+    InitializeParameters();
+    InitializeScene();
+    InitializeSimulations();
+    InitializeExternals();
+
+    ROS_INFO_NAMED("vehicle","Vehicle initialized.");
+}
+
+void MochaVehicle::InitializeParameters()
+{
+    ROS_INFO_NAMED("vehicle","Vehicle initializing parameters.");
+
+    m_private_nh.param("params_file", m_config.params_file, m_config.params_file);
+    m_private_nh.param("mode", (int&)m_config.mode, (int&)m_config.mode);
+    m_private_nh.param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
+    m_private_nh.param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
+    m_private_nh.param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
+    m_private_nh.param("map_frame", m_config.map_frame, m_config.map_frame);
+    m_private_nh.param("base_link_frame", m_config.base_link_frame, m_config.base_link_frame);
+    m_private_nh.param("opt_dim", m_config.opt_dim, m_config.opt_dim);
+
+    CarParameters::LoadFromFile(m_config.params_file,m_DefaultParams);
+}
+
+void MochaVehicle::InitializeScene()
+{
+    ROS_INFO_NAMED("vehicle","Vehicle initializing scene.");
+
+    // DLOG(INFO) << "Initing scene";
+    const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
+    if(!pScene)
+    {
+        ROS_ERROR("Could not import mesh.");
+        return;
+    }
+    pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+                                                        0, 1, 0, 0,
+                                                        0, 0, 1, 0,
+                                                        0, 0, 0, 1 );
+
+    // std::cout << std::endl;
+    m_vMinBounds = btVector3(DBL_MAX,DBL_MAX,DBL_MAX);
+    m_vMaxBounds = btVector3(DBL_MIN,DBL_MIN,DBL_MIN);
+    btTriangleMesh *pTriangleMesh = new btTriangleMesh();
+    /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
+    DLOG(INFO) << "Generating static hull" << std::endl;
+    MochaVehicle::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,m_vMinBounds,m_vMaxBounds);
+    /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
+    DLOG(INFO) << "Initing CollisionShape" << std::endl;
+    // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+    m_pDefaultCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+}
+
+void MochaVehicle::InitializeSimulations()
+{
+    ROS_INFO_NAMED("vehicle","Vehicle initializing simulations.");
+
+    m_nNumWorlds = GetNumWorldsRequired(m_config.opt_dim);
+    for(size_t ii = 0 ; ii < m_nNumWorlds ; ii++) {
+        BulletWorldInstance *pWorld = new BulletWorldInstance();
+        pWorld->m_nIndex = ii;
+
+        DLOG(INFO) << "Initing world " << std::to_string(ii);
+        _InitWorld(pWorld,m_pDefaultCollisionShape,m_vMinBounds,m_vMaxBounds,false);
+
+        //initialize the car
+        DLOG(INFO) << "Initing vehicle " << std::to_string(ii);
+        _InitVehicle(pWorld,m_DefaultParams);
+
+        m_vWorlds.push_back(pWorld);
+    }
+}
+
+void MochaVehicle::InitializeExternals()
+{
+    ROS_INFO_NAMED("vehicle","Vehicle initializing externals.");
+
+    m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
+    m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
+ 
+    m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
+
+    m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
+
+    m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
+
+    m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
+
+    m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
+
+    InitializeStatePublishers();
+    InitializeCommandSubscribers();
+
+    m_actionApplyVelocities_server0.start();
+    m_actionApplyVelocities_server1.start();
+    m_actionApplyVelocities_server2.start();
+    m_actionApplyVelocities_server3.start();
+    m_actionApplyVelocities_server4.start();
+    m_actionApplyVelocities_server5.start();
+    m_actionApplyVelocities_server6.start();
+    m_actionApplyVelocities_server7.start();
+    m_actionApplyVelocities_server8.start();
+    m_actionApplyVelocities_server9.start();
+
+    m_actionSetState_server.start();
+
+    m_actionUpdateState_server.start();
+
+    m_actionRaycast_server.start();
+}
+
+/////////////////////////////////
+
 void MochaVehicle::Init()
 {
   //  if ( real ) {
@@ -324,6 +440,9 @@ void MochaVehicle::Init()
     m_private_nh.param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
     m_private_nh.param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
     m_private_nh.param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
+    m_private_nh.param("map_frame", m_config.map_frame, m_config.map_frame);
+    m_private_nh.param("base_link_frame", m_config.base_link_frame, m_config.base_link_frame);
+    m_private_nh.param("opt_dim", m_config.opt_dim, m_config.opt_dim);
 
     DLOG(INFO) << "Initing scene";
     const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
@@ -332,21 +451,11 @@ void MochaVehicle::Init()
         ROS_ERROR("Could not import mesh.");
         return;
     }
-    
-    DLOG(INFO) << "Assigning target";
-    if(m_config.mode == MochaVehicle::Config::Mode::Simulation){
-        DLOG(INFO) << " to Simulation";
-        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-                                                          0, 1, 0, 0,
-                                                          0, 0, 1, 0,
-                                                          0, 0, 0, 1 );
-    }else{
-        DLOG(INFO) << " to Experiment";
-        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-                                                          0, 1, 0, 0,
-                                                          0, 0, 1, 0,
-                                                          0, 0, 0, 1 );
-    }
+    pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+                                                        0, 1, 0, 0,
+                                                        0, 0, 1, 0,
+                                                        0, 0, 0, 1 );
+
     // std::cout << std::endl;
     btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
     btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
@@ -367,8 +476,8 @@ void MochaVehicle::Init()
     // else
     //     Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
 
-    #define OPT_DIM 4
-    Init( pCollisionShape,dMin,dMax, defaultParams, GetNumWorldsRequired(OPT_DIM), false);
+    // #define OPT_DIM 4
+    Init( pCollisionShape,dMin,dMax, defaultParams, GetNumWorldsRequired(m_config.opt_dim), false);
 
     // //generate the triangle mesh
     // aiNode *pAINode = pAIScene->mRootNode;
@@ -405,7 +514,10 @@ void MochaVehicle::_InitWorld(BulletWorldInstance* pWorld, btCollisionShape *pGr
 
 
     //set the gravity vector
-    pWorld->m_pDynamicsWorld->setGravity(btVector3(0,0,-BULLET_MODEL_GRAVITY));
+    // pWorld->m_pDynamicsWorld->setGravity(btVector3(0,0,-BULLET_MODEL_GRAVITY));
+    btVector3 gravity(0,0,0);
+    gravity[pWorld->m_pVehicle->getUpAxis()] = -BULLET_MODEL_GRAVITY;
+    pWorld->m_pDynamicsWorld->setGravity(gravity);
 
     btTransform tr;
     tr.setIdentity();
@@ -763,6 +875,7 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
 	// pWorld->m_vVehicleCollisionShapes.push_back(wheelShape);
 
     pWorld->m_vehicleBackup.SaveState(pWorld->m_pVehicle);
+    SyncStateToVehicle(pWorld);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -833,7 +946,7 @@ void MochaVehicle::InitROS()
     // m_actionGetControlDelay_server->start();
 
     // m_actionGetInertiaTensor_server = new actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction>(m_nh, "plan_car/get_inertia_tensor", boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1));
-    m_actionGetInertiaTensor_server.start();
+    // m_actionGetInertiaTensor_server.start();
 
     // m_actionSetNoDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction>(m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1));
     // m_actionSetNoDelay_server.start();
@@ -942,34 +1055,34 @@ void MochaVehicle::UpdateStateService(const carplanner_msgs::UpdateStateGoalCons
 //     m_actionGetGravityCompensation_server->setSucceeded(actionGetGravityCompensation_result);
 // }
 
-void MochaVehicle::GetControlDelayService(const carplanner_msgs::GetControlDelayGoalConstPtr &goal)
-{
-    carplanner_msgs::GetControlDelayResult actionGetControlDelay_result;
+// void MochaVehicle::GetControlDelayService(const carplanner_msgs::GetControlDelayGoalConstPtr &goal)
+// {
+//     carplanner_msgs::GetControlDelayResult actionGetControlDelay_result;
 
-    // DLOG(INFO) << "GetControlDelay service called.";
+//     // DLOG(INFO) << "GetControlDelay service called.";
     
-    double val = GetParameters(goal->worldId)[CarParameters::ControlDelay];
+//     double val = GetParameters(goal->worldId)[CarParameters::ControlDelay];
 
-    actionGetControlDelay_result.val = val;
-    m_actionGetControlDelay_server->setSucceeded(actionGetControlDelay_result);
-}
+//     actionGetControlDelay_result.val = val;
+//     m_actionGetControlDelay_server->setSucceeded(actionGetControlDelay_result);
+// }
 
-void MochaVehicle::GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr &goal)
-{
-    carplanner_msgs::GetInertiaTensorResult actionGetInertiaTensor_result;
+// void MochaVehicle::GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr &goal)
+// {
+//     carplanner_msgs::GetInertiaTensorResult actionGetInertiaTensor_result;
 
-    // DLOG(INFO) << "GetInertiaTensor service called.";
+//     // DLOG(INFO) << "GetInertiaTensor service called.";
 
-    Eigen::Vector3d vals = GetVehicleInertiaTensor(goal->world_id);
-    // actionGetInertiaTensor_result.vals[0] = vals[0];
-    // actionGetInertiaTensor_result.vals[1] = vals[1];
-    // actionGetInertiaTensor_result.vals[2] = vals[2];
-    actionGetInertiaTensor_result.vals.push_back(vals[0]);
-    actionGetInertiaTensor_result.vals.push_back(vals[1]);
-    actionGetInertiaTensor_result.vals.push_back(vals[2]);
+//     Eigen::Vector3d vals = GetVehicleInertiaTensor(goal->world_id);
+//     // actionGetInertiaTensor_result.vals[0] = vals[0];
+//     // actionGetInertiaTensor_result.vals[1] = vals[1];
+//     // actionGetInertiaTensor_result.vals[2] = vals[2];
+//     actionGetInertiaTensor_result.vals.push_back(vals[0]);
+//     actionGetInertiaTensor_result.vals.push_back(vals[1]);
+//     actionGetInertiaTensor_result.vals.push_back(vals[2]);
 
-    m_actionGetInertiaTensor_server.setSucceeded(actionGetInertiaTensor_result);
-}
+//     m_actionGetInertiaTensor_server.setSucceeded(actionGetInertiaTensor_result);
+// }
 
 // void MochaVehicle::SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr &goal)
 // {
@@ -1715,7 +1828,7 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
 
       mesh_msgs::TriangleMeshStamped* mesh_stamped = new mesh_msgs::TriangleMeshStamped();
       mesh_stamped->mesh = *mesh;
-      mesh_stamped->header.frame_id = "map";
+      mesh_stamped->header.frame_id = m_config.map_frame;
       mesh_stamped->header.stamp = ros::Time::now();
 
       time_t t1 = std::clock();
@@ -1731,8 +1844,8 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
     static tf::StampedTransform Twm;
     try
     {
-        m_tflistener.waitForTransform("map", "infinitam", ros::Time::now(), ros::Duration(1.0));
-        m_tflistener.lookupTransform("map", "infinitam", ros::Time(0), Twm);
+        m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(1.0));
+        m_tflistener.lookupTransform(m_config.map_frame, "infinitam", ros::Time(0), Twm);
     }
     catch (tf::TransformException ex)
     {
@@ -1854,68 +1967,87 @@ void MochaVehicle::_pubTFs(uint nWorldId)
 
         // tform_chassis = rot_180_x*tform_chassis*rot_180_x;
 
-        tf::StampedTransform stform(tform_chassis, now, "map", "base_link/"+std::to_string(nWorldId));
+        tf::StampedTransform stform(tform_chassis, now, m_config.map_frame, m_config.base_link_frame+"/"+std::to_string(nWorldId));
         tfcaster.sendTransform(stform);
     }
-    // base_link -> front_right_wheel
-    {
-        btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-        // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(0)->getBody()->getWorldTransform(); 
-        btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(0).m_worldTransform;
-        // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[0];
-        // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
-        // ROS_INFO("Setting state %d w wheels %f %f %f", 0, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-        ros::Time now = ros::Time::now();
+    // // base_link -> front_right_wheel
+    // {
+    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
+    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(0)->getBody()->getWorldTransform(); 
+    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(0).m_worldTransform;
+    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[0];
+    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
+    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 0, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
+    //     ros::Time now = ros::Time::now();
 
-        btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-        tf::Transform tform_wheel_cs(
-            tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
-            tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
+    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
+    //     tf::Transform tform_wheel_cs(
+    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
+    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
 
-        tf::StampedTransform stform(tform_wheel_cs, now, "base_link/"+std::to_string(nWorldId), "front_right_wheel/"+std::to_string(nWorldId));
-        tfcaster.sendTransform(stform);
-    }
-    // base_link -> front_left_wheel
-    {
-        btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-        // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(1)->getBody()->getWorldTransform();  
-        btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(1).m_worldTransform;
-        // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[1];
-        // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
-        // ROS_INFO("Setting state %d w wheels %f %f %f", 1, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-        ros::Time now = ros::Time::now();
+    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(0)+"/"+std::to_string(nWorldId));
+    //     tfcaster.sendTransform(stform);
+    // }
+    // // base_link -> front_left_wheel
+    // {
+    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
+    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(1)->getBody()->getWorldTransform();  
+    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(1).m_worldTransform;
+    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[1];
+    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
+    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 1, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
+    //     ros::Time now = ros::Time::now();
 
-        btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-        tf::Transform tform_wheel_cs(
-            tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
-            tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
+    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
+    //     tf::Transform tform_wheel_cs(
+    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
+    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
 
-        tf::StampedTransform stform(tform_wheel_cs, now, "base_link/"+std::to_string(nWorldId), "front_left_wheel/"+std::to_string(nWorldId));
-        tfcaster.sendTransform(stform);
-    }
-    // base_link -> back_left_wheel
-    {
-        btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-        // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(2)->getBody()->getWorldTransform();  
-        btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(2).m_worldTransform;
-        // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[2];
-        // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
-        // ROS_INFO("Setting state %d w wheels %f %f %f", 2, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-        ros::Time now = ros::Time::now();
+    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(1)+"/"+std::to_string(nWorldId));
+    //     tfcaster.sendTransform(stform);
+    // }
+    // // base_link -> back_left_wheel
+    // {
+    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
+    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(2)->getBody()->getWorldTransform();  
+    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(2).m_worldTransform;
+    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[2];
+    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
+    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 2, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
+    //     ros::Time now = ros::Time::now();
 
-        btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-        tf::Transform tform_wheel_cs(
-            tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
-            tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
+    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
+    //     tf::Transform tform_wheel_cs(
+    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
+    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
 
-        tf::StampedTransform stform(tform_wheel_cs, now, "base_link/"+std::to_string(nWorldId), "back_left_wheel/"+std::to_string(nWorldId));
-        tfcaster.sendTransform(stform);
-    }
-    // base_link -> back_right_wheel
+    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(2)+"/"+std::to_string(nWorldId));
+    //     tfcaster.sendTransform(stform);
+    // }
+    // // base_link -> back_right_wheel
+    // {
+    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
+    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(3)->getBody()->getWorldTransform(); 
+    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(3).m_worldTransform;
+    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[3];
+    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z())); 
+    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 3, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
+    //     ros::Time now = ros::Time::now();
+
+    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
+    //     tf::Transform tform_wheel_cs(
+    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
+    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
+
+    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(3)+"/"+std::to_string(nWorldId));
+    //     tfcaster.sendTransform(stform);
+    // }
+
+    for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
     {
         btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
         // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(3)->getBody()->getWorldTransform(); 
-        btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(3).m_worldTransform;
+        btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(i).m_worldTransform;
         // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[3];
         // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z())); 
         // ROS_INFO("Setting state %d w wheels %f %f %f", 3, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
@@ -1926,9 +2058,10 @@ void MochaVehicle::_pubTFs(uint nWorldId)
             tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
             tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
 
-        tf::StampedTransform stform(tform_wheel_cs, now, "base_link/"+std::to_string(nWorldId), "back_right_wheel/"+std::to_string(nWorldId));
+        tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(i)+"/"+std::to_string(nWorldId));
         tfcaster.sendTransform(stform);
     }
+
     ros::spinOnce();
 }
 
@@ -1970,7 +2103,7 @@ void MochaVehicle::_pubVehicleMesh(uint nWorldId)
     // chassis
     // Eigen::Vector7d Tchassis = pWorld->m_state.ToXYZQuat();
     visualization_msgs::Marker chassis_marker_msg;
-    chassis_marker_msg.header.frame_id = "base_link/"+std::to_string(nWorldId);
+    chassis_marker_msg.header.frame_id = m_config.base_link_frame+"/"+std::to_string(nWorldId);
     chassis_marker_msg.header.stamp = ros::Time();
     // chassis_marker_msg.ns = "chassis";
     chassis_marker_msg.id = 0;
@@ -2702,36 +2835,37 @@ void MochaVehicle::UpdateState(  const int& worldId,
 
     // update internal variables with produce of stepSim
     //do this in a critical section
-    {
-      boost::mutex::scoped_lock lock(*pWorld);
-      //get chassis data from bullet
-      Eigen::Matrix4d Twv;
-      pWorld->m_pVehicle->getChassisWorldTransform().getOpenGLMatrix(Twv.data());
-      pWorld->m_state.m_dTwv = Sophus::SE3d(Twv);
+    // {
+    //   boost::mutex::scoped_lock lock(*pWorld);
+    //   //get chassis data from bullet
+    //   Eigen::Matrix4d Twv;
+    //   pWorld->m_pVehicle->getChassisWorldTransform().getOpenGLMatrix(Twv.data());
+    //   pWorld->m_state.m_dTwv = Sophus::SE3d(Twv);
 
-      pWorld->m_state.m_bChassisInCollision = pWorld->m_pVehicle->m_bChassisInCollision;
-    //   if (pWorld->m_state.m_bChassisInCollision)
-    //     ROS_INFO("* CHASSIS IN COLLISION ****");
+    //   pWorld->m_state.m_bChassisInCollision = pWorld->m_pVehicle->m_bChassisInCollision;
+    // //   if (pWorld->m_state.m_bChassisInCollision)
+    // //     ROS_INFO("* CHASSIS IN COLLISION ****");
 
-      if(pWorld->m_state.m_vWheelStates.size() != pWorld->m_pVehicle->getNumWheels()) {
-        pWorld->m_state.m_vWheelStates.resize(pWorld->m_pVehicle->getNumWheels());
-        pWorld->m_state.m_vWheelContacts.resize(pWorld->m_pVehicle->getNumWheels());
-      }
+    //   if(pWorld->m_state.m_vWheelStates.size() != pWorld->m_pVehicle->getNumWheels()) {
+    //     pWorld->m_state.m_vWheelStates.resize(pWorld->m_pVehicle->getNumWheels());
+    //     pWorld->m_state.m_vWheelContacts.resize(pWorld->m_pVehicle->getNumWheels());
+    //   }
 
-      for(size_t ii = 0; ii < pWorld->m_pVehicle->getNumWheels() ; ii++) {
-        //m_pVehicle->updateWheelTransform(ii,true);
-        pWorld->m_pVehicle->getWheelInfo(ii).m_worldTransform.getOpenGLMatrix(Twv.data());
-        pWorld->m_state.m_vWheelStates[ii] = Sophus::SE3d(Twv);
-        pWorld->m_state.m_vWheelContacts[ii] = pWorld->m_pVehicle->getWheelInfo(ii).m_raycastInfo.m_isInContact;
-      }
+    //   for(size_t ii = 0; ii < pWorld->m_pVehicle->getNumWheels() ; ii++) {
+    //     //m_pVehicle->updateWheelTransform(ii,true);
+    //     pWorld->m_pVehicle->getWheelInfo(ii).m_worldTransform.getOpenGLMatrix(Twv.data());
+    //     pWorld->m_state.m_vWheelStates[ii] = Sophus::SE3d(Twv);
+    //     pWorld->m_state.m_vWheelContacts[ii] = pWorld->m_pVehicle->getWheelInfo(ii).m_raycastInfo.m_isInContact;
+    //   }
 
-      //get the velocity
-      pWorld->m_state.m_dV << pWorld->m_pVehicle->getRigidBody()->getLinearVelocity()[0], pWorld->m_pVehicle->getRigidBody()->getLinearVelocity()[1], pWorld->m_pVehicle->getRigidBody()->getLinearVelocity()[2];
-      pWorld->m_state.m_dW << pWorld->m_pVehicle->getRigidBody()->getAngularVelocity()[0], pWorld->m_pVehicle->getRigidBody()->getAngularVelocity()[1], pWorld->m_pVehicle->getRigidBody()->getAngularVelocity()[2];
+    //   //get the velocity
+    //   pWorld->m_state.m_dV << pWorld->m_pVehicle->getRigidBody()->getLinearVelocity()[0], pWorld->m_pVehicle->getRigidBody()->getLinearVelocity()[1], pWorld->m_pVehicle->getRigidBody()->getLinearVelocity()[2];
+    //   pWorld->m_state.m_dW << pWorld->m_pVehicle->getRigidBody()->getAngularVelocity()[0], pWorld->m_pVehicle->getRigidBody()->getAngularVelocity()[1], pWorld->m_pVehicle->getRigidBody()->getAngularVelocity()[2];
 
-      //set the steering
-      pWorld->m_state.m_dSteering = pWorld->m_pVehicle->GetAckermanSteering();
-    }
+    //   //set the steering
+    //   pWorld->m_state.m_dSteering = pWorld->m_pVehicle->GetAckermanSteering();
+    // }
+    SyncStateToVehicle(pWorld);
 
     // if (worldId==9)
     // {
@@ -2749,6 +2883,52 @@ void MochaVehicle::UpdateState(  const int& worldId,
     //     (pWorld->m_state.m_vWheelContacts[0]?"1":"0"), (pWorld->m_state.m_vWheelContacts[1]?"1":"0"), (pWorld->m_state.m_vWheelContacts[2]?"1":"0"), (pWorld->m_state.m_vWheelContacts[3]?"1":"0"));
         // force[0], force[1], force[2]
         // pWorld->m_state.m_dSteering
+}
+
+void MochaVehicle::SyncAllStatesToVehicles()
+{
+    for (uint i=0; i<GetNumWorlds(); i++)
+    {
+        SyncStateToVehicle(i);
+    }
+}
+
+void MochaVehicle::SyncStateToVehicle(int worldId)
+{
+    BulletWorldInstance* world = GetWorldInstance(worldId);
+    SyncStateToVehicle(world);
+}
+
+void MochaVehicle::SyncStateToVehicle(BulletWorldInstance* world)
+{
+    boost::mutex::scoped_lock lock(*world);
+    //get chassis data from bullet
+    Eigen::Matrix4d Twv;
+    world->m_pVehicle->getChassisWorldTransform().getOpenGLMatrix(Twv.data());
+    world->m_state.m_dTwv = Sophus::SE3d(Twv);
+
+    world->m_state.m_bChassisInCollision = world->m_pVehicle->m_bChassisInCollision;
+//   if (world->m_state.m_bChassisInCollision)
+//     ROS_INFO("* CHASSIS IN COLLISION ****");
+
+    if(world->m_state.m_vWheelStates.size() != world->m_pVehicle->getNumWheels()) {
+    world->m_state.m_vWheelStates.resize(world->m_pVehicle->getNumWheels());
+    world->m_state.m_vWheelContacts.resize(world->m_pVehicle->getNumWheels());
+    }
+
+    for(size_t ii = 0; ii < world->m_pVehicle->getNumWheels() ; ii++) {
+    //m_pVehicle->updateWheelTransform(ii,true);
+    world->m_pVehicle->getWheelInfo(ii).m_worldTransform.getOpenGLMatrix(Twv.data());
+    world->m_state.m_vWheelStates[ii] = Sophus::SE3d(Twv);
+    world->m_state.m_vWheelContacts[ii] = world->m_pVehicle->getWheelInfo(ii).m_raycastInfo.m_isInContact;
+    }
+
+    //get the velocity
+    world->m_state.m_dV << world->m_pVehicle->getRigidBody()->getLinearVelocity()[0], world->m_pVehicle->getRigidBody()->getLinearVelocity()[1], world->m_pVehicle->getRigidBody()->getLinearVelocity()[2];
+    world->m_state.m_dW << world->m_pVehicle->getRigidBody()->getAngularVelocity()[0], world->m_pVehicle->getRigidBody()->getAngularVelocity()[1], world->m_pVehicle->getRigidBody()->getAngularVelocity()[2];
+
+    //set the steering
+    world->m_state.m_dSteering = world->m_pVehicle->GetAckermanSteering();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

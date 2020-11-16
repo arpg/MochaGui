@@ -505,6 +505,8 @@ struct VehicleState
 
     Eigen::Vector7d GetWheelPoseCS(uint i) const
     {
+        assert(i<m_vWheelStates[i]);
+
         Sophus::SE3d state = m_vWheelStates[i];
         state = m_dTwv.inverse() * state;
         Eigen::Vector3d trans = state.translation();
@@ -536,6 +538,8 @@ struct VehicleState
 
     std::string GetWheelFrame(uint i) const
     {
+        assert(i<m_vWheelStates[i]);
+
         std::string frame;
         Eigen::Vector7d pose = GetWheelPoseCS(i);
         if (pose[0]>0)
@@ -1171,7 +1175,10 @@ public:
         std::string params_file="/home/mike/code/mochagui/learning_params.csv",
             terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply",
             car_mesh_file="/home/mike/code/mochagui/herbie/herbie.blend",
-            wheel_mesh_file="/home/mike/code/mochagui/herbie/wheel.blend";
+            wheel_mesh_file="/home/mike/code/mochagui/herbie/wheel.blend",
+            map_frame="map",
+            base_link_frame="base_link";
+        int opt_dim = 4;
         enum Mode{ Simulation=0, Experiment=1 } mode=Mode::Simulation;
     } m_config;
 
@@ -1308,11 +1315,11 @@ public:
     // void GetGravityCompensationService(const carplanner_msgs::GetGravityCompensationGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>* m_actionGetGravityCompensation_server;
 
-    void GetControlDelayService(const carplanner_msgs::GetControlDelayGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_server;
+    // void GetControlDelayService(const carplanner_msgs::GetControlDelayGoalConstPtr&);
+    // actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>* m_actionGetControlDelay_server;
 
-    void GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr&);
-    actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_server;
+    // void GetInertiaTensorService(const carplanner_msgs::GetInertiaTensorGoalConstPtr&);
+    // actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction> m_actionGetInertiaTensor_server;
 
     // void SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server;
@@ -1348,14 +1355,27 @@ public:
     virtual void SetStateNoReset(BulletWorldInstance *pWorld, const Sophus::SE3d &Twv );
     BulletWorldInstance *GetWorldInstance(int id){ return m_vWorlds[id]; }
     const BulletWorldInstance *GetWorldInstance(int id) const { return m_vWorlds[id]; }
-    const int GetWorldCount() const { return m_vWorlds.size(); }
+    const int GetNumWorlds() const { return m_vWorlds.size(); }
+
+    void SyncAllStatesToVehicles();
+    void SyncStateToVehicle(int worldId);
+    void SyncStateToVehicle(BulletWorldInstance* world);
 
     double GetCorrectedSteering(double& dCurvature, int index);
     double  GetSteeringAngle(const double dcurvature, double& dCorrectedCurvature, int index, double steeringCoef /*= 1*/);
     std::vector<Sophus::SE3d> GetWheelTransforms(const int worldIndex);
 
+    CarParameterMap m_DefaultParams;
+    btCollisionShape* m_pDefaultCollisionShape;
+    btVector3 m_vMinBounds, m_vMaxBounds;
+    void Initialize();
+    void InitializeParameters();
+    void InitializeScene();
+    void InitializeSimulations();
+    void InitializeExternals();
+
     //getter functions
-    Eigen::Vector3d     GetGravity() { return m_dGravity; }
+    // Eigen::Vector3d     GetGravity() { return m_dGravity; }
     //HeightMap*          GetHeightMap() { return m_pHeightMap; }
     void                GetCommandHistory(int worldId,CommandList &previousCommandsOut);
     void                ResetCommandHistory(int worldId);
@@ -1402,7 +1422,7 @@ protected:
     // boost::thread* m_pStatePublisherThread;
     boost::thread* m_pTerrainMeshPublisherThread;
 
-    Eigen::Vector3d m_dGravity;
+    // Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;
 
     static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2; }

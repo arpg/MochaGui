@@ -124,7 +124,7 @@ public:
         std::string params_file="/home/mike/code/mochagui/learning_params.csv", 
             terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply",
             map_frame="map",
-            base_frame="base_link";
+            base_link_frame="base_link";
         enum Mode{ Simulation=0, Experiment=1 } mode=Mode::Simulation;
     } m_config;
 
@@ -143,6 +143,11 @@ private:
     ros::Publisher m_pubActualTraj;
     ros::Publisher m_pubControlTraj;
     bool m_bSubToVehicleWp;
+
+    void Init();
+    void Initialize();
+    void InitializeParameters();
+    void InitializeExternals();
 
     bool m_bServersInitialized = false;
 
@@ -190,6 +195,7 @@ private:
     // void wpPathCb(const nav_msgs::OdometryConstPtr);
     // void publishPath();
 
+    void WaitForPlannerVehicles();
 
     void waypointsCb(const carplanner_msgs::OdometryArray&);
 

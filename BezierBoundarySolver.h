@@ -12,7 +12,7 @@ struct BezierBoundaryProblem : BoundaryProblem
 {
     BezierBoundaryProblem() :
         m_bSolved(false),
-        m_dAggressiveness(1.2) { }
+        m_dAggressiveness(2.5) { }
 
     std::vector<double> m_vDistances;      //< Output: The distances alon
     Eigen::VectorXd m_xVals;            //< The x values of the control handles for the bezier curve

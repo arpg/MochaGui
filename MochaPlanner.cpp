@@ -52,10 +52,39 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_actionGetState_client("vehicle/get_state",true),
     m_bServersInitialized(false),
     m_bSubToVehicleWp(true), 
-    m_dWpLookupDuration(5.0)
+    m_dWpLookupDuration(5.0),
+    m_bPlanContinuously(false)
 {
+    Init();
+    // Initialize();
+
+    if (!m_bPlanContinuously)
+        replan();
+}
+
+MochaPlanner::~MochaPlanner()
+{
+    // if(m_pPlannerThread) {
+    //     m_pPlannerThread->join();
+    // }
+    // delete m_pPlannerThread;
+    // m_pPlannerThread = 0 ;
+}
+
+void MochaPlanner::Initialize()
+{
+    InitializeParameters();
+    InitializeExternals();
+
+    ROS_INFO_NAMED("planner","Planner initialized.");   
+}
+
+void MochaPlanner::Init()
+{
+    ROS_INFO_NAMED("planner","Planner initializing parameters.");
+
     m_private_nh.param("map_frame", m_config.map_frame, m_config.map_frame);
-    m_private_nh.param("base_frame", m_config.base_frame, m_config.base_frame);
+    m_private_nh.param("base_link_frame", m_config.base_link_frame, m_config.base_link_frame);
     m_private_nh.param("params_file", m_config.params_file, m_config.params_file);
     m_private_nh.param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
 
@@ -89,6 +118,8 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     // m_dTrajWeight(6) = CURV_WEIGHT;
     // //m_dTrajWeight(7) = BADNESS_WEIGHT;
 
+
+    ROS_INFO_NAMED("planner","Planner initializing empty waypoints.");
     {
         boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
         m_vWaypoints.clear();
@@ -157,6 +188,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_nh.param("success_norm",     g_dSuccessNorm,    g_dSuccessNorm  );
     m_nh.param("disable_damping",  g_bDisableDamping, g_bDisableDamping);
     m_nh.param("improvement_norm", g_dImprovementNorm, g_dImprovementNorm);
+    m_nh.param("plan_continuously", m_bPlanContinuously, m_bPlanContinuously);
 
     m_dynReconfig_server.setCallback(boost::bind(&MochaPlanner::dynReconfigCb, this, _1, _2));
 
@@ -199,11 +231,11 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_srvEnableTerrainPlanning_server = m_nh.advertiseService("planner/enable_terrain_planning", &MochaPlanner::EnableTerrainPlanningSvcCb, this);
 
     m_timerPlanningLoop = m_private_nh.createTimer(ros::Duration(1.0), &MochaPlanner::PlanningLoopFunc, this);
-    m_bPlanContinuously = false;
     m_srvEnableContinuousPlanning_server = m_nh.advertiseService("planner/enable_continuous_planning", &MochaPlanner::EnableContinuousPlanningSvcCb, this);
 
     m_srvReplay_server = m_nh.advertiseService("planner/replay", &MochaPlanner::ReplaySvcCb, this);
 
+    ROS_INFO_NAMED("planner","Planner waiting for Raycast server.");
     m_actionRaycast_client.waitForServer();
     // while( !m_bServersInitialized && ros::ok()) 
     // {
@@ -238,20 +270,9 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     //     ros::Duration(1).sleep();
     // }
 
+    // WaitForPlannerVehicles();
 
-    ROS_INFO("Initialized.");   
-
-    if (!m_bPlanContinuously)
-        replan();
-}
-
-MochaPlanner::~MochaPlanner()
-{
-    // if(m_pPlannerThread) {
-    //     m_pPlannerThread->join();
-    // }
-    // delete m_pPlannerThread;
-    // m_pPlannerThread = 0 ;
+    ROS_INFO_NAMED("planner","Planner initialized.");   
 }
 
 void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, uint32_t level)
@@ -1097,6 +1118,11 @@ void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, ui
 //     return;
 // }
 
+void MochaPlanner::WaitForPlannerVehicles()
+{
+    usleep(5e6);
+}
+
 bool MochaPlanner::EnableTerrainPlanningSvcCb(carplanner_msgs::EnableTerrainPlanning::Request &req, carplanner_msgs::EnableTerrainPlanning::Response &res)
 {   
     DLOG(INFO) << "EnableTerrainPlanning service called.";
@@ -1865,8 +1891,8 @@ void MochaPlanner::vehicleWpLookupFunc(const ros::TimerEvent& event)
     tf::StampedTransform this_tf;
     try
     {
-        tflistener.waitForTransform(m_config.map_frame, m_config.base_frame, ros::Time::now(), ros::Duration(1.0));
-        tflistener.lookupTransform(m_config.map_frame, m_config.base_frame, ros::Time(0), this_tf);
+        tflistener.waitForTransform(m_config.map_frame, m_config.base_link_frame, ros::Time::now(), ros::Duration(1.0));
+        tflistener.lookupTransform(m_config.map_frame, m_config.base_link_frame, ros::Time(0), this_tf);
     }
     catch (tf2::TransformException ex)
     {
@@ -2316,7 +2342,7 @@ bool MochaPlanner::replan()
             }
 
             ROS_INFO("Replanning.");
-            // ROS_INFO_NAMED("Planner","Replanning\n from %s\n to   %s", startState.toString().c_str(), goalState.toString().c_str());
+            // ROS_INFO_NAMED("planner","Replanning\n from %s\n to   %s", startState.toString().c_str(), goalState.toString().c_str());
 
     //                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
     //                GLWayPoint* pPrevWaypoint = &m_Gui.GetWaypoint((iSegment ==  0) ? m_Path[m_Path.size()-2] : m_Path[iSegment-1])->m_Waypoint;
@@ -2410,6 +2436,16 @@ bool MochaPlanner::replan()
                         t1-t0, 
                         m_vSegmentSamples[dirtySegmentId].m_vStates.size(),
                         (t1-t0)/m_vSegmentSamples[dirtySegmentId].m_vStates.size());
+                    // ROS_INFO("segSoln is w norm %f", finalNorm);
+                    // for (uint i=0; i<m_vSegmentSamples[dirtySegmentId].m_vStates.size(); i+=5)
+                    // {
+                    //     ROS_INFO("  %d %f %f %f %f %f", i, 
+                    //             m_vSegmentSamples[dirtySegmentId].m_vStates[i].ToXYZQuat()[0],
+                    //             m_vSegmentSamples[dirtySegmentId].m_vStates[i].ToXYZQuat()[1],
+                    //             m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dForce,
+                    //             m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dPhi,
+                    //             m_vSegmentSamples[dirtySegmentId].m_vCommands[i].m_dCurvature);
+                    // }
                     this_norm = finalNorm;
                 }
 
@@ -2626,9 +2662,9 @@ void MochaPlanner::pubPotentialPathsViz()
         normviz_msg.markers[i].pose.position.y += offset[1];
         normviz_msg.markers[i].pose.position.z += offset[2];
         normviz_msg.markers[i].scale.z = 0.1;
-        normviz_msg.markers[i].color.r = 1.0;
-        normviz_msg.markers[i].color.g = 1.0;
-        normviz_msg.markers[i].color.b = 1.0;
+        normviz_msg.markers[i].color.r = 0.8;
+        normviz_msg.markers[i].color.g = 0.8;
+        normviz_msg.markers[i].color.b = 0.8;
         normviz_msg.markers[i].color.a = 1.0;
         normviz_msg.markers[i].text = std::to_string(m_vPotentialNorms[i]);
         normviz_msg.markers[i].action = visualization_msgs::Marker::ADD;
@@ -2673,7 +2709,7 @@ void MochaPlanner::_pubPlan(std::vector<MotionSample>& path_in)
 /////////////////////////////////////////////////////////////////////////////////////////////
 void MochaPlanner::_pubWaypoints(std::vector<Waypoint*>& pts)
 {
-    if (pts.empty()) { pts.empty(); }
+    if (pts.empty()) { return; }
     // tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
 
     geometry_msgs::PoseArray pts_msg;
