@@ -2608,14 +2608,14 @@ void MochaPlanner::pubPotentialPathsViz()
         m_pubPotentialPaths.publish(pathviz_msg);
         visualization_msgs::MarkerArray normviz_msg;
         normviz_msg.markers.resize(1);
-        normviz_msg.markers[0].header.frame_id = "map";
+        normviz_msg.markers[0].header.frame_id = m_config.map_frame;
         normviz_msg.markers[0].action = visualization_msgs::Marker::DELETE;
         m_pubPotentialNorms.publish(normviz_msg);
         return;
     }
 
     visualization_msgs::MarkerArray pathviz_msg;
-    convertSomePath2LineStripArrayMsg(m_vPotentialPaths, &pathviz_msg, "map", carplanner_msgs::MarkerArrayConfig("", 0.01, 0.01, 0.01, 0.678, 0.847, 0.902, 1.0));
+    convertSomePath2LineStripArrayMsg(m_vPotentialPaths, &pathviz_msg, m_config.map_frame, carplanner_msgs::MarkerArrayConfig("", 0.01, 0.01, 0.01, 0.678, 0.847, 0.902, 1.0));
     for (uint i=0; i<pathviz_msg.markers.size(); i++)
     {
         pathviz_msg.markers[i].pose.position.x += offset[0];
@@ -2650,7 +2650,7 @@ void MochaPlanner::pubPotentialPathsViz()
     // normviz_msg.markers[i].action = visualization_msgs::Marker::DELETE;
     for (uint i=0; i<m_vPotentialPaths.size(); i++)
     {
-        normviz_msg.markers[i].header.frame_id = "map";
+        normviz_msg.markers[i].header.frame_id = m_config.map_frame;
         normviz_msg.markers[i].header.stamp = ros::Time::now();
         normviz_msg.markers[i].ns = "";
         normviz_msg.markers[i].id = i;
