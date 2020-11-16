@@ -42,8 +42,8 @@
 #include <carplanner_msgs/UpdateStateAction.h>
 // #include <carplanner_msgs/GetGravityCompensationAction.h>
 // #include <carplanner_msgs/GetFrictionCompensationAction.h>
-#include <carplanner_msgs/GetControlDelayAction.h>
-#include <carplanner_msgs/GetInertiaTensorAction.h>
+// #include <carplanner_msgs/GetControlDelayAction.h>
+// #include <carplanner_msgs/GetInertiaTensorAction.h>
 // #include <carplanner_msgs/SetNoDelayAction.h>
 #include <carplanner_msgs/RaycastAction.h>
 
