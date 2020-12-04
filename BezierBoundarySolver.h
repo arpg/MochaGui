@@ -47,6 +47,8 @@ private:
 
     static const int m_nOrder = 5; //< The order of the bezier cubic that is used to generate the control law
 
+    int g_nAggressivenessDivisor;
+
     /// This function returns the maximum curvature of an already sample bezier curve
     double _GetMaximumCurvature(const BezierBoundaryProblem* pProblem);
 

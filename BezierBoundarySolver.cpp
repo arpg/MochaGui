@@ -1,13 +1,13 @@
 #include "BezierBoundarySolver.h"
-#include "cvars/CVar.h"
+// #include "cvars/CVar.h"
 
 #define CURV_MULT 1.2
 
-static int& g_nAggressivenessDivisor(CVarUtils::CreateGetUnsavedCVar("debug.AggressivenessDivisor", 5,""));
 
 
 ///////////////////////////////////////////////////////////////////////////////
 BezierBoundarySolver::BezierBoundarySolver()
+    : g_nAggressivenessDivisor(5)
 {
 }
 
