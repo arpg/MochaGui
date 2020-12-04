@@ -244,7 +244,7 @@ btScalar RaycastVehicle::rayCast(WheelInfo& wheel)
     btVector3 rayvector = wheel.m_raycastInfo.m_wheelDirectionWS * (raylen);
     btVector3& source = wheel.m_raycastInfo.m_hardPointWS;
     wheel.m_raycastInfo.m_contactPointWS = source + rayvector;
-    source = source - rayvector;
+    source = source - rayvector; // source set to twice the raylen above the target
     const btVector3& target = wheel.m_raycastInfo.m_contactPointWS;
 
     btScalar param = btScalar(0.);
@@ -253,7 +253,68 @@ btScalar RaycastVehicle::rayCast(WheelInfo& wheel)
 
     btAssert(m_vehicleRaycaster);
 
+    // printf("\nCasting ray from source %f %f %f to target %f %f %f\n",source[0],source[1],source[2],target[0],target[1],target[2]);
+
     void* object = m_vehicleRaycaster->castRay(source,target,rayResults);
+    if (object)
+    {
+        // printf("  Hit!\n");
+    } else
+    {
+        // printf("\nRay from source %f %f %f to target %f %f %f w normal %f %f %f missed\n",source[0],source[1],source[2],target[0],target[1],target[2],-rayvector[0],-rayvector[1],-rayvector[2]);
+        
+        // Only needed if normal vector (nx, ny, nz) is not already normalized.
+        float s = 1.0f / sqrt(rayvector[0] * rayvector[0] + rayvector[1] * rayvector[1] + rayvector[2] * rayvector[2]);
+        float v3x = s * -rayvector[0];
+        float v3y = s * -rayvector[1];
+        float v3z = s * -rayvector[2];
+
+        // printf("  v3 %f %f %f\n",v3x,v3y,v3z);
+
+        // Calculate v1.
+        s = 1.0f / (v3x * v3x + v3z * v3z);
+        float v1x = s * v3z;
+        float v1y = 0.0f;
+        float v1z = s * -v3x;
+
+        // printf("  v1 %f %f %f\n",v1x,v1y,v1z);
+
+        // Calculate v2 as cross product of v3 and v1.
+        // Since v1y is 0, it could be removed from the following calculations. Keeping it for consistency.
+        float v2x = v3y * v1z - v3z * v1y;
+        float v2y = v3z * v1x - v3x * v1z;
+        float v2z = v3x * v1y - v3y * v1x;
+
+        // printf("  v2 %f %f %f\n",v2x,v2y,v2z);
+
+        float radius = 0.1;
+        float ang_res_deg = 360.0/4;
+        float deg2rad = 3.14159265/180.0;
+        btVector3 offset, new_source, new_target;
+        for (float angle_deg=0.0; angle_deg<360.0; angle_deg+=ang_res_deg)
+        {
+            float angle_rad = angle_deg*deg2rad;
+
+            // For each circle point.
+            offset[0] = radius * (v1x * cos(angle_rad) + v2x * sin(angle_rad));
+            offset[1] = radius * (v1y * cos(angle_rad) + v2y * sin(angle_rad));
+            offset[2] = radius * (v1z * cos(angle_rad) + v2z * sin(angle_rad));
+
+            new_source = source + offset;
+            new_target = new_source + rayvector;
+
+            // printf("  New ray from source %f %f %f (%f) to target %f %f %f (%f) w offset %f %f %f\n",new_source[0],new_source[1],new_source[2],(source-new_source).norm(),new_target[0],new_target[1],new_target[2],(target-new_target).norm(),offset[0],offset[1],offset[2]);
+
+            object = m_vehicleRaycaster->castRay(new_source,new_target,rayResults);
+            if(object)
+            {
+                break;
+            } else
+            {
+                // printf("  Miss :(\n");
+            }
+        }
+    }
 
     wheel.m_raycastInfo.m_groundObject = 0;
 

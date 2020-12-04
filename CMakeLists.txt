@@ -46,7 +46,7 @@ find_package( GLog REQUIRED)
 #find_package( CarPlanner REQUIRED )
 #find_package( SceneGraph REQUIRED )
 find_package( ZeroMQ REQUIRED )
-find_package( CVars REQUIRED )
+# find_package( CVars REQUIRED )
 find_package( Boost COMPONENTS ${BOOST_LIBS} REQUIRED)
 #find_package( Protobuf REQUIRED )
 find_package( Bullet REQUIRED )
@@ -108,7 +108,7 @@ set( _INCLUDE_DIRS
             ${BOOST_INCLUDE_DIR}
 	    # ${carplanner_INCLUDE_DIRS}
 	    #${CarPlanner_INCLUDE_DIRS}
-	    ${CVars_INCLUDE_DIRS}
+	    # ${CVars_INCLUDE_DIRS}
             ${ZeroMQ_INCLUDE_DIRS}
             #${PROTOBUF_INCLUDE_DIRS}
             #${SceneGraph_INCLUDE_DIRS}
@@ -135,7 +135,7 @@ set( LIBRARIES
 	       ${ZeroMQ_LIBRARIES}
          #${PROTOBUF_LIBRARIES}
                ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY}  #link in the boost libraries we want
-               ${CVars_LIBRARIES}
+              #  ${CVars_LIBRARIES}
                #nvwidgets #this is built with MochaGui. No finding is required
               #  Gamepad # this is also built with the solution
                ${assimp_LIBRARIES}
@@ -159,7 +159,7 @@ set( SHARED_HDRS
                  BezierBoundarySolver.h
                  CarPlannerCommon.h
                  CarParameters.h
-                 CVarHelpers.h
+                #  CVarHelpers.h
                  RpgUtils.h
                  MochaProblem.h
 		            mesh_conversion_tools.hpp

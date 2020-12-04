@@ -1,4 +1,4 @@
-#include "CVarHelpers.h"
+// #include "CVarHelpers.h"
 #include "MochaPlanner.h"
 
 // inline Eigen::VectorXd GetPointLineError(const Eigen::Vector6d& line1,const Eigen::Vector6d& line2, const Eigen::Vector6d& point, double& dInterpolationFactor)
@@ -55,6 +55,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_dWpLookupDuration(5.0),
     m_bPlanContinuously(false)
 {
+    ROS_INFO("Planner constructed.");
     Init();
     // Initialize();
 
@@ -1993,7 +1994,20 @@ void MochaPlanner::waypointsCb(const carplanner_msgs::OdometryArray& odom_arr_ms
         m_vWaypoints.clear();
         for(uint i=0; i<odom_arr_msg.odoms.size(); i++)
         {
-            AddWaypoint(Waypoint::OdomMsg2Waypoint(odom_arr_msg.odoms[i]));
+            float s = sqrt(odom_arr_msg.odoms[i].pose.pose.orientation.x*odom_arr_msg.odoms[i].pose.pose.orientation.x +
+                           odom_arr_msg.odoms[i].pose.pose.orientation.y*odom_arr_msg.odoms[i].pose.pose.orientation.y +
+                           odom_arr_msg.odoms[i].pose.pose.orientation.z*odom_arr_msg.odoms[i].pose.pose.orientation.z +
+                           odom_arr_msg.odoms[i].pose.pose.orientation.w*odom_arr_msg.odoms[i].pose.pose.orientation.w);
+            if (s>.1)
+            {
+                AddWaypoint(Waypoint::OdomMsg2Waypoint(odom_arr_msg.odoms[i])); 
+            }
+            else
+            {
+                ROS_ERROR("Failed to add waypoints bc of zero norm quaternion.");
+                return;
+            }
+            
         }
     }
 
@@ -2486,6 +2500,8 @@ bool MochaPlanner::replan()
 
 
         _pubPlan(m_vSegmentSamples);
+
+        // replay(4);
 
         return true;
     // }

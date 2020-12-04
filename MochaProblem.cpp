@@ -978,13 +978,13 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
             vState = VehicleState();
     }
 
-    // double t1 = Tic();
+    double t1 = Tic();
     // Eigen::VectorXd finalState = sample.m_vStates.back().ToXYZTCV();
     // Eigen::VectorXd finalParams = m_CurrentSolution.m_dOptParams;
     double minTrajTime;
     Eigen::VectorXd finalErrors = _CalculateSampleError(sample, minTrajTime);
     double finalNorm = _CalculateErrorNorm(finalErrors);
-    ROS_INFO("Simulated trajectory w %s soln for world %d w norm %f",(bUsingBestSolution ? "best" : "new"),iWorld,finalNorm);
+    ROS_INFO("Simulated trajectory w %s soln for world %d w norm %f took %fs",(bUsingBestSolution ? "best" : "new"),iWorld,finalNorm,t1-t0);
     // ROS_INFO("Simulated trajectory for world %d\n final pose [%s],\n opt params [%s],\n error [%s],\n norm %f, took %fs for %d states (%fs/state)",
     //     iWorld,
     //     convertEigenMatrix2String(finalState.transpose()).c_str(), 
@@ -994,6 +994,16 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
     //     t1-t0, 
     //     sample.m_vStates.size(),
     //     (t1-t0)/sample.m_vStates.size());
+    
+    // for (uint i=0; i<sample.m_vStates.size(); i+=5)
+    // {
+    //     ROS_INFO("  %d %f %f %f %f %f", i,
+    //         sample.m_vStates[i].ToXYZQuat()[0],
+    //         sample.m_vStates[i].ToXYZQuat()[1],
+    //         sample.m_vCommands[i].m_dForce,
+    //         sample.m_vCommands[i].m_dPhi,
+    //         sample.m_vCommands[i].m_dCurvature); 
+    // }
 
     //transform the result back
     Eigen::Vector6d dRes = _Transform3dGoalPose(vState);
@@ -1120,7 +1130,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     goal.no_delay = noDelay;
 
     double t1 = Tic();
-    ROS_DBG("Sending AV (%d) goal with %d commands", nWorldId, goal.initial_motion_sample.commands.size());
+    ROS_DBG("Problem sending AV (%d) goal with %d commands", nWorldId, goal.initial_motion_sample.commands.size());
     // while(!client.isServerConnected())
     // {
     //     ROS_WARN_THROTTLE(0.1, "AV (%d) disconnected.", nWorldId);
@@ -1149,45 +1159,9 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     float timeout(15.0);
     timeout = 0.1 * goal.initial_motion_sample.commands.size();
     bool finished_before_timeout = client.waitForResult(ros::Duration(timeout));
-    // while ( ros::ok() )
-    // {
-    //     if (client->getState()==actionlib::SimpleClientGoalState::SUCCEEDED) 
-    //     {
-    //         ROS_DBG("Got AV (%d) result. Succeeded.", nWorldId);
-    //         result = client->getResult();
-    //         sample.fromROS(result->motion_sample);
-    //         return true;
-    //     }
-    //     if (Toc(t2)>timeout)
-    //     {
-    //         ROS_ERROR("Got AV (%d) result. Did not finish before the %.1fs timeout.", nWorldId, timeout);
-    //         return false;
-    //     }
-    //     if (client->getState()==actionlib::SimpleClientGoalState::ABORTED)
-    //     {
-    //         ROS_ERROR("Got AV (%d) result. Aborted.", nWorldId);
-    //         return false;
-    //     } 
-    //     if (client->getState()==actionlib::SimpleClientGoalState::PREEMPTED)
-    //     {
-    //         ROS_ERROR("Got AV (%d) result. Preempted.", nWorldId);
-    //         return false;
-    //     } 
-    //     if (client->getState()==actionlib::SimpleClientGoalState::RECALLED)
-    //     {
-    //         ROS_ERROR("Got AV (%d) result. Recalled.", nWorldId);
-    //         return false;
-    //     } 
-    //     if (client->getState()==actionlib::SimpleClientGoalState::REJECTED)
-    //     {
-    //         ROS_ERROR("Got AV (%d) result. Rejected.", nWorldId);
-    //         return false;
-    //     } 
-    //     usleep(0.001e6);
-    // }
 
     double t3 = Tic();
-    ROS_DBG("Got goal result (%d), took %fs", nWorldId, t3-t1);
+    ROS_INFO("Got goal result (%d), took %fs", nWorldId, t3-t1);
     if (finished_before_timeout)
     {
         success = true;
@@ -1204,33 +1178,6 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
         success = false;
         ROS_ERROR("ApplyVelocities (%d) did not finish before the %fs timeout.", nWorldId, timeout);
     }
-
-    // double t4 = Tic();
-    // ROS_INFO("Result %d received at %.2fs", nWorldId, ros::Time::now().toSec());
-
-    // spin_thread.join();
-
-    // while (actionApplyVelocities_client.getState() == actionlib::SimpleClientGoalState::PENDING
-    //     || actionApplyVelocities_client.getState() == actionlib::SimpleClientGoalState::ACTIVE
-    //     )
-    // {  
-    //     DLOG(INFO) << std::to_string(goal.world_id) << ": " << actionApplyVelocities_client.getState().toString();
-    //     ros::Rate(10).sleep();
-    // }
-
-    // result = actionApplyVelocities_client.getResult();
-    // sample.fromROS(result->motion_sample);
-
-    // DLOG(INFO) << "AV done:" 
-    //     << " world " << std::to_string(goal.world_id) 
-    //     << " " << actionApplyVelocities_client.getState().toString()
-    //     // << " poseOut " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x) 
-    //     //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x)  
-    //     //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.y)
-    //     //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.z) 
-    //     ;
-
-    // ROS_INFO("ApplyVelocities for world %d %s, server wait %.2fs, goal prep %.2fs, server call %.2fs, total %.2fs", nWorldId, (success ? "succeeded" : "failed"), t1-t0, t2-t1, t3-t2, t3-t0);
 
     return success;
 }
@@ -1888,7 +1835,16 @@ bool MochaProblem::_IterateGaussNewton()
         // ROS_WARN("Local minimum detected.");
     }
 
-    ROS_INFO("bestSoln is w norm %f", m_pBestSolution->m_dNorm);
+    // ROS_INFO("bestSoln is w norm %f", m_pBestSolution->m_dNorm);
+    // for (uint i=0; i<m_pBestSolution->m_Sample.m_vStates.size(); i+=5)
+    // {
+    //     ROS_INFO("  %d %f %f %f %f %f", i,
+    //         m_pBestSolution->m_Sample.m_vStates[i].ToXYZQuat()[0],
+    //         m_pBestSolution->m_Sample.m_vStates[i].ToXYZQuat()[1],
+    //         m_pBestSolution->m_Sample.m_vCommands[i].m_dForce,
+    //         m_pBestSolution->m_Sample.m_vCommands[i].m_dPhi,
+    //         m_pBestSolution->m_Sample.m_vCommands[i].m_dCurvature); 
+    // }
     
     //m_CurrentSolution.m_Sample = newSolution.m_Sample;
 

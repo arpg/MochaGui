@@ -515,8 +515,10 @@ void MochaVehicle::_InitWorld(BulletWorldInstance* pWorld, btCollisionShape *pGr
 
     //set the gravity vector
     // pWorld->m_pDynamicsWorld->setGravity(btVector3(0,0,-BULLET_MODEL_GRAVITY));
+    // float gravity[3];
+    // gravity[CAR_UP_AXIS] = -BULLET_MODEL_GRAVITY;
     btVector3 gravity(0,0,0);
-    gravity[pWorld->m_pVehicle->getUpAxis()] = -BULLET_MODEL_GRAVITY;
+    gravity[CAR_UP_AXIS] = -BULLET_MODEL_GRAVITY;
     pWorld->m_pDynamicsWorld->setGravity(gravity);
 
     btTransform tr;
@@ -890,11 +892,11 @@ void MochaVehicle::InitROS()
     // m_private_nh.param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
 
     std::string terrain_mesh_topic;
-    m_private_nh.param("terrain_mesh_topic", terrain_mesh_topic, std::string("vehicle/manager/input_terrain_mesh"));
+    m_private_nh.param("terrain_mesh_topic", terrain_mesh_topic, std::string("vehicle/input_terrain_mesh"));
 
     // m_statePub = m_nh.advertise<carplanner_msgs::VehicleState>("state",1);
-    m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/manager/output_terrain_mesh",1);
-    m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/manager/output_vehicle_shape",1);
+    m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
+    m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
     // m_meshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>(m_meshSubTopic, 1, boost::bind(&MochaVehicle::_meshCB, this, _1))
     // m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("input_terrain_mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
     // m_meshSub2 = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("/fake_mesh_publisher/mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
@@ -1841,6 +1843,7 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
 
 void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
+    float t0 = Tic();
     static tf::StampedTransform Twm;
     try
     {
@@ -1854,29 +1857,36 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
         return;
     }
 
-    time_t t0 = std::clock();
+    // time_t t0 = std::clock();
     // ros::Time t0 = ros::Time::now();
 
     // tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
     // Twm.setData(rot_180_x*Twm);
 
+    float t1 = Tic();
+
     btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
     convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape);
 
+    float t2 = Tic();
+
     for (uint i=0; i<GetNumWorlds(); i++)
     {
-       appendMesh(i, meshShape, Twm);
+    //    appendMesh(i, meshShape, Twm);
+        replaceMesh(i, meshShape, Twm);
     }
 
-    time_t t1 = std::clock();
+    float t3 = Tic();
+
+    // time_t t1 = std::clock();
     // ros::Time t1 = ros::Time::now();
-    ROS_INFO("got mesh, %d faces, %d vertices, at time %.4fs, conv took %.2fs", 
+    ROS_INFO("Vehicle got mesh (%d faces, %d vertices), at %.4fs, tf lookup took %.4fs, conv took %.4fs, integ took %.4fs", 
       mesh_msg->mesh.triangles.size(), 
       mesh_msg->mesh.vertices.size(),  
-      ros::Time::now().toSec(), 
-      difftime(t1,t0)/CLOCKS_PER_SEC
-      // (float)t1.toSec() - (float)t0.toSec()
-      );
+      t0, 
+      t1-t0,
+      t2-t1,
+      t3-t2 );
 
 }
 
