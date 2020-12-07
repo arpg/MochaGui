@@ -937,7 +937,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
                                                  const int iWorld /*= 0*/,
                                                  const bool& bBestSolution /* = false */)
 {
-    ROS_DBG("Simulating trajectory (%d)", iWorld);
+    ROS_INFO("[Problem] Simulating trajectory (%d)", iWorld);
     double t0 = Tic();
 
     sample.Clear();
@@ -952,6 +952,9 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
         SampleAcceleration(sample.m_vCommands);
     }
 
+
+    double t1= Tic();
+
     VehicleState vState;
     if(sample.m_vCommands.size() == 0){
         vState = m_StartState;
@@ -965,7 +968,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
         // }
 
         ApplyVelocities( m_StartState, sample, iWorld, bUsingBestSolution, m_bNoDelay);
-
+        ROS_INFO("[Problem] Applied velocities (%d)",iWorld);
 
         // DLOG(INFO) << "States(" << sample.m_vStates.size() << "):";
         // for(uint i=0; i<sample.m_vStates.size(); i++) {
@@ -978,13 +981,14 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
             vState = VehicleState();
     }
 
-    double t1 = Tic();
+    double t2 = Tic();
     // Eigen::VectorXd finalState = sample.m_vStates.back().ToXYZTCV();
     // Eigen::VectorXd finalParams = m_CurrentSolution.m_dOptParams;
     double minTrajTime;
     Eigen::VectorXd finalErrors = _CalculateSampleError(sample, minTrajTime);
+    double t3 = Tic();
     double finalNorm = _CalculateErrorNorm(finalErrors);
-    ROS_INFO("Simulated trajectory w %s soln for world %d w norm %f took %fs",(bUsingBestSolution ? "best" : "new"),iWorld,finalNorm,t1-t0);
+    double t4 = Tic();
     // ROS_INFO("Simulated trajectory for world %d\n final pose [%s],\n opt params [%s],\n error [%s],\n norm %f, took %fs for %d states (%fs/state)",
     //     iWorld,
     //     convertEigenMatrix2String(finalState.transpose()).c_str(), 
@@ -1007,6 +1011,10 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
 
     //transform the result back
     Eigen::Vector6d dRes = _Transform3dGoalPose(vState);
+    double t5 = Tic();
+
+    ROS_INFO("[Problem] Simulated trajectory w %s soln for world %d w norm %f, accel took %fs, AV took %fs, error calc took %fs, norm calc took %fs, res tform took %fs",(bUsingBestSolution ? "best" : "new"),iWorld,finalNorm,t1-t0,t2-t1,t3-t2,t4-t3,t5-t4);
+
     return dRes;
 }
 
@@ -1107,9 +1115,9 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
 
     // ROS_INFO("ApplyVelocities for world %d started", nWorldId);
 
-    // ROS_INFO("Applying velocities (%d)", nWorldId);
+    ROS_INFO("[Problem] Applying velocities (%d)", nWorldId);
 
-    // double t0 = Tic();
+    double t0 = Tic();
 
     // if (nWorldId >= m_clientsApplyVelocities.size())
     // {
@@ -1130,7 +1138,8 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     goal.no_delay = noDelay;
 
     double t1 = Tic();
-    ROS_DBG("Problem sending AV (%d) goal with %d commands", nWorldId, goal.initial_motion_sample.commands.size());
+    ROS_INFO("[Problem] sending AV (%d) goal with %d commands, prep took %fs", nWorldId, goal.initial_motion_sample.commands.size(),t1-t0);
+    
     // while(!client.isServerConnected())
     // {
     //     ROS_WARN_THROTTLE(0.1, "AV (%d) disconnected.", nWorldId);
@@ -1161,7 +1170,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     bool finished_before_timeout = client.waitForResult(ros::Duration(timeout));
 
     double t3 = Tic();
-    ROS_INFO("Got goal result (%d), took %fs", nWorldId, t3-t1);
+    ROS_INFO("[Problem] got goal result (%d), took %fs", nWorldId, t3-t1);
     if (finished_before_timeout)
     {
         success = true;
@@ -1172,11 +1181,14 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
 
         result = client.getResult();
         sample.fromROS(result->motion_sample);
+        
+        double t4 = Tic();
+        ROS_INFO("[Problem] goal result conv took %fs",t4-t3);
     }
     else
     {
         success = false;
-        ROS_ERROR("ApplyVelocities (%d) did not finish before the %fs timeout.", nWorldId, timeout);
+        ROS_ERROR("[Problem] ApplyVelocities (%d) did not finish before the %fs timeout.", nWorldId, timeout);
     }
 
     return success;

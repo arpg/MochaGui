@@ -15,7 +15,7 @@ rostopic pub /planner/input_waypoints carplanner_msgs/OdometryArray "odoms:
       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   twist:
     twist:
-      linear: {x: 1.0, y: 0.0, z: 0.0}
+      linear: {x: ${15-1.0}, y: 0.0, z: 0.0}
       angular: {x: 0.0, y: 0.0, z: 0.0}
     covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -36,7 +36,7 @@ rostopic pub /planner/input_waypoints carplanner_msgs/OdometryArray "odoms:
       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   twist:
     twist:
-      linear: {x: 1.0, y: 0.0, z: 0.0}
+      linear: {x: ${15-1.0}, y: 0.0, z: 0.0}
       angular: {x: 0.0, y: 0.0, z: 0.0}
     covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,

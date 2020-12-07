@@ -147,7 +147,7 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_actionRaycast_server(m_nh, "vehicle/raycast", boost::bind(&MochaVehicle::RaycastService, this, _1), false)//,
     // m_dGravity(0,0,-BULLET_MODEL_GRAVITY)
 {
-    ROS_INFO("Vehicle constructed.");
+    ROS_INFO("[Vehicle] constructed.");
     // Init();
     Initialize();
 }
@@ -320,12 +320,12 @@ void MochaVehicle::Initialize()
     InitializeSimulations();
     InitializeExternals();
 
-    ROS_INFO_NAMED("vehicle","Vehicle initialized.");
+    ROS_INFO_NAMED("vehicle","[Vehicle] initialized.");
 }
 
 void MochaVehicle::InitializeParameters()
 {
-    ROS_INFO_NAMED("vehicle","Vehicle initializing parameters.");
+    ROS_INFO_NAMED("vehicle","[Vehicle] initializing parameters.");
 
     m_private_nh.param("params_file", m_config.params_file, m_config.params_file);
     m_private_nh.param("mode", (int&)m_config.mode, (int&)m_config.mode);
@@ -341,7 +341,7 @@ void MochaVehicle::InitializeParameters()
 
 void MochaVehicle::InitializeScene()
 {
-    ROS_INFO_NAMED("vehicle","Vehicle initializing scene.");
+    ROS_INFO_NAMED("vehicle","[Vehicle] initializing scene.");
 
     // DLOG(INFO) << "Initing scene";
     const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
@@ -370,7 +370,7 @@ void MochaVehicle::InitializeScene()
 
 void MochaVehicle::InitializeSimulations()
 {
-    ROS_INFO_NAMED("vehicle","Vehicle initializing simulations.");
+    ROS_INFO_NAMED("vehicle","[Vehicle] initializing simulations.");
 
     m_nNumWorlds = GetNumWorldsRequired(m_config.opt_dim);
     for(size_t ii = 0 ; ii < m_nNumWorlds ; ii++) {
@@ -390,7 +390,7 @@ void MochaVehicle::InitializeSimulations()
 
 void MochaVehicle::InitializeExternals()
 {
-    ROS_INFO_NAMED("vehicle","Vehicle initializing externals.");
+    ROS_INFO_NAMED("vehicle","[Vehicle] initializing externals.");
 
     m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
     m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
@@ -1591,7 +1591,7 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
                                     bool noDelay /*=false*/)
 {
     double t0 = Tic();
-    ROS_DBG("Applying velocities (%d)", nWorldId);
+    ROS_INFO("[Vehicle] applying velocities (%d)", nWorldId);
 
 /*
     Eigen::Vector3d torques;
@@ -1761,7 +1761,7 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
     }
 
     double t1 = Tic();
-    ROS_DBG("Done applying velocities (%d), took %fs", nWorldId, t1-t0);
+    ROS_INFO("[Vehicle] done applying velocities (%d), took %fs", nWorldId, t1-t0);
 }
 
 VehicleState MochaVehicle::ApplyVelocities( VehicleState& startState,
@@ -1880,7 +1880,7 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
 
     // time_t t1 = std::clock();
     // ros::Time t1 = ros::Time::now();
-    ROS_INFO("Vehicle got mesh (%d faces, %d vertices), at %.4fs, tf lookup took %.4fs, conv took %.4fs, integ took %.4fs", 
+    ROS_INFO("[Vehicle] got mesh (%d faces, %d vertices), at %.4fs, tf lookup took %.4fs, conv took %.4fs, integ took %.4fs", 
       mesh_msg->mesh.triangles.size(), 
       mesh_msg->mesh.vertices.size(),  
       t0, 

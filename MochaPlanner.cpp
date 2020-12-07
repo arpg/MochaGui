@@ -55,7 +55,7 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_dWpLookupDuration(5.0),
     m_bPlanContinuously(false)
 {
-    ROS_INFO("Planner constructed.");
+    ROS_INFO("[Planner] constructed.");
     Init();
     // Initialize();
 
@@ -77,12 +77,12 @@ void MochaPlanner::Initialize()
     InitializeParameters();
     InitializeExternals();
 
-    ROS_INFO_NAMED("planner","Planner initialized.");   
+    ROS_INFO_NAMED("planner","[Planner] initialized.");   
 }
 
 void MochaPlanner::Init()
 {
-    ROS_INFO_NAMED("planner","Planner initializing parameters.");
+    ROS_INFO_NAMED("planner","[Planner] initializing parameters.");
 
     m_private_nh.param("map_frame", m_config.map_frame, m_config.map_frame);
     m_private_nh.param("base_link_frame", m_config.base_link_frame, m_config.base_link_frame);
@@ -120,7 +120,7 @@ void MochaPlanner::Init()
     // //m_dTrajWeight(7) = BADNESS_WEIGHT;
 
 
-    ROS_INFO_NAMED("planner","Planner initializing empty waypoints.");
+    ROS_INFO_NAMED("planner","[Planner] initializing empty waypoints.");
     {
         boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
         m_vWaypoints.clear();
@@ -236,7 +236,7 @@ void MochaPlanner::Init()
 
     m_srvReplay_server = m_nh.advertiseService("planner/replay", &MochaPlanner::ReplaySvcCb, this);
 
-    ROS_INFO_NAMED("planner","Planner waiting for Raycast server.");
+    ROS_INFO_NAMED("planner","[Planner] waiting for Raycast server.");
     m_actionRaycast_client.waitForServer();
     // while( !m_bServersInitialized && ros::ok()) 
     // {
@@ -273,7 +273,7 @@ void MochaPlanner::Init()
 
     // WaitForPlannerVehicles();
 
-    ROS_INFO_NAMED("planner","Planner initialized.");   
+    ROS_INFO_NAMED("planner","[Planner] initialized.");   
 }
 
 void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, uint32_t level)
@@ -2039,12 +2039,12 @@ void MochaPlanner::AddWaypoint(Waypoint& wp)
 
     m_vWaypoints.push_back(wp_ptr);
 
-    ROS_INFO("Added %dth waypoint:\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
-        m_vWaypoints.size(), 
-        wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
-        wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
-        wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
-        wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
+    // ROS_INFO("Added %dth waypoint:\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
+    //     m_vWaypoints.size(), 
+    //     wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
+    //     wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
+    //     wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
+    //     wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
 }
 
 void MochaPlanner::SetWaypoint(int idx, Waypoint& wp)
@@ -2071,12 +2071,12 @@ void MochaPlanner::SetWaypoint(int idx, Waypoint& wp)
     // }
     m_vWaypoints[idx] = wp_ptr;
 
-    ROS_INFO("Setting %dth waypoint to\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
-        idx+1, 
-        wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
-        wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
-        wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
-        wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
+    // ROS_INFO("Setting %dth waypoint to\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
+    //     idx+1, 
+    //     wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
+    //     wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
+    //     wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
+    //     wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
 }
 
 // m_vWaypoints.resize(2);
@@ -2432,7 +2432,7 @@ bool MochaPlanner::replan()
                     double t0 = Tic();
                     success = _IteratePlanner(problem, m_vSegmentSamples[dirtySegmentId], m_vActualTrajectory, m_vControlTrajectory);
                     double t1 = Tic();
-                    // ROS_INFO("Planner %s after %dth iteration.", (success ? "succeeded" : "failed"), numIterations+1);
+                    // ROS_INFO("[Planner] %s after %dth iteration.", (success ? "succeeded" : "failed"), numIterations+1);
                     // Eigen::VectorXd finalState = m_vSegmentSamples[dirtySegmentId].m_vStates.back().ToXYZTCV();
                     // Eigen::VectorXd finalParams = problem.m_CurrentSolution.m_dOptParams;
                     // Eigen::VectorXd finalErrors = problem._CalculateSampleError(m_vSegmentSamples[dirtySegmentId]);
@@ -2440,17 +2440,24 @@ bool MochaPlanner::replan()
                     Eigen::VectorXd weights = problem._GetWeightVector();
                     Eigen::VectorXd weightedErrors = (Eigen::MatrixXd(finalErrors.asDiagonal()) * Eigen::MatrixXd(weights.asDiagonal())).diagonal();
                     double finalNorm = problem._CalculateErrorNorm(finalErrors);
-                    ROS_INFO("Segment %d planner %s after %dth iteration\n error [%s],\n weights [%s],\n weighted errors [%s], norm %f,\n took %fs for %d states (%fs/state)",
+                    ROS_INFO("Segment %d planner %s after %dth iteration took %fs for %d states (%fs/state)",
                         dirtySegmentId,
                         (success ? "succeeded" : "failed"),
                         numIterations+1,
-                        convertEigenMatrix2String(finalErrors.transpose(),4).c_str(),
-                        convertEigenMatrix2String(weights.transpose()).c_str(),
-                        convertEigenMatrix2String(weightedErrors.transpose()).c_str(),
-                        finalNorm,
                         t1-t0, 
                         m_vSegmentSamples[dirtySegmentId].m_vStates.size(),
                         (t1-t0)/m_vSegmentSamples[dirtySegmentId].m_vStates.size());
+                    // ROS_INFO("Segment %d planner %s after %dth iteration\n error [%s],\n weights [%s],\n weighted errors [%s], norm %f,\n took %fs for %d states (%fs/state)",
+                    //     dirtySegmentId,
+                    //     (success ? "succeeded" : "failed"),
+                    //     numIterations+1,
+                    //     convertEigenMatrix2String(finalErrors.transpose(),4).c_str(),
+                    //     convertEigenMatrix2String(weights.transpose()).c_str(),
+                    //     convertEigenMatrix2String(weightedErrors.transpose()).c_str(),
+                    //     finalNorm,
+                    //     t1-t0, 
+                    //     m_vSegmentSamples[dirtySegmentId].m_vStates.size(),
+                    //     (t1-t0)/m_vSegmentSamples[dirtySegmentId].m_vStates.size());
                     // ROS_INFO("segSoln is w norm %f", finalNorm);
                     // for (uint i=0; i<m_vSegmentSamples[dirtySegmentId].m_vStates.size(); i+=5)
                     // {
@@ -2605,7 +2612,7 @@ bool MochaPlanner::_IteratePlanner(
     // if (dtcur > dtmax) dtmax = dtcur;
     // ROS_INFO("Planning this iteration: %fs, max: %fs", dtcur, dtmax);
 
-    // ROS_INFO("Planner iteration %d, final pose [%s], error [%s], norm %f, simtraj took %.2fs",
+    // ROS_INFO("[Planner] iteration %d, final pose [%s], error [%s], norm %f, simtraj took %.2fs",
     //         m_index,
     //         convertEigenMatrix2String(problem.m_pBestSolution.m_Sample.m_vStates.back()->ToXYZCTV().transpose()).c_str(), 
     //         convertEigenMatrix2String(problem.m_vBestSolutionError.transpose()).c_str(),
@@ -2720,7 +2727,7 @@ void MochaPlanner::_pubPlan(std::vector<MotionSample>& path_in)
 
     m_pubPlan.publish(plan_msg);
     ros::spinOnce();
-    ROS_INFO("Published new plan.");
+    // ROS_INFO("Published new plan.");
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
