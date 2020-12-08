@@ -146,7 +146,7 @@ set( LIBRARIES
 
 include_directories( ${_INCLUDE_DIRS} )
 
-set( SHARED_HDRS 
+set( SHARED_HDRS
   # PlannerGui.h
                 #  GLBulletDebugDrawer.h
                 #  UiCommon.h
@@ -162,8 +162,8 @@ set( SHARED_HDRS
                 #  CVarHelpers.h
                  RpgUtils.h
                  MochaProblem.h
-		            mesh_conversion_tools.hpp
-                tf_conversion_tools.hpp
+		            #mesh_conversion_tools.hpp
+                #tf_conversion_tools.hpp
                 RaycastVehicle.h
                 WheelInfo.h
                  )

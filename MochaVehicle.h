@@ -27,8 +27,8 @@
 
 #include <nodelet/nodelet.h>
 
-#include "mesh_conversion_tools.hpp"
-#include "tf_conversion_tools.hpp"
+#include <carplanner_msgs/mesh_conversion_tools.hpp>
+#include <carplanner_msgs/tf_conversion_tools.hpp>
 //#include "/home/ohrad/code/mochagui/mesh_conversion_tools.hpp"
 //#include "/home/ohrad/code/mochagui/tf_conversion_tools.hpp"
 // #include <mochagui/conversion_tools.h>
@@ -72,7 +72,7 @@
 #include <boost/signals2/mutex.hpp>
 
 #include "sophus/se3.hpp"
-#include "BulletDynamics/Vehicle/btHinge2Vehicle.h"
+// #include "BulletDynamics/Vehicle/btHinge2Vehicle.h"
 
 #include <stdio.h>
 #include <chrono>
@@ -122,9 +122,9 @@
 #define MAX_CONTROL_DELAY 0.3
 
 
-struct CollisionEvent 
-{ 
-    const btCollisionObject* bodyA; 
+struct CollisionEvent
+{
+    const btCollisionObject* bodyA;
     const btCollisionObject* bodyB;
     btVector3 point;
 
@@ -1025,7 +1025,7 @@ struct MotionSample
         //         //cost += fabs(state.m_dSteering);
         //     }
         //     cost /= GetDistance();
-        // }      
+        // }
 
         for(size_t ii = 1; ii < m_vStates.size() ; ii++){
             // Eigen::Vector3d error_weights(1,.25,0); // roll pitch yaw
@@ -1033,14 +1033,14 @@ struct MotionSample
             // const VehicleState& state = m_vStates[ii];
             Eigen::Vector3d dWCS(m_vStates[ii].m_dW.transpose() * m_vStates[ii].m_dTwv.rotationMatrix());
             Eigen::Vector3d last_dWCS(m_vStates[ii-1].m_dW.transpose() * m_vStates[ii-1].m_dTwv.rotationMatrix());
-            // for(uint i=0; i<dWCS.size(); i++) { dWCS[i] = fabs(dWCS[i]); } 
+            // for(uint i=0; i<dWCS.size(); i++) { dWCS[i] = fabs(dWCS[i]); }
             // cost += error_weights.dot(dWCS);
             cost += fabs(dWCS[0]-last_dWCS[0]);
             // cost += dWCS[1]*0.5;
             // cost += dWCS[0]*dWCS[0];
 
             // Eigen::Vector3d z_proj = (m_vStates[0].m_dTwv.inverse() * state.m_dTwv).rotationMatrix().col(2);
-            // double off_up_normal = 
+            // double off_up_normal =
             // cost += z_proj[1]*z_proj[1]; //fabs(z_proj[1]); // roll only
             // ROS_INFO("z proj cost of %f %f %f",z_proj[0],z_proj[1],z_proj[2]);
         }
