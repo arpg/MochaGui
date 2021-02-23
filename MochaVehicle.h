@@ -1172,10 +1172,10 @@ class MochaVehicle
 {
 public:
     struct Config{
-        std::string params_file="/home/mike/code/mochagui/learning_params.csv",
-            terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply",
-            car_mesh_file="/home/mike/code/mochagui/herbie/herbie.blend",
-            wheel_mesh_file="/home/mike/code/mochagui/herbie/wheel.blend",
+        std::string params_file="$(find mochapc)/learning_params.csv",
+            terrain_mesh_file="$(find mochapc)/labLoop.ply",
+            car_mesh_file="$(find mochapc)/herbie/herbie.blend",
+            wheel_mesh_file="$(find mochapc)/herbie/wheel.blend",
             map_frame="map",
             base_link_frame="base_link";
         int opt_dim = 4;

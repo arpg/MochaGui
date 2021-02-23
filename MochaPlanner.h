@@ -121,8 +121,8 @@ class MochaPlanner
 {
 public:
     struct Config{
-        std::string params_file="/home/mike/code/mochagui/learning_params.csv", 
-            terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply",
+        std::string params_file="$(find mochapc)/learning_params.csv", 
+            terrain_mesh_file="$(find mochapc)/labLoop.ply",
             map_frame="map",
             base_link_frame="base_link";
         enum Mode{ Simulation=0, Experiment=1 } mode=Mode::Simulation;
