@@ -513,7 +513,8 @@ void MochaVehicle::_InitWorld(BulletWorldInstance* pWorld, btCollisionShape *pGr
     //pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_DrawAabb);
     //pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_NoDebug);
 
-
+    // Temporary fix
+    pWorld->m_pDynamicsWorld->setBroadphase(pWorld->m_pOverlappingPairCache);
     //set the gravity vector
     // pWorld->m_pDynamicsWorld->setGravity(btVector3(0,0,-BULLET_MODEL_GRAVITY));
     // float gravity[3];
