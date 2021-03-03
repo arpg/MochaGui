@@ -148,6 +148,7 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     // m_dGravity(0,0,-BULLET_MODEL_GRAVITY)
 {
     ROS_INFO("[Vehicle] constructed.");
+    DLOG(INFO) << "Constructed Vehicle";
     // Init();
     Initialize();
 }
@@ -397,11 +398,11 @@ void MochaVehicle::InitializeExternals()
  
     m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
 
-    m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
+    // m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
 
     m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
 
-    m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
+    // m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
 
     m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
 
@@ -875,7 +876,6 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
     // btCollisionShape* wheelShape = pWorld->m_pVehicle->getWheel(0)->getShape();
     // pWorld->m_vVehicleCollisionShapes.push_back(pWorld->m_pVehicleChassisShape);
 	// pWorld->m_vVehicleCollisionShapes.push_back(wheelShape);
-
     pWorld->m_vehicleBackup.SaveState(pWorld->m_pVehicle);
     SyncStateToVehicle(pWorld);
 }
@@ -1845,6 +1845,7 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
 {
     float t0 = Tic();
     static tf::StampedTransform Twm;
+    /* Temp removal
     try
     {
         m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(1.0));
@@ -1856,6 +1857,7 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
         usleep(10000);
         return;
     }
+    */
 
     // time_t t0 = std::clock();
     // ros::Time t0 = ros::Time::now();
@@ -1888,6 +1890,7 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
       t2-t1,
       t3-t2 );
 
+    DLOG(INFO) << "Mesh Callback: Address: " << mesh_msg.get();
 }
 
 void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm)

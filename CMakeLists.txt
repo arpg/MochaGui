@@ -124,7 +124,7 @@ set( _INCLUDE_DIRS
 set( LIBRARIES
                ${GLog_LIBRARIES}
                #${Node_LIBRARIES}
-	${BULLET_LIBRARIES}
+               ${BULLET_LIBRARIES}
                ${CeresSolver_LIBRARIES}
                #${SensorFusion_LIBRARIES}
                #${Pangolin_LIBRARIES}
@@ -203,6 +203,14 @@ set( LEARNING_SRC
 
 #add_executable( fake_mesh_publisher fake_mesh_publisher.cpp ${SHARED_HDRS} ${SHARED_SRC} ${catkin_INCLUDE_DIRS} )
 #target_link_libraries( fake_mesh_publisher ${LIBRARIES} ${catkin_LIBRARIES} )
+
+add_library( static_mesh_publisher_lib ${SHARED_HDRS} ${SHARED_SRC} )
+target_link_libraries( static_mesh_publisher_lib ${LIBRARIES} )
+add_library( static_mesh_publisher_nodelet StaticMeshPublisherNodelet.cpp )
+target_link_libraries( static_mesh_publisher_nodelet static_mesh_publisher_lib )       
+
+add_executable( static_mesh_publisher_standalone_nodelet StaticMeshPublisherStandaloneNodelet.cpp )
+target_link_libraries( static_mesh_publisher_standalone_nodelet static_mesh_publisher_nodelet )
 
 #add_executable( command2cmdvel Command2CmdVel.cpp ${SHARED_HDRS} ${SHARED_SRC} ${catkin_INCLUDE_DIRS} )
 #target_link_libraries( command2cmdvel ${LIBRARIES} ${catkin_LIBRARIES} )

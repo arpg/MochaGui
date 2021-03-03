@@ -20,5 +20,12 @@
     </description>
   </class>
 </library>
+<library path="lib/libstatic_mesh_publisher_nodelet">
+  <class name="mochapc/StaticMeshPublisherNodelet" type="mochapc::StaticMeshPublisherNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet for periodically publishing a static mesh file
+    </description>
+  </class>
+</library>
 </class_libraries>
 

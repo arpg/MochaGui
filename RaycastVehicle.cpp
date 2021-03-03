@@ -223,7 +223,8 @@ void	RaycastVehicle::updateWheelTransformsWS(WheelInfo& wheel , bool interpolate
 
     btTransform chassisTrans = getChassisWorldTransform();
     if (interpolatedTransform && (getRigidBody()->getMotionState())){
-        getRigidBody()->getMotionState()->getWorldTransform(chassisTrans);
+        // Temp removal
+        // getRigidBody()->getMotionState()->getWorldTransform(chassisTrans);
     }
 
     wheel.m_raycastInfo.m_hardPointWS = chassisTrans( wheel.m_chassisConnectionPointCS );

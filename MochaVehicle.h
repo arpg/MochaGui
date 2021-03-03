@@ -11,6 +11,7 @@
 // #include <mt_actionlib/server/mt_simple_action_server.h>
 
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 // #include <tf2_ros/transform_listener.h>
@@ -1172,10 +1173,10 @@ class MochaVehicle
 {
 public:
     struct Config{
-        std::string params_file="$(find mochapc)/learning_params.csv",
-            terrain_mesh_file="$(find mochapc)/labLoop.ply",
-            car_mesh_file="$(find mochapc)/herbie/herbie.blend",
-            wheel_mesh_file="$(find mochapc)/herbie/wheel.blend",
+        std::string params_file=ros::package::getPath("mochapc") + "/learning_params.csv",
+            terrain_mesh_file=ros::package::getPath("mochapc") + "/labLoop.ply",
+            car_mesh_file=ros::package::getPath("mochapc") + "/herbie/herbie.blend",
+            wheel_mesh_file=ros::package::getPath("mochapc") + "/herbie/wheel.blend",
             map_frame="map",
             base_link_frame="base_link";
         int opt_dim = 4;
