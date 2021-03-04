@@ -2,7 +2,7 @@
 #include <gflags/gflags.h>
 #include <cstdio>
 
-#include "mesh_conversion_tools.hpp"
+#include <carplanner_msgs/mesh_conversion_tools.hpp>
 #include <tf/transform_listener.h>
 
 DEFINE_string(mesh, "~/code/mochagui/labLoop.ply", "File for terrain mesh.");
