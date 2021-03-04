@@ -312,7 +312,7 @@ void MochaProblem::Reset()
     m_CurrentSolution = Solution();
     m_CurrentSolution.m_dNorm = DBL_MAX;
 
-    m_ThreadPool.size_controller().resize(8);
+    m_ThreadPool.size_controller().resize(OPT_DIM*2+1);
 
     m_dPointWeight = Eigen::MatrixXd(POINT_COST_ERROR_TERMS,1);
     m_dTrajWeight = Eigen::MatrixXd(TRAJ_EXTRA_ERROR_TERMS+TRAJ_UNIT_ERROR_TERMS,1);
@@ -937,7 +937,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
                                                  const int iWorld /*= 0*/,
                                                  const bool& bBestSolution /* = false */)
 {
-    ROS_INFO("[Problem] Simulating trajectory (%d)", iWorld);
+    ROS_INFO("[Problem] > (%d) Simulating trajectory", iWorld);
     double t0 = Tic();
 
     sample.Clear();
@@ -968,7 +968,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
         // }
 
         ApplyVelocities( m_StartState, sample, iWorld, bUsingBestSolution, m_bNoDelay);
-        ROS_INFO("[Problem] Applied velocities (%d)",iWorld);
+        ROS_INFO("[Problem] < (%d) Applied velocities",iWorld);
 
         // DLOG(INFO) << "States(" << sample.m_vStates.size() << "):";
         // for(uint i=0; i<sample.m_vStates.size(); i++) {
@@ -1013,7 +1013,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
     Eigen::Vector6d dRes = _Transform3dGoalPose(vState);
     double t5 = Tic();
 
-    ROS_INFO("[Problem] Simulated trajectory w %s soln for world %d w norm %f, accel took %fs, AV took %fs, error calc took %fs, norm calc took %fs, res tform took %fs",(bUsingBestSolution ? "best" : "new"),iWorld,finalNorm,t1-t0,t2-t1,t3-t2,t4-t3,t5-t4);
+    ROS_INFO("[Problem] < (%d) Simulated trajectory w %s soln w norm %f, accel took %fs, AV took %fs, error calc took %fs, norm calc took %fs, res tform took %fs",iWorld,(bUsingBestSolution ? "best" : "new"),finalNorm,t1-t0,t2-t1,t3-t2,t4-t3,t5-t4);
 
     return dRes;
 }
@@ -1115,7 +1115,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
 
     // ROS_INFO("ApplyVelocities for world %d started", nWorldId);
 
-    ROS_INFO("[Problem] Applying velocities (%d)", nWorldId);
+    ROS_INFO("[Problem] >> (%d) Applying velocities.", nWorldId);
 
     double t0 = Tic();
 
@@ -1138,12 +1138,13 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     goal.no_delay = noDelay;
 
     double t1 = Tic();
-    ROS_INFO("[Problem] sending AV (%d) goal with %d commands, prep took %fs", nWorldId, goal.initial_motion_sample.commands.size(),t1-t0);
+    ROS_INFO("[Problem] >> (%d) Sending AV goal with %d commands, prep took %fs", nWorldId, goal.initial_motion_sample.commands.size(),t1-t0);
     
-    // while(!client.isServerConnected())
+    // while(!client.isServerConnected())s
     // {
     //     ROS_WARN_THROTTLE(0.1, "AV (%d) disconnected.", nWorldId);
     // }
+    // hasSubscriber segfault occurs here, in sendGoal
     client.sendGoal(goal
         // , boost::bind(&MochaProblem::ApplyVelocitiesDoneCb, this, _1, _2)
         // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleActiveCallback()
@@ -1170,7 +1171,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     bool finished_before_timeout = client.waitForResult(ros::Duration(timeout));
 
     double t3 = Tic();
-    ROS_INFO("[Problem] got goal result (%d), took %fs", nWorldId, t3-t1);
+    ROS_INFO("[Problem] << (%d) Got goal result, send/receive took %fs", nWorldId, t3-t1);
     if (finished_before_timeout)
     {
         success = true;
@@ -1183,12 +1184,12 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
         sample.fromROS(result->motion_sample);
         
         double t4 = Tic();
-        ROS_INFO("[Problem] goal result conv took %fs",t4-t3);
+        ROS_INFO("[Problem] << (%d) Goal result conv to sample, took %fs",nWorldId,t4-t3);
     }
     else
     {
         success = false;
-        ROS_ERROR("[Problem] ApplyVelocities (%d) did not finish before the %fs timeout.", nWorldId, timeout);
+        ROS_ERROR("[Problem] << (%d) ApplyVelocities did not finish before the %fs timeout.", nWorldId, timeout);
     }
 
     return success;
@@ -1657,7 +1658,7 @@ bool MochaProblem::_IterateGaussNewton()
     if(bZeroCols) {
         JtJ += Eigen::Matrix<double,OPT_DIM,OPT_DIM>::Identity();
     }
-    ROS_DBG("Solving for delta P.");
+    // ROS_DBG("Solving for delta P."); 
     (JtJ).llt().solveInPlace(dDeltaP);
 
     //this is a hack for now, but it should take care of large deltas

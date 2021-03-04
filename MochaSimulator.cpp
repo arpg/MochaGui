@@ -88,9 +88,9 @@ int main( int argc, char* argv[] )
         goal.worldId = 0;
         goal.command.force = (lin_vel - last_lin_vel)/dt;
         goal.command.curvature = ang_vel;
-        goal.command.torques.push_back(0);
-        goal.command.torques.push_back(0);
-        goal.command.torques.push_back(0);
+        // goal.command.torques.push_back(0);
+        // goal.command.torques.push_back(0);
+        // goal.command.torques.push_back(0);
         goal.command.dt = dt;
         goal.command.dphi = -ang_vel;
         // goal.command.time

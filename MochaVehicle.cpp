@@ -128,16 +128,16 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_nh(nh),
     // m_actionCreateSimpleServer_server(m_nh, "plan_car/create_server", boost::bind(&MochaVehicle::CreateServerService, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server0(m_nh, "vehicle/0/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server1(m_nh, "vehicle/1/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server2(m_nh, "vehicle/2/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server3(m_nh, "vehicle/3/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server4(m_nh, "vehicle/4/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server5(m_nh, "vehicle/5/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server6(m_nh, "vehicle/6/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server7(m_nh, "vehicle/7/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server8(m_nh, "vehicle/8/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server9(m_nh, "vehicle/9/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server0(m_nh, "vehicle/0/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*0*/, this, _1), false),
+    m_actionApplyVelocities_server1(m_nh, "vehicle/1/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*1*/, this, _1), false),
+    m_actionApplyVelocities_server2(m_nh, "vehicle/2/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*2*/, this, _1), false),
+    m_actionApplyVelocities_server3(m_nh, "vehicle/3/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*3*/, this, _1), false),
+    m_actionApplyVelocities_server4(m_nh, "vehicle/4/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*4*/, this, _1), false),
+    m_actionApplyVelocities_server5(m_nh, "vehicle/5/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*5*/, this, _1), false),
+    m_actionApplyVelocities_server6(m_nh, "vehicle/6/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*6*/, this, _1), false),
+    m_actionApplyVelocities_server7(m_nh, "vehicle/7/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*7*/, this, _1), false),
+    m_actionApplyVelocities_server8(m_nh, "vehicle/8/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*8*/, this, _1), false),
+    m_actionApplyVelocities_server9(m_nh, "vehicle/9/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*9*/, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "vehicle/apply_all_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
     m_actionSetState_server(m_nh, "vehicle/set_state", boost::bind(&MochaVehicle::SetStateService, this, _1), false),
     m_actionGetState_server(m_nh, "vehicle/get_state", boost::bind(&MochaVehicle::GetStateService, this, _1), false),
@@ -228,90 +228,90 @@ void MochaVehicle::GenerateStaticHull( const struct aiScene *pAIScene, const str
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-void MochaVehicle::Init(btCollisionShape* pCollisionShape, const btVector3 &dMin, const btVector3 &dMax, CarParameterMap &parameters, unsigned int numWorlds, bool real )
-{
-  //  if ( real ) {
-  //    m_poseThreadPub = m_nh.advertise<nav_msgs::Odometry>("pose",1);
-  //    m_commandThreadSub = m_nh.subscribe<carplanner_msgs::Command>("command", 1, boost::bind(&MochaVehicle::_CommandThreadFunc, this, _1));
-  //  }
+// void MochaVehicle::Init(btCollisionShape* pCollisionShape, const btVector3 &dMin, const btVector3 &dMax, CarParameterMap &parameters, unsigned int numWorlds, bool real )
+// {
+//   //  if ( real ) {
+//   //    m_poseThreadPub = m_nh.advertise<nav_msgs::Odometry>("pose",1);
+//   //    m_commandThreadSub = m_nh.subscribe<carplanner_msgs::Command>("command", 1, boost::bind(&MochaVehicle::_CommandThreadFunc, this, _1));
+//   //  }
 
-    // reset_mesh_frame = true;
+//     // reset_mesh_frame = true;
 
-    m_nNumWorlds = numWorlds;
-    //initialize a number of worlds
-    for(size_t ii = 0 ; ii < m_nNumWorlds ; ii++) {
-        BulletWorldInstance *pWorld = new BulletWorldInstance();
-        pWorld->m_nIndex = ii;
+//     m_nNumWorlds = numWorlds;
+//     //initialize a number of worlds
+//     for(size_t ii = 0 ; ii < m_nNumWorlds ; ii++) {
+//         BulletWorldInstance *pWorld = new BulletWorldInstance();
+//         pWorld->m_nIndex = ii;
 
-        DLOG(INFO) << "Initing world " << std::to_string(ii);
-        _InitWorld(pWorld,pCollisionShape,dMin,dMax,false);
+//         DLOG(INFO) << "Initing world " << std::to_string(ii);
+//         _InitWorld(pWorld,pCollisionShape,dMin,dMax,false);
 
-        //initialize the car
-        DLOG(INFO) << "Initing vehicle " << std::to_string(ii);
-        _InitVehicle(pWorld,parameters);
+//         //initialize the car
+//         DLOG(INFO) << "Initing vehicle " << std::to_string(ii);
+//         _InitVehicle(pWorld,parameters);
 
-        m_vWorlds.push_back(pWorld);
-    }
+//         m_vWorlds.push_back(pWorld);
+//     }
 
-    InitROS();
+//     InitROS();
 
-  //  if (real) {
-  //    m_pPoseThread = new boost::thread( std::bind( &MochaVehicle::_PoseThreadFunc, this ));
-  //  }
-}
+//   //  if (real) {
+//   //    m_pPoseThread = new boost::thread( std::bind( &MochaVehicle::_PoseThreadFunc, this ));
+//   //  }
+// }
 
-///////////////////////////////////////////////////////////////////////////////////////////
-void MochaVehicle::Init(const struct aiScene *pAIScene, CarParameterMap &parameters, unsigned int numWorlds, bool real )
-{
-  //  if ( real ) {
-  //    m_poseThreadPub = m_nh.advertise<nav_msgs::Odometry>("pose",1);
-  //    m_commandThreadSub = m_nh.subscribe<carplanner_msgs::Command>("command", 1, boost::bind(&MochaVehicle::_CommandThreadFunc, this, _1));
-  //  }
+// ///////////////////////////////////////////////////////////////////////////////////////////
+// void MochaVehicle::Init(const struct aiScene *pAIScene, CarParameterMap &parameters, unsigned int numWorlds, bool real )
+// {
+//   //  if ( real ) {
+//   //    m_poseThreadPub = m_nh.advertise<nav_msgs::Odometry>("pose",1);
+//   //    m_commandThreadSub = m_nh.subscribe<carplanner_msgs::Command>("command", 1, boost::bind(&MochaVehicle::_CommandThreadFunc, this, _1));
+//   //  }
 
-    // std::cout << "Initing scene" << std::endl;
-    // const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
-    // std::cout << "Assigning target";
-    // if(m_config.mode == MochaVehicle::Config::Mode::Simulation){
-    //     std::cout << " to Simulation";
-    //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-    //                                                       0, 1, 0, 0,
-    //                                                       0, 0,-1, 0,
-    //                                                       0, 0, 0, 1 );
-    // }else{
-    //     std::cout << " to Experiment";
-    //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-    //                                                       0, 1, 0, 0,
-    //                                                       0, 0,-1, 0,
-    //                                                       0, 0, 0, 1 );
-    // }
-    // std::cout << std::endl;
-    // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
-    // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
-    // btTriangleMesh *pTriangleMesh = new btTriangleMesh();
-    // /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
-    // std::cout << "Generating static hull" << std::endl;
-    // MochaVehicle::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
-    // /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
-    // std::cout << "Initing CollisionShape" << std::endl;
-    // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
-    // /// Initialize the car parameters.
-    // CarParameterMap defaultParams;
-    // CarParameters::LoadFromFile(m_config.params_file,defaultParams);
-    // /// As well as the car that we're actually driving.
-    // if ( m_config.mode == MochaVehicle::Config::Mode::Simulation )
-    //     Init( pCollisionShape,dMin,dMax, defaultParams,1, false);
-    // else
-    //     Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
+//     // std::cout << "Initing scene" << std::endl;
+//     // const aiScene *pScene = aiImportFile( m_config.terrain_mesh_file.c_str(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_FindInvalidData | aiProcess_FixInfacingNormals );
+//     // std::cout << "Assigning target";
+//     // if(m_config.mode == MochaVehicle::Config::Mode::Simulation){
+//     //     std::cout << " to Simulation";
+//     //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+//     //                                                       0, 1, 0, 0,
+//     //                                                       0, 0,-1, 0,
+//     //                                                       0, 0, 0, 1 );
+//     // }else{
+//     //     std::cout << " to Experiment";
+//     //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+//     //                                                       0, 1, 0, 0,
+//     //                                                       0, 0,-1, 0,
+//     //                                                       0, 0, 0, 1 );
+//     // }
+//     // std::cout << std::endl;
+//     // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
+//     // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
+//     // btTriangleMesh *pTriangleMesh = new btTriangleMesh();
+//     // /// Using pTriangleMesh and the terrain mesh, fill in the gaps to create a static hull.
+//     // std::cout << "Generating static hull" << std::endl;
+//     // MochaVehicle::GenerateStaticHull(pScene,pScene->mRootNode,pScene->mRootNode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+//     // /// Now generate the collision shape from the triangle mesh --- to know where the ground is.
+//     // std::cout << "Initing CollisionShape" << std::endl;
+//     // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+//     // /// Initialize the car parameters.
+//     // CarParameterMap defaultParams;
+//     // CarParameters::LoadFromFile(m_config.params_file,defaultParams);
+//     // /// As well as the car that we're actually driving.
+//     // if ( m_config.mode == MochaVehicle::Config::Mode::Simulation )
+//     //     Init( pCollisionShape,dMin,dMax, defaultParams,1, false);
+//     // else
+//     //     Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
 
-    // //generate the triangle mesh
-    // aiNode *pAINode = pAIScene->mRootNode;
-    // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
-    // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
-    // btTriangleMesh *pTriangleMesh = new btTriangleMesh();
-    // GenerateStaticHull(pAIScene,pAINode,pAINode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
-    // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
-    // Init(pCollisionShape, dMin, dMax, parameters, numWorlds, real);
-}
+//     // //generate the triangle mesh
+//     // aiNode *pAINode = pAIScene->mRootNode;
+//     // btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
+//     // btVector3 dMax(DBL_MIN,DBL_MIN,DBL_MIN);
+//     // btTriangleMesh *pTriangleMesh = new btTriangleMesh();
+//     // GenerateStaticHull(pAIScene,pAINode,pAINode->mTransformation,1.0,*pTriangleMesh,dMin,dMax);
+//     // btCollisionShape* pCollisionShape = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+//     // Init(pCollisionShape, dMin, dMax, parameters, numWorlds, real);
+// }
 
 void MochaVehicle::Initialize()
 {
@@ -1289,6 +1289,178 @@ void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocities
     //     ROS_INFO(prtstr.c_str());
     // }
 }
+// void MochaVehicle::ApplyVelocitiesService0(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server0.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService1(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server1.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService2(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server2.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService3(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server3.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService4(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server4.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService5(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server5.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService6(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server6.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService7(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server7.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService8(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server8.setSucceeded(actionApplyVelocities_result);
+// }
+// void MochaVehicle::ApplyVelocitiesService9(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
+// {
+//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
+//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+//     actionApplyVelocities_result.motion_sample = sample.toROS();
+//     m_actionApplyVelocities_server9.setSucceeded(actionApplyVelocities_result);
+// }
+
 
 // void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
 // {
@@ -1591,7 +1763,7 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
                                     bool noDelay /*=false*/)
 {
     double t0 = Tic();
-    ROS_INFO("[Vehicle] applying velocities (%d)", nWorldId);
+    ROS_INFO("[Vehicle] >>> (%d) Got velocities. Updating state.", nWorldId);
 
 /*
     Eigen::Vector3d torques;
@@ -1761,7 +1933,7 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
     }
 
     double t1 = Tic();
-    ROS_INFO("[Vehicle] done applying velocities (%d), took %fs", nWorldId, t1-t0);
+    ROS_INFO("[Vehicle] <<< (%d) Done updating state, took %fs", nWorldId, t1-t0);
 }
 
 VehicleState MochaVehicle::ApplyVelocities( VehicleState& startState,
@@ -1843,12 +2015,13 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
 
 void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
-    float t0 = Tic();
+    double t0 = Tic();
+    ROS_INFO("[Vehicle::MeshCb] Received mesh addr 0x%08X", &*mesh_msg);
     static tf::StampedTransform Twm;
     try
     {
         m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(1.0));
-        m_tflistener.lookupTransform(m_config.map_frame, "infinitam", ros::Time(0), Twm);
+        m_tflistener.lookupTransform(m_config.map_frame, "infinitam", mesh_msg->header.stamp, Twm);
     }
     catch (tf::TransformException ex)
     {
@@ -1863,12 +2036,32 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
     // tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
     // Twm.setData(rot_180_x*Twm);
 
-    float t1 = Tic();
+    double t1 = Tic();
+    ROS_INFO("[Vehicle::MeshCb] tform lookup took %fs", t1-t0);
 
     btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
-    convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape);
+    // convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape); // works slowly
+    // convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), meshShape); // works slowly
+    convertMeshMsg2CollisionShape(&(mesh_msg->mesh), meshShape); // works slowly
+    // convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape); // doesn't work, free pointer
 
-    float t2 = Tic();
+    // btTriangleMesh* triangleMesh = new btTriangleMesh();
+    // {
+    //     unsigned char** vertexbase;
+    //     int numverts;
+    //     PHY_ScalarType vertextype;
+    //     int vertexstride;
+    //     unsigned char** indexbase;
+    //     int indexstride;
+    //     int numfaces;
+    //     PHY_ScalarType indicestype;
+    //     int subpart = 0;
+    //     triangleMesh->getLockedVertexIndexBase(vertexbase, numverts, vertextype, vertexstride, indexbase, indexstride, numfaces, indicestype, subpart);
+    // }
+    // meshShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
+
+    double t2 = Tic();
+    ROS_INFO("[Vehicle::MeshCb] conv to coll shape took %fs", t2-t1);
 
     for (uint i=0; i<GetNumWorlds(); i++)
     {
@@ -1876,7 +2069,8 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
         replaceMesh(i, meshShape, Twm);
     }
 
-    float t3 = Tic();
+    double t3 = Tic();
+    ROS_INFO("[Vehicle::MeshCb] replaceMesh took %fs", t3-t2);
 
     // time_t t1 = std::clock();
     // ros::Time t1 = ros::Time::now();
@@ -2076,7 +2270,7 @@ void MochaVehicle::_pubTFs(uint nWorldId)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-void MochaVehicle::_PublisherFunc()
+void MochaVehicle::_PublisherFunc() 
 {
     while( ros::ok() )
     {
@@ -2830,7 +3024,7 @@ void MochaVehicle::UpdateState(  const int& worldId,
     // printf("OK 0\n");
     if (pWorld->m_pDynamicsWorld && bNoUpdate==false)
     {
-      // boost::mutex::scoped_lock lock(*pWorld);
+      boost::mutex::scoped_lock lock(*pWorld);
       Eigen::Vector3d T_w = pWorld->m_state.m_dTwv.so3()*command.m_dTorque;
       btVector3 bTorques( T_w[0], T_w[1], T_w[2] );
       pWorld->m_pVehicle->getRigidBody()->applyTorque( bTorques );

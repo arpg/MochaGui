@@ -1291,6 +1291,16 @@ public:
 
     // void ApplyVelocities(carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService0(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService1(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService2(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService3(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService4(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService5(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService6(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService7(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService8(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService9(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
     actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0;
     actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1;
