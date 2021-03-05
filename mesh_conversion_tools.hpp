@@ -309,7 +309,86 @@ inline void convertCollisionShape2MeshMsg(btCollisionShape* collisionShape, mesh
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-inline void convertMeshMsg2CollisionShape(mesh_msgs::TriangleMesh* meshMsg, btCollisionShape** collisionShape)
+inline void convertMeshMsg2CollisionShape(const mesh_msgs::TriangleMesh* meshMsg, btCollisionShape*& collisionShape)
+{
+  btTriangleMesh* triangleMesh = new btTriangleMesh();
+  for( uint it=0; it<meshMsg->triangles.size(); it++)
+  {
+    // geometry_msgs::Point vertex0 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]]; // works
+    // geometry_msgs::Point vertex1 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]];
+    // geometry_msgs::Point vertex2 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]];
+
+    // triangleMesh->addTriangle(btVector3(vertex0.x, vertex0.y, vertex0.z),
+    //                           btVector3(vertex1.x, vertex1.y, vertex1.z),
+    //                           btVector3(vertex2.x, vertex2.y, vertex2.z),
+    //                           it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
+
+    const btScalar* v0x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].x)); // works
+    const btScalar* v0y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].y));
+    const btScalar* v0z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].z));
+    const btScalar* v1x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].x));
+    const btScalar* v1y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].y));
+    const btScalar* v1z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].z));
+    const btScalar* v2x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].x));
+    const btScalar* v2y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].y));
+    const btScalar* v2z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].z));
+
+    triangleMesh->addTriangle(btVector3( *v0x, *v0y, *v0z ),
+                              btVector3( *v1x, *v1y, *v1z ),
+                              btVector3( *v2x, *v2y, *v2z ),
+                              it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
+  }
+
+  collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
+
+  return;
+}
+
+// inline void convertMeshMsg2CollisionShape(mesh_msgs::TriangleMesh* meshMsg, btCollisionShape*& collisionShape)
+// {
+//   btTriangleMesh* triangleMesh = new btTriangleMesh();
+//   triangleMesh->preallocateVertices(meshMsg->vertices.size());
+//   triangleMesh->preallocateIndices(meshMsg->triangles.size()*3);
+//   for( uint it=0; it<meshMsg->triangles.size(); it++)
+//   {
+//     geometry_msgs::Point vertex0 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]];
+//     geometry_msgs::Point vertex1 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]];
+//     geometry_msgs::Point vertex2 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]];
+
+//     triangleMesh->addTriangle(btVector3(vertex0.x, vertex0.y, vertex0.z),
+//                               btVector3(vertex1.x, vertex1.y, vertex1.z),
+//                               btVector3(vertex2.x, vertex2.y, vertex2.z),
+//                               it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
+
+//     // const btScalar* v0x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].x)); 
+//     // const btScalar* v0y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].y));
+//     // const btScalar* v0z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].z));
+//     // const btScalar* v1x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].x));
+//     // const btScalar* v1y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].y));
+//     // const btScalar* v1z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].z));
+//     // const btScalar* v2x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].x));
+//     // const btScalar* v2y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].y));
+//     // const btScalar* v2z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].z));
+
+//     // triangleMesh->addTriangle(btVector3( *v0x, *v0y, *v0z ),
+//     //                           btVector3( *v1x, *v1y, *v1z ),
+//     //                           btVector3( *v2x, *v2y, *v2z ),
+//     //                           it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
+//   }
+
+//   collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
+
+//   return;
+// }
+
+// inline void convertMeshMsg2CollisionShape(mesh_msgs::TriangleMeshStamped* meshMsg, btCollisionShape*& collisionShape)
+// {
+//   mesh_msgs::TriangleMesh* mesh = &(meshMsg->mesh);
+//   convertMeshMsg2CollisionShape(mesh, collisionShape);
+//   return;
+// }
+
+inline void convertMeshMsg2CollisionShape(const mesh_msgs::TriangleMesh::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
 {
   btTriangleMesh* triangleMesh = new btTriangleMesh();
   for( uint it=0; it<meshMsg->triangles.size(); it++)
@@ -324,15 +403,63 @@ inline void convertMeshMsg2CollisionShape(mesh_msgs::TriangleMesh* meshMsg, btCo
                               it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
   }
 
-  *collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
+  collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
 
   return;
 }
 
-inline void convertMeshMsg2CollisionShape(mesh_msgs::TriangleMeshStamped* meshMsg, btCollisionShape** collisionShape)
+inline void convertMeshMsg2CollisionShape(const mesh_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
 {
-  mesh_msgs::TriangleMesh* mesh = &(meshMsg->mesh);
+  mesh_msgs::TriangleMesh::ConstPtr mesh = mesh_msgs::TriangleMesh::ConstPtr(&(meshMsg->mesh));
   convertMeshMsg2CollisionShape(mesh, collisionShape);
+  return;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+
+inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMesh::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
+{
+  btTriangleMesh* triangleMesh = new btTriangleMesh();
+  // triangleMesh->preallocateVertices(meshMsg->vertices.size());
+  // triangleMesh->preallocateIndices(meshMsg->triangles.size()*3);
+
+  for( uint it=0; it<meshMsg->triangles.size(); it++)
+  {
+    // geometry_msgs::Point vertex0 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]];
+    // geometry_msgs::Point vertex1 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]];
+    // geometry_msgs::Point vertex2 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]];
+
+    const btScalar* v0x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].x));
+    const btScalar* v0y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].y));
+    const btScalar* v0z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].z));
+    const btScalar* v1x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].x));
+    const btScalar* v1y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].y));
+    const btScalar* v1z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].z));
+    const btScalar* v2x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].x));
+    const btScalar* v2y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].y));
+    const btScalar* v2z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].z));
+
+    triangleMesh->addTriangle(btVector3( *v0x, *v0y, *v0z ),
+                              btVector3( *v1x, *v1y, *v1z ),
+                              btVector3( *v2x, *v2y, *v2z ),
+                              it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
+
+    // triangleMesh->addTriangle(btVector3( &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].x), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].y), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].z) ),
+    //                           btVector3( &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].x), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].y), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].z) ),
+    //                           btVector3( &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].x), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].y), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].z) ),
+    //                           it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
+  }
+
+  collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
+  // collisionShape = new
+
+  return;
+}
+
+inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
+{
+  mesh_msgs::TriangleMesh::ConstPtr mesh = mesh_msgs::TriangleMesh::ConstPtr(&(meshMsg->mesh));
+  convertMeshMsg2CollisionShape_Shared(mesh, collisionShape);
   return;
 }
 

@@ -236,8 +236,8 @@ void MochaPlanner::Init()
 
     m_srvReplay_server = m_nh.advertiseService("planner/replay", &MochaPlanner::ReplaySvcCb, this);
 
-    ROS_INFO_NAMED("planner","[Planner] waiting for Raycast server.");
-    m_actionRaycast_client.waitForServer();
+    // ROS_INFO_NAMED("planner","[Planner] waiting for Raycast server.");
+    // m_actionRaycast_client.waitForServer();
     // while( !m_bServersInitialized && ros::ok()) 
     // {
     //     m_bServersInitialized = 

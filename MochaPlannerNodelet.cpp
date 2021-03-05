@@ -16,6 +16,8 @@ public:
     {
         ros::NodeHandle& nh = this->getMTNodeHandle();
         ros::NodeHandle& private_nh = this->getMTPrivateNodeHandle();
+        // ros::NodeHandle& nh = this->getNodeHandle();
+        // ros::NodeHandle& private_nh = this->getPrivateNodeHandle();
 
         planner_.reset(new MochaPlanner(private_nh, nh));
 

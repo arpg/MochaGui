@@ -16,6 +16,7 @@ public:
     {
         ros::NodeHandle& nh = this->getMTNodeHandle();
         ros::NodeHandle& private_nh = this->getMTPrivateNodeHandle();
+
         vehicle_.reset(new MochaVehicle(private_nh, nh));
     };
 private:
