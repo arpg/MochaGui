@@ -398,11 +398,12 @@ void MochaVehicle::InitializeExternals()
  
     m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
 
-    // m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
 
     m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
 
-    // m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
+    m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
+    
+    m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
 
     m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
 
@@ -478,7 +479,7 @@ void MochaVehicle::Init()
     //     Init( pCollisionShape,dMin,dMax, defaultParams,1, true);
 
     // #define OPT_DIM 4
-    Init( pCollisionShape,dMin,dMax, defaultParams, GetNumWorldsRequired(m_config.opt_dim), false);
+    // Init( pCollisionShape,dMin,dMax, defaultParams, GetNumWorldsRequired(m_config.opt_dim), false);
 
     // //generate the triangle mesh
     // aiNode *pAINode = pAIScene->mRootNode;
@@ -513,8 +514,6 @@ void MochaVehicle::_InitWorld(BulletWorldInstance* pWorld, btCollisionShape *pGr
     //pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_DrawAabb);
     //pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_NoDebug);
 
-    // Temporary fix
-    pWorld->m_pDynamicsWorld->setBroadphase(pWorld->m_pOverlappingPairCache);
     //set the gravity vector
     // pWorld->m_pDynamicsWorld->setGravity(btVector3(0,0,-BULLET_MODEL_GRAVITY));
     // float gravity[3];
@@ -534,7 +533,6 @@ void MochaVehicle::_InitWorld(BulletWorldInstance* pWorld, btCollisionShape *pGr
     //   delete pWorld->m_pTerrainBody;
     // }
     pWorld->m_pTerrainBody = _LocalAddRigidBody(pWorld,0,tr,pWorld->m_pTerrainShape,COL_GROUND,COL_RAY|COL_CAR);
-
 
     // btAssert((!pWorld->m_pTerrainShape || pWorld->m_pTerrainShape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
     // btDefaultMotionState* myMotionState = new btDefaultMotionState(tr);
@@ -1963,8 +1961,8 @@ void MochaVehicle::pubTerrainMesh(uint nWorldId)
     _pubMesh(pWorld->m_pTerrainBody->getCollisionShape(), &(pWorld->m_pTerrainBody->getWorldTransform()), &m_terrainMeshPub);
     
     time_t t1 = clock();
-    uint num_tri = dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainBody->getCollisionShape())->getMeshInterface())->getNumTriangles();
-    ROS_INFO_THROTTLE(0.5,"pubbing mesh, %d triangles, %.2f sec", num_tri, std::difftime(t1,t0)/CLOCKS_PER_SEC); 
+    // uint num_tri = dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainBody->getCollisionShape())->getMeshInterface())->getNumTriangles();
+    // ROS_INFO_THROTTLE(0.5,"pubbing mesh, %d triangles, %.2f sec", num_tri, std::difftime(t1,t0)/CLOCKS_PER_SEC); 
     
     // btCollisionObjectArray objarr = pWorld->m_pDynamicsWorld->getCollisionObjectArray();
     // for(uint i=0; i<objarr.size(); i++)
@@ -2001,7 +1999,7 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
     //   (*transformedToRosParent) *= (transformedToRosParent*parentTransform);
       convertCollisionShape2MeshMsg(collisionShape, parentTransform, &mesh);
 
-      mesh_msgs::TriangleMeshStamped* mesh_stamped = new mesh_msgs::TriangleMeshStamped();
+      mesh_msgs::TriangleMeshStamped::Ptr mesh_stamped(new mesh_msgs::TriangleMeshStamped);
       mesh_stamped->mesh = *mesh;
       mesh_stamped->header.frame_id = m_config.map_frame;
       mesh_stamped->header.stamp = ros::Time::now();
@@ -2009,7 +2007,7 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
       time_t t1 = std::clock();
 
       // ROS_INFO("pubbing mesh, %d faces, %d vertices, %.2f sec", mesh->triangles.size(), mesh->vertices.size(), std::difftime(t1,t0)/CLOCKS_PER_SEC); 
-      pub->publish(*mesh_stamped);
+      pub->publish(mesh_stamped);
       ros::spinOnce();
       // ros::Rate(10).sleep();
 }
@@ -2017,9 +2015,11 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
 void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
     double t0 = Tic();
-    ROS_INFO("[Vehicle::MeshCb] Received mesh addr 0x%08X", &*mesh_msg);
+    ROS_INFO_STREAM("[Vehicle::MeshCb] Received mesh addr " << mesh_msg);
     static tf::StampedTransform Twm;
-    /* Temp removal
+
+    static double avg = 0.0d;
+    static int count = 0;
     try
     {
         m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(1.0));
@@ -2031,7 +2031,6 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
         usleep(10000);
         return;
     }
-    */
 
     // time_t t0 = std::clock();
     // ros::Time t0 = ros::Time::now();
@@ -2045,8 +2044,8 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
     btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
     // convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape); // works slowly
     // convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), meshShape); // works slowly
-    convertMeshMsg2CollisionShape(&(mesh_msg->mesh), meshShape); // works slowly
-    // convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape); // doesn't work, free pointer
+    // convertMeshMsg2CollisionShape(&(mesh_msg->mesh), meshShape); // works slowly
+    convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape);
 
     // btTriangleMesh* triangleMesh = new btTriangleMesh();
     // {
@@ -2085,7 +2084,10 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
       t2-t1,
       t3-t2 );
 
-    DLOG(INFO) << "Mesh Callback: Address: " << mesh_msg.get();
+    avg = (avg * count + (t3 - t0)) / (count + 1);
+    ++count;
+
+    ROS_INFO("Vehicle::MeshCb] average time %.4fs", avg);
 }
 
 void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm)
@@ -2093,8 +2095,7 @@ void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::St
     // btAssert((!meshShape || meshShape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
 
     BulletWorldInstance* pWorld = GetWorldInstance(worldId);
-    // boost::unique_lock<boost::mutex> lock(*pWorld);
-    pWorld->lock();
+    boost::unique_lock<boost::mutex> lock(*pWorld);
 
     if(pWorld->m_pTerrainBody != NULL)
     {
@@ -2107,9 +2108,6 @@ void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::St
       btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
       btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
     pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
-    
-    // boost::unique_lock<boost::mutex> unlock(*pWorld);
-    pWorld->unlock();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -2118,17 +2116,14 @@ void MochaVehicle::appendMesh(uint worldId, btCollisionShape* meshShape, tf::Sta
     btAssert((!meshShape || meshShape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
 
     BulletWorldInstance* pWorld = GetWorldInstance(worldId);
-    // boost::unique_lock<boost::mutex> lock(*pWorld);
-    pWorld->lock();
     
     uint max_num_coll_objs = 3;
     if( pWorld->m_pDynamicsWorld->getCollisionWorld()->getNumCollisionObjects() >= max_num_coll_objs )
     {
-        // boost::unique_lock<boost::mutex> unlock(*pWorld);
-        pWorld->unlock();
         replaceMesh(worldId, meshShape, Twm);
         return;
     }
+    boost::unique_lock<boost::mutex> lock(*pWorld);
 
     btTransform tr;
     tr.setIdentity();
@@ -2142,9 +2137,6 @@ void MochaVehicle::appendMesh(uint worldId, btCollisionShape* meshShape, tf::Sta
       btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
     pWorld->m_pTerrainBody = body;
     pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
-
-    // boost::unique_lock<boost::mutex> unlock(*pWorld);
-    pWorld->unlock();
 }
 
 void MochaVehicle::_pubTFs(uint nWorldId)
@@ -3032,7 +3024,7 @@ void MochaVehicle::UpdateState(  const int& worldId,
       Eigen::Vector3d T_w = pWorld->m_state.m_dTwv.so3()*command.m_dTorque;
       btVector3 bTorques( T_w[0], T_w[1], T_w[2] );
       pWorld->m_pVehicle->getRigidBody()->applyTorque( bTorques );
-    //   ROS_INFO("Sending torque vector %f %f %f", T_w[0], T_w[1], T_w[2]);
+      // ROS_INFO("Sending torque vector %f %f %f dt %f", T_w[0], T_w[1], T_w[2], dT);
       // printf("OK 1\n");
     //   double t0 = Tic();
       pWorld->m_pDynamicsWorld->stepSimulation(dT,1,dT);
@@ -3492,7 +3484,6 @@ btRigidBody*	MochaVehicle::_LocalAddRigidBody(BulletWorldInstance *pWorld, doubl
     btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
 
     btRigidBody::btRigidBodyConstructionInfo cInfo(mass,myMotionState,shape,localInertia);
-
     btRigidBody* body = new btRigidBody(cInfo);
     body->setContactProcessingThreshold(BT_LARGE_FLOAT);
 

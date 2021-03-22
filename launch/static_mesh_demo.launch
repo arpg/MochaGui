@@ -9,8 +9,7 @@
   <arg name="terrain_mesh_topic" default="vehicle/input_terrain_mesh"/>
   <arg name="publish_timeout" default="1.0"/>
 
-  <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager"/>
-  
+  <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager" output="screen"/>
   
   <node pkg="nodelet" type="nodelet" name="static_mesh_publisher" args="load mochapc/StaticMeshPublisherNodelet mocha_manager">
     <param name="terrain_mesh_file" value="$(arg terrain_mesh_file)"/>

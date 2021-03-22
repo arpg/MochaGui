@@ -7,7 +7,7 @@
   <arg name="car_mesh_file" default="$(find mochapc)/herbie/herbie.blend"/>
   <arg name="wheel_mesh_file" default="$(find mochapc)/herbie/wheel.blend"/>
 
-  <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager"/>
+  <node pkg="nodelet" type="nodelet" name="mocha_manager" args="manager"/>
   <node pkg="nodelet" type="nodelet" name="mocha_planner" args="load mochapc/MochaPlannerNodelet mocha_manager">
     <!-- <remap from="input_mesh" to="$(arg input_mesh)"/> -->
     <param name="params_file" value="$(arg params_file)"/>

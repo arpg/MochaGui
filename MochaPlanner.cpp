@@ -74,9 +74,6 @@ MochaPlanner::~MochaPlanner()
 
 void MochaPlanner::Initialize()
 {
-    InitializeParameters();
-    InitializeExternals();
-
     ROS_INFO_NAMED("planner","[Planner] initialized.");   
 }
 

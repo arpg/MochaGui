@@ -28,6 +28,7 @@
 
 #include <nodelet/nodelet.h>
 
+#include "mesh_conversion_tools.hpp"
 #include <carplanner_msgs/mesh_conversion_tools.hpp>
 #include <carplanner_msgs/tf_conversion_tools.hpp>
 //#include "/home/ohrad/code/mochagui/mesh_conversion_tools.hpp"
@@ -512,7 +513,6 @@ struct VehicleState
         state = m_dTwv.inverse() * state;
         Eigen::Vector3d trans = state.translation();
         Eigen::Quaterniond quat = state.unit_quaternion();
-
         Eigen::Vector7d pose;
         pose << trans[0],
                 trans[1],
@@ -1432,6 +1432,9 @@ protected:
     boost::thread* m_pPublisherThread;
     // boost::thread* m_pStatePublisherThread;
     boost::thread* m_pTerrainMeshPublisherThread;
+
+    // boost::shared_ptr<btAlignedObjectArray<btVector3>> m_pMeshVertexData;
+    // boost::shared_ptr<btAlignedObjectArray<unsigned int>> m_pMeshTriangleIndices;
 
     // Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;
