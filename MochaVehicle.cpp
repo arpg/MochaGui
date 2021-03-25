@@ -396,7 +396,7 @@ void MochaVehicle::InitializeExternals()
     m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
     m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
  
-    m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
+    m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
 
 
     m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
@@ -902,7 +902,7 @@ void MochaVehicle::InitROS()
 
     // m_resetmeshSrv = m_nh.advertiseService("reset_mesh", &MochaVehicle::ResetMesh, this);
 
-    m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>(terrain_mesh_topic, 1, &MochaVehicle::meshCb, this);
+    m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>(terrain_mesh_topic, 1, &MochaVehicle::meshCb, this);
 
     m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
     // m_pStatePublisherThread = new boost::thread( std::bind( &MochaVehicle::_StatePublisherFunc, this ));
@@ -2012,7 +2012,7 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
       // ros::Rate(10).sleep();
 }
 
-void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
+void MochaVehicle::meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
     double t0 = Tic();
     ROS_INFO_STREAM("[Vehicle::MeshCb] Received mesh addr " << mesh_msg);
@@ -2070,6 +2070,8 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
     //    appendMesh(i, meshShape, Twm);
         replaceMesh(i, meshShape, Twm);
     }
+    // Extend lifetime of mesh data until next meshCb call
+    m_pMeshMsg = mesh_msg;
 
     double t3 = Tic();
     ROS_INFO("[Vehicle::MeshCb] replaceMesh took %fs", t3-t2);
@@ -2077,8 +2079,8 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
     // time_t t1 = std::clock();
     // ros::Time t1 = ros::Time::now();
     ROS_INFO("[Vehicle] got mesh (%d faces, %d vertices), at %.4fs, tf lookup took %.4fs, conv took %.4fs, integ took %.4fs", 
-      mesh_msg->mesh.triangles.size(), 
-      mesh_msg->mesh.vertices.size(),  
+      mesh_msg->triangleIndices.size() / 3, 
+      mesh_msg->triangleVertices.size(),  
       t0, 
       t1-t0,
       t2-t1,

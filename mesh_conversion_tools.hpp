@@ -4,6 +4,9 @@
 #include <ros/ros.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
+#include <carplanner_msgs/TriangleMeshStamped.h>
+
+#include "CarPlannerCommon.h"
 
 #include <Eigen/Eigen>
 
@@ -438,6 +441,7 @@ inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMesh& 
     triangleIndices->at(i * 3 + 2) = meshMsg.triangles[i].vertex_indices[2];
   }
 
+
   btTriangleIndexVertexArray* triangleMesh = new btTriangleIndexVertexArray(meshMsg.triangles.size(), (int *)&triangleIndices->at(0), 3 * sizeof(int), meshMsg.vertices.size(), (btScalar *)&triangleVertices->at(0), sizeof(btVector3));
   collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
 
@@ -448,6 +452,25 @@ inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMeshSt
 {
   convertMeshMsg2CollisionShape_Shared(meshMsg->mesh, collisionShape);
   return;
+}
+
+inline void convertMeshMsg2CollisionShape_Shared(const carplanner_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
+{
+  double t0 = Tic();
+  // Still leaking ~18 bytes of data each iteration
+  btAlignedObjectArray<btVector3>* triangleVertices = new btAlignedObjectArray<btVector3>();
+  btAlignedObjectArray<unsigned int>* triangleIndices = new btAlignedObjectArray<unsigned int>();
+  double t1 = Tic();
+  triangleVertices->initializeFromBuffer(const_cast<btScalar *>(meshMsg->triangleVertices.data()), meshMsg->triangleVertices.size() / 4, meshMsg->triangleVertices.size() / 4);
+  triangleIndices->initializeFromBuffer(const_cast<unsigned int *>(meshMsg->triangleIndices.data()), meshMsg->triangleIndices.size(), meshMsg->triangleIndices.size());
+  
+  double t2 = Tic();
+  btTriangleIndexVertexArray* triangleMesh = new btTriangleIndexVertexArray(meshMsg->triangleIndices.size() / 3, (int *)&triangleIndices->at(0), 3 * sizeof(int), triangleVertices->size() / 4, (btScalar *)&triangleVertices->at(0), sizeof(btVector3));
+  double t3 = Tic();
+  collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,false);
+  double t4 = Tic();
+
+  ROS_INFO("[mesh_conversion_tools] Completed mesh conversion. Initialization %.4f, Buffers %.4f, TriangleIndexVertexArray %.4f, CollisionShape %.4f", t1 - t0, t2 - t1, t3 - t2, t4 - t3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

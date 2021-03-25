@@ -48,6 +48,7 @@
 // #include <carplanner_msgs/GetInertiaTensorAction.h>
 // #include <carplanner_msgs/SetNoDelayAction.h>
 #include <carplanner_msgs/RaycastAction.h>
+#include <carplanner_msgs/TriangleMeshStamped.h>
 
 // #include "btBulletDynamicsCommon.h"
 #include "BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h"
@@ -1335,7 +1336,7 @@ public:
     // void SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server;
 
-    void meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
+    void meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr&);
 
     void replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm);
     void appendMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm);
@@ -1432,6 +1433,9 @@ protected:
     boost::thread* m_pPublisherThread;
     // boost::thread* m_pStatePublisherThread;
     boost::thread* m_pTerrainMeshPublisherThread;
+
+    carplanner_msgs::TriangleMeshStamped::ConstPtr m_pPrevMeshMsg;
+    carplanner_msgs::TriangleMeshStamped::ConstPtr m_pMeshMsg;
 
     // boost::shared_ptr<btAlignedObjectArray<btVector3>> m_pMeshVertexData;
     // boost::shared_ptr<btAlignedObjectArray<unsigned int>> m_pMeshTriangleIndices;
