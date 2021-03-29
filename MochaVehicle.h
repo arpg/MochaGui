@@ -1434,11 +1434,7 @@ protected:
     // boost::thread* m_pStatePublisherThread;
     boost::thread* m_pTerrainMeshPublisherThread;
 
-    carplanner_msgs::TriangleMeshStamped::ConstPtr m_pPrevMeshMsg;
     carplanner_msgs::TriangleMeshStamped::ConstPtr m_pMeshMsg;
-
-    // boost::shared_ptr<btAlignedObjectArray<btVector3>> m_pMeshVertexData;
-    // boost::shared_ptr<btAlignedObjectArray<unsigned int>> m_pMeshTriangleIndices;
 
     // Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;

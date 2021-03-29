@@ -6,8 +6,6 @@
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <carplanner_msgs/TriangleMeshStamped.h>
 
-#include "CarPlannerCommon.h"
-
 #include <Eigen/Eigen>
 
 #include <assimp/cimport.h>
@@ -455,38 +453,21 @@ inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMeshSt
 }
 
 inline void convertMeshMsg2CollisionShape_Shared(const carplanner_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
-{
-  
-  double t0 = Tic();
-  // Still leaking ~18 bytes of data each iteration
-  // btAlignedObjectArray<btVector3>* triangleVertices = new btAlignedObjectArray<btVector3>();
-  // btAlignedObjectArray<unsigned int>* triangleIndices = new btAlignedObjectArray<unsigned int>();
-  double t1 = Tic();
-  // triangleVertices->initializeFromBuffer(const_cast<btScalar *>(meshMsg->triangleVertices.data()), meshMsg->triangleVertices.size() / 4, meshMsg->triangleVertices.size() / 4);
-  // triangleIndices->initializeFromBuffer(const_cast<unsigned int *>(meshMsg->triangleIndices.data()), meshMsg->triangleIndices.size(), meshMsg->triangleIndices.size());
-  
+{  
 	btIndexedMesh mesh;
 
 	mesh.m_numTriangles = meshMsg->triangleIndices.size() / 3;
 	mesh.m_triangleIndexBase = (const unsigned char*)meshMsg->triangleIndices.data();
 	mesh.m_triangleIndexStride = sizeof(int) * 3;
-	mesh.m_numVertices = meshMsg->triangleVertices.size() / 4;
+	mesh.m_numVertices = meshMsg->triangleVertices.size() / 3;
 	mesh.m_vertexBase = (const unsigned char*)meshMsg->triangleVertices.data();
-	mesh.m_vertexStride = sizeof(float) * 4;
+	mesh.m_vertexStride = sizeof(float) * 3;
   mesh.m_vertexType = PHY_FLOAT;
 
   btTriangleIndexVertexArray* triangleMesh = new btTriangleIndexVertexArray();
 	triangleMesh->addIndexedMesh(mesh);
 
-
-  double t2 = Tic();
-  //btTriangleIndexVertexArray* triangleMesh = new btTriangleIndexVertexArray(meshMsg->triangleIndices.size() / 3, 
-  //      meshMsg->triangleIndices.data(), 3 * sizeof(int), meshMsg->triangleVertices.size() / 3, meshMsg->triangleVertices.data(), sizeof(float) * 3);
-  double t3 = Tic();
   collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
-  double t4 = Tic();
-
-  ROS_INFO("[mesh_conversion_tools] Completed mesh conversion. Initialization %.4f, Buffers %.4f, TriangleIndexVertexArray %.4f, CollisionShape %.4f", t1 - t0, t2 - t1, t3 - t2, t4 - t3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

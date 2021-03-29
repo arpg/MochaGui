@@ -403,7 +403,7 @@ void MochaVehicle::InitializeExternals()
 
     m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
     
-    m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
+    // m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
 
     m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
 
@@ -2006,7 +2006,7 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
 
       time_t t1 = std::clock();
 
-      // ROS_INFO("pubbing mesh, %d faces, %d vertices, %.2f sec", mesh->triangles.size(), mesh->vertices.size(), std::difftime(t1,t0)/CLOCKS_PER_SEC); 
+      ROS_INFO("[MochaVehicle] pubbing mesh, %d faces, %d vertices, %.2f sec", mesh->triangles.size(), mesh->vertices.size(), std::difftime(t1,t0)/CLOCKS_PER_SEC); 
       pub->publish(mesh_stamped);
       ros::spinOnce();
       // ros::Rate(10).sleep();
@@ -2017,9 +2017,6 @@ void MochaVehicle::meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& 
     double t0 = Tic();
     ROS_INFO_STREAM("[Vehicle::MeshCb] Received mesh addr " << mesh_msg);
     static tf::StampedTransform Twm;
-
-    static double avg = 0.0d;
-    static int count = 0;
     try
     {
         m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(1.0));
@@ -2085,11 +2082,6 @@ void MochaVehicle::meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& 
       t1-t0,
       t2-t1,
       t3-t2 );
-
-    avg = (avg * count + (t3 - t0)) / (count + 1);
-    ++count;
-
-    ROS_INFO("Vehicle::MeshCb] average time %.4fs", avg);
 }
 
 void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm)
