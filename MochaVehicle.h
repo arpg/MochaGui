@@ -1292,7 +1292,8 @@ public:
     // std::vector<actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>> servers_;
 
     // void ApplyVelocities(carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
-    void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    void ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction>);
+    // void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService0(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService1(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService2(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
@@ -1304,17 +1305,8 @@ public:
     // void ApplyVelocitiesService8(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService9(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server2;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server3;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server4;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server5;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server6;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server7;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9;
-
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
+    
     void SetStateService(const carplanner_msgs::SetStateGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::SetStateAction> m_actionSetState_server;
 

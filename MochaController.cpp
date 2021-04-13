@@ -77,7 +77,7 @@ void MochaController::InitController( ) {
 void MochaController::Reset()
 {
     {
-        boost::mutex::scoped_lock(m_PlanMutex);
+        boost::mutex::scoped_lock lock(m_PlanMutex);
         while(m_lControlPlans.begin() != m_lControlPlans.end()) {
             //delete this plan
             delete(m_lControlPlans.front());
