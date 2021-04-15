@@ -12,6 +12,7 @@
 
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <ros/callback_queue_interface.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 // #include <tf2_ros/transform_listener.h>
@@ -1163,7 +1164,25 @@ struct MotionSample
     }
 };
 
+class ApplyVelocitiesFunctionObj : public ros::CallbackInterface
+{
+public:
+    ApplyVelocitiesFunctionObj(const boost::function<void()> &callback) :
+        m_Callback(callback)
+    {}
 
+    virtual ros::CallbackInterface::CallResult call() override {
+        m_Callback();
+        return ros::CallbackInterface::CallResult::Success;
+    }
+
+    virtual bool ready() override {
+        return true;
+    }
+
+private:
+    boost::function<void()> m_Callback;
+};
 
 typedef actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> ApplyVelocitiesClient;
 typedef std::vector<ApplyVelocitiesClient*> ApplyVelocitiesClients;

@@ -1125,7 +1125,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     //     return false;
     // }
     // ApplyVelocitiesClient* client = m_clientsApplyVelocities[nWorldId];
-    ApplyVelocitiesClient client("vehicle/"+std::to_string(nWorldId)+"/apply_velocities",true);
+    ApplyVelocitiesClient client("vehicle/apply_velocities",true);
     client.waitForServer();
 
     carplanner_msgs::ApplyVelocitiesGoal goal;

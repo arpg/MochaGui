@@ -958,7 +958,7 @@ bool MochaController::ApplyVelocities(const VehicleState& startState,
 
     double t0 = Tic();
 
-    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> actionApplyVelocities_client("vehicle/"+std::to_string(nWorldId)+"/apply_velocities",true);
+    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> actionApplyVelocities_client("vehicle/apply_velocities",true);
     actionApplyVelocities_client.waitForServer();
 
 

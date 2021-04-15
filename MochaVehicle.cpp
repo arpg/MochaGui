@@ -128,7 +128,7 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_nh(nh),
     // m_actionCreateSimpleServer_server(m_nh, "plan_car/create_server", boost::bind(&MochaVehicle::CreateServerService, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server(m_nh, "vehicle/0/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*0*/, this, _1), false),
+    m_actionApplyVelocities_server(m_nh, "vehicle/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*0*/, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "vehicle/apply_all_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
     m_actionSetState_server(m_nh, "vehicle/set_state", boost::bind(&MochaVehicle::SetStateService, this, _1), false),
     m_actionGetState_server(m_nh, "vehicle/get_state", boost::bind(&MochaVehicle::GetStateService, this, _1), false),
@@ -1130,7 +1130,7 @@ void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner
 
     ROS_INFO("[ApplyVelocitiesService] Accepting new goal");
 
-    std::thread([this, goalHandle]() mutable {
+    auto fObj = boost::make_shared<ApplyVelocitiesFunctionObj>([this, goalHandle]() mutable {
         carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
         const carplanner_msgs::ApplyVelocitiesGoalConstPtr goal = goalHandle.getGoal();
         ROS_INFO("[ApplyVelocitiesService] Running ApplyVelocities on goal %d", goalHandle.getGoalID());
@@ -1149,7 +1149,8 @@ void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner
         actionApplyVelocities_result.motion_sample = sample.toROS();
 
         goalHandle.setSucceeded(actionApplyVelocities_result);
-    }).detach();
+    });
+    ros::getGlobalCallbackQueue()->addCallback(fObj);
 }
 
 // void MochaVehicle::ApplyVelocitiesService0(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
@@ -1569,7 +1570,7 @@ bool MochaVehicle::ApplyVelocitiesFromClient(ApplyVelocitiesClient* client,
     if (!client)
     {
         ROS_WARN("No client provided, creating new one.");
-        client = new ApplyVelocitiesClient("vehicle/"+std::to_string(nWorldId)+"/apply_velocities",true);
+        client = new ApplyVelocitiesClient("vehicle/apply_velocities",true);
         client->waitForServer();
     }
     
