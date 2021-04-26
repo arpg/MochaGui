@@ -212,6 +212,14 @@ target_link_libraries( static_mesh_publisher_nodelet static_mesh_publisher_lib )
 add_executable( static_mesh_publisher_standalone_nodelet StaticMeshPublisherStandaloneNodelet.cpp )
 target_link_libraries( static_mesh_publisher_standalone_nodelet static_mesh_publisher_nodelet )
 
+add_library( fake_apply_velocities_lib ${SHARED_HDRS} ${SHARED_SRC} )
+target_link_libraries( fake_apply_velocities_lib ${LIBRARIES} )
+add_library( fake_apply_velocities_nodelet FakeApplyVelocitiesNodelet.cpp )
+target_link_libraries( fake_apply_velocities_nodelet fake_apply_velocities_lib )       
+
+add_executable( fake_apply_velocities_standalone_nodelet FakeApplyVelocitiesStandaloneNodelet.cpp )
+target_link_libraries( fake_apply_velocities_standalone_nodelet fake_apply_velocities_nodelet )
+
 #add_executable( command2cmdvel Command2CmdVel.cpp ${SHARED_HDRS} ${SHARED_SRC} ${catkin_INCLUDE_DIRS} )
 #target_link_libraries( command2cmdvel ${LIBRARIES} ${catkin_LIBRARIES} )
 

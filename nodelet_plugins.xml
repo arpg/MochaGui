@@ -27,5 +27,12 @@
     </description>
   </class>
 </library>
+<library path="lib/libfake_apply_velocities_nodelet">
+  <class name="mochapc/FakeApplyVelocitiesNodelet" type="mochapc::FakeApplyVelocitiesNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet for sending test goals to the MochaVehicle ApplyVelocities server
+    </description>
+  </class>
+</library>
 </class_libraries>
 

@@ -1133,7 +1133,7 @@ void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner
     auto fObj = boost::make_shared<ApplyVelocitiesFunctionObj>([this, goalHandle]() mutable {
         carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
         const carplanner_msgs::ApplyVelocitiesGoalConstPtr goal = goalHandle.getGoal();
-        ROS_INFO("[ApplyVelocitiesService] Running ApplyVelocities on goal %d", goalHandle.getGoalID());
+        ROS_INFO("[ApplyVelocitiesService] Running ApplyVelocities on world %d", goal->world_id);
 
         VehicleState state;
         state.fromROS(goal->initial_state);
