@@ -197,6 +197,8 @@ private:
 
     Eigen::MatrixXd m_dTrajWeight;
 
+    std::string m_map_frame;
+
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 

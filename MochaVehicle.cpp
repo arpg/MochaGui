@@ -404,10 +404,14 @@ void MochaVehicle::InitializeExternals()
     m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
 
     m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
+    m_srvSetSimMode = m_nh.advertiseService("vehicle/set_sim_mode", &MochaVehicle::SetSimModeSvcCb, this);
 
     InitializeStatePublishers();
     InitializeCommandSubscribers();
+    InitializeTransformSubscribers();
+    InitializeTransformPublishers();
 
+    // InitializeApplyVelocitiesServers();
     m_actionApplyVelocities_server0.start();
     m_actionApplyVelocities_server1.start();
     m_actionApplyVelocities_server2.start();
@@ -1130,7 +1134,7 @@ void MochaVehicle::RaycastService(const carplanner_msgs::RaycastGoalConstPtr &go
 
 bool MochaVehicle::SetDriveModeSvcCb(carplanner_msgs::SetDriveMode::Request &req, carplanner_msgs::SetDriveMode::Response &res)
 {   
-    DLOG(INFO) << "SetDriveMode service called.";
+    ROS_INFO("SetDriveMode service called.");
 
     SetDriveMode(req.world_id, req.mode);
 
@@ -1144,6 +1148,40 @@ void MochaVehicle::SetDriveMode(uint nWorldId, uint mode)
 {
     BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
     // pWorld->m_pVehicle->setDriveMode((btWheelVehicle::DriveMode)mode);
+}
+
+bool MochaVehicle::SetSimModeSvcCb(carplanner_msgs::SetSimMode::Request &req, carplanner_msgs::SetSimMode::Response &res)
+{   
+    ROS_INFO("SetSimMode service called.");
+
+    SetSimMode(req.world_id, req.mode);
+
+    // if (!m_bPlanContinuously)
+    //     replan();
+
+    return true;
+}
+
+void MochaVehicle::SetSimMode(uint nWorldId, uint mode=0)
+{
+    BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
+    // abort if already set
+    if (pWorld->m_nMode==mode) return;
+    // lock and change if not already set
+    pWorld->lock();
+    pWorld->m_nMode = mode;
+    // if (pWorld->m_nMode==0)
+    // {
+    //     // new mode is simulation
+
+    // }
+    // else
+    // {
+    //     // new mode is experiment
+    // }
+    pWorld->unlock();
+    InitializeTransformSubscribers();
+    InitializeTransformPublishers();
 }
 
 // void MochaVehicle::CreateServerService(const carplanner_msgs::CreateServerGoalConstPtr &goal)
@@ -2015,12 +2053,13 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
 
 void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
+    if (mesh_msg->mesh.vertices.size()<=0) return;
     double t0 = Tic();
     ROS_INFO("[Vehicle::MeshCb] Received mesh addr 0x%08X", &*mesh_msg);
     static tf::StampedTransform Twm;
     try
     {
-        m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(1.0));
+        m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(0.2));
         m_tflistener.lookupTransform(m_config.map_frame, "infinitam", mesh_msg->header.stamp, Twm);
     }
     catch (tf::TransformException ex)
@@ -2040,9 +2079,9 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
     ROS_INFO("[Vehicle::MeshCb] tform lookup took %fs", t1-t0);
 
     btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
-    // convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape); // works slowly
+    convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), &meshShape); // works slowly
     // convertMeshMsg2CollisionShape(new mesh_msgs::TriangleMeshStamped(*mesh_msg), meshShape); // works slowly
-    convertMeshMsg2CollisionShape(&(mesh_msg->mesh), meshShape); // works slowly
+    // convertMeshMsg2CollisionShape(&(mesh_msg->mesh), meshShape); // works slowly
     // convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape); // doesn't work, free pointer
 
     // btTriangleMesh* triangleMesh = new btTriangleMesh();
@@ -2065,12 +2104,12 @@ void MochaVehicle::meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_m
 
     for (uint i=0; i<GetNumWorlds(); i++)
     {
-    //    appendMesh(i, meshShape, Twm);
-        replaceMesh(i, meshShape, Twm);
+       appendMesh(i, meshShape, Twm);
+        // replaceMesh(i, meshShape, Twm);
     }
 
     double t3 = Tic();
-    ROS_INFO("[Vehicle::MeshCb] replaceMesh took %fs", t3-t2);
+    ROS_INFO("[Vehicle::MeshCb] mesh import took %fs", t3-t2);
 
     // time_t t1 = std::clock();
     // ros::Time t1 = ros::Time::now();
@@ -2094,6 +2133,7 @@ void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::St
 
     if(pWorld->m_pTerrainBody != NULL)
     {
+        btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Removing terrain body at %.2f %.2f %.2f in replaceMesh.",pos[0],pos[1],pos[2]);
         pWorld->m_pDynamicsWorld->removeRigidBody(pWorld->m_pTerrainBody);
     }
 
@@ -2103,6 +2143,7 @@ void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::St
       btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
       btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
     pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
+    btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Setting terrain body at %.2f %.2f %.2f in replaceMesh.",pos[0],pos[1],pos[2]);
     
     // boost::unique_lock<boost::mutex> unlock(*pWorld);
     pWorld->unlock();
@@ -2117,10 +2158,11 @@ void MochaVehicle::appendMesh(uint worldId, btCollisionShape* meshShape, tf::Sta
     // boost::unique_lock<boost::mutex> lock(*pWorld);
     pWorld->lock();
     
-    uint max_num_coll_objs = 3;
+    uint max_num_coll_objs = 2;
     if( pWorld->m_pDynamicsWorld->getCollisionWorld()->getNumCollisionObjects() >= max_num_coll_objs )
     {
         // boost::unique_lock<boost::mutex> unlock(*pWorld);
+        ROS_WARN_THROTTLE(1,"appendMesh has reached max num coll objects. replaceMesh called instead.");
         pWorld->unlock();
         replaceMesh(worldId, meshShape, Twm);
         return;
@@ -2136,7 +2178,7 @@ void MochaVehicle::appendMesh(uint worldId, btCollisionShape* meshShape, tf::Sta
     body->setWorldTransform(btTransform(
       btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
       btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
-    pWorld->m_pTerrainBody = body;
+    btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Setting terrain body at %.2f %.2f %.2f in appendMesh.",pos[0],pos[1],pos[2]);
     pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
 
     // boost::unique_lock<boost::mutex> unlock(*pWorld);
@@ -2158,7 +2200,7 @@ void MochaVehicle::_pubTFs(uint nWorldId)
     //     ROS_ERROR("%s", ex.what());
     // }
 
-    static tf::TransformBroadcaster tfcaster;
+    // static tf::TransformBroadcaster tfcaster;
     // tf::Transform rot_180_x( tf::Quaternion(1, 0, 0, 0), tf::Vector3(0, 0, 0) );
     // map -> base_link
     {
@@ -2172,7 +2214,7 @@ void MochaVehicle::_pubTFs(uint nWorldId)
         // tform_chassis = rot_180_x*tform_chassis*rot_180_x;
 
         tf::StampedTransform stform(tform_chassis, now, m_config.map_frame, m_config.base_link_frame+"/"+std::to_string(nWorldId));
-        tfcaster.sendTransform(stform);
+        m_tfcaster.sendTransform(stform);
     }
     // // base_link -> front_right_wheel
     // {
@@ -2263,7 +2305,7 @@ void MochaVehicle::_pubTFs(uint nWorldId)
             tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
 
         tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(i)+"/"+std::to_string(nWorldId));
-        tfcaster.sendTransform(stform);
+        m_tfcaster.sendTransform(stform);
     }
 
     ros::spinOnce();
@@ -2274,8 +2316,8 @@ void MochaVehicle::_PublisherFunc()
 {
     while( ros::ok() )
     {
-        _pubTFs(0);
-        _pubVehicleMesh(0);
+        // _pubTFs(9);
+        _pubVehicleMesh(9);
 
         // BulletWorldInstance* pWorld = GetWorldInstance(0);
         // _pubMesh(pWorld->m_pCarChassis->getCollisionShape(), &(pWorld->m_pCarChassis->getWorldTransform()), &m_chassisMeshPub);
@@ -2395,6 +2437,73 @@ void MochaVehicle::InitializeStatePublishers()
         ros::Publisher* pub = new ros::Publisher(m_nh.advertise<carplanner_msgs::VehicleState>("vehicle/"+std::to_string(i)+"/state",1));
         m_vStatePublishers.push_back(pub);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////
+
+// void MochaVehicle::poseCb(const geometry_msgs::PoseStamped::ConstPtr& msg, int worldId)
+// {
+//     VehicleState state;
+//     GetVehicleState(worldId, stateOut);
+//     SetState(worldId, state, true);
+// }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+void MochaVehicle::InitializeTransformPublishers()
+{
+    m_vTransformPubTimers.clear();
+    for (uint i=0; i<GetNumWorlds(); i++)
+    {   
+        BulletWorldInstance* pWorld = GetWorldInstance(i);
+        if (pWorld->m_nMode==0)
+        {
+            ros::Timer tim = m_private_nh.createTimer(ros::Duration(1.0/m_dTransformPubRate), boost::bind(&MochaVehicle::TransformPubLoopFunc, this, _1, i));
+            m_vTransformPubTimers.emplace_back(tim);
+        }
+    }
+}
+
+void MochaVehicle::TransformPubLoopFunc(const ros::TimerEvent& event, int worldId)
+{
+    _pubTFs(worldId);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+void MochaVehicle::InitializeTransformSubscribers()
+{
+    m_vTransformLookupTimers.clear();
+    for (uint i=0; i<GetNumWorlds(); i++)
+    {   
+        BulletWorldInstance* pWorld = GetWorldInstance(i);
+        if (pWorld->m_nMode==1)
+        {
+            ros::Timer tim = m_private_nh.createTimer(ros::Duration(1.0/m_dTransformLookupRate), boost::bind(&MochaVehicle::TransformLookupLoopFunc, this, _1, i));
+            m_vTransformLookupTimers.emplace_back(tim);
+        }
+    }
+}
+
+void MochaVehicle::TransformLookupLoopFunc(const ros::TimerEvent& event, int worldId)
+{
+    tf::StampedTransform Tmv;
+    std::string base_link_frame = m_config.base_link_frame+"/"+std::to_string(worldId);
+    try
+    {
+        m_tflistener.waitForTransform(m_config.map_frame, base_link_frame, ros::Time::now(), ros::Duration(0.2));
+        m_tflistener.lookupTransform(m_config.map_frame, base_link_frame, ros::Time(0), Tmv);
+    }
+    catch (tf::TransformException ex)
+    {
+        ROS_ERROR("%s",ex.what());
+        return;
+    }
+    VehicleState state;
+    // GetVehicleState(worldId, state);
+    // state.fromROS
+    state = VehicleState::tf2VehicleState(Tmv);
+    SetState(worldId, state, true);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////

@@ -30,7 +30,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 2
-    SyncSource: DepthCloud
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -205,7 +205,7 @@ Visualization Manager:
       Marker Topic: /planner/potential_paths
       Name: PotentialPaths
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -213,7 +213,7 @@ Visualization Manager:
       Marker Topic: /planner/potential_path_norms
       Name: PotentialPathNorms
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -367,14 +367,6 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        Base:
-          Value: false
-        Base/link:
-          Value: false
-        X1:
-          Value: false
-        X1/base_link:
-          Value: true
         X1/base_link/0:
           Value: false
         X1/base_link/1:
@@ -399,137 +391,87 @@ Visualization Manager:
           Value: false
         X1/base_link/camera_down_optical:
           Value: false
-        X1/base_link/camera_front:
-          Value: false
-        X1/base_link/camera_front_optical:
-          Value: false
-        X1/base_link/front_laser:
-          Value: false
-        X1/base_link/imu_sensor:
-          Value: false
-        X1/base_link/planar_laser:
-          Value: false
-        X1/front_left_wheel_link:
-          Value: true
-        X1/front_right_wheel_link:
-          Value: true
         X1/map:
           Value: true
-        X1/odom:
-          Value: false
-        X1/pan_gimbal_link:
-          Value: false
-        X1/rear_left_wheel_link:
+        back_left_wheel_link/0:
           Value: true
-        X1/rear_right_wheel_link:
+        back_left_wheel_link/1:
           Value: true
-        X1/tilt_gimbal_link:
-          Value: false
-        X1/tilt_gimbal_link/camera_pan_tilt:
-          Value: false
-        X1/tilt_gimbal_link/camera_pan_tilt_optical:
-          Value: false
-        back_left_wheel/0:
-          Value: false
-        back_left_wheel/1:
-          Value: false
-        back_left_wheel/2:
-          Value: false
-        back_left_wheel/3:
-          Value: false
-        back_left_wheel/4:
-          Value: false
-        back_left_wheel/5:
-          Value: false
-        back_left_wheel/6:
-          Value: false
-        back_left_wheel/7:
-          Value: false
-        back_left_wheel/8:
-          Value: false
-        back_right_wheel/0:
-          Value: false
-        back_right_wheel/1:
-          Value: false
-        back_right_wheel/2:
-          Value: false
-        back_right_wheel/3:
-          Value: false
-        back_right_wheel/4:
-          Value: false
-        back_right_wheel/5:
-          Value: false
-        back_right_wheel/6:
-          Value: false
-        back_right_wheel/7:
-          Value: false
-        back_right_wheel/8:
-          Value: false
-        base_link/9:
-          Value: false
-        front_left_wheel/0:
-          Value: false
-        front_left_wheel/1:
-          Value: false
-        front_left_wheel/2:
-          Value: false
-        front_left_wheel/3:
-          Value: false
-        front_left_wheel/4:
-          Value: false
-        front_left_wheel/5:
-          Value: false
-        front_left_wheel/6:
-          Value: false
-        front_left_wheel/7:
-          Value: false
-        front_left_wheel/8:
-          Value: false
+        back_left_wheel_link/2:
+          Value: true
+        back_left_wheel_link/3:
+          Value: true
+        back_left_wheel_link/4:
+          Value: true
+        back_left_wheel_link/5:
+          Value: true
+        back_left_wheel_link/6:
+          Value: true
+        back_left_wheel_link/7:
+          Value: true
+        back_left_wheel_link/8:
+          Value: true
+        back_left_wheel_link/9:
+          Value: true
+        back_right_wheel_link/0:
+          Value: true
+        back_right_wheel_link/1:
+          Value: true
+        back_right_wheel_link/2:
+          Value: true
+        back_right_wheel_link/3:
+          Value: true
+        back_right_wheel_link/4:
+          Value: true
+        back_right_wheel_link/5:
+          Value: true
+        back_right_wheel_link/6:
+          Value: true
+        back_right_wheel_link/7:
+          Value: true
+        back_right_wheel_link/8:
+          Value: true
+        back_right_wheel_link/9:
+          Value: true
+        front_left_wheel_link/0:
+          Value: true
+        front_left_wheel_link/1:
+          Value: true
+        front_left_wheel_link/2:
+          Value: true
+        front_left_wheel_link/3:
+          Value: true
+        front_left_wheel_link/4:
+          Value: true
+        front_left_wheel_link/5:
+          Value: true
+        front_left_wheel_link/6:
+          Value: true
+        front_left_wheel_link/7:
+          Value: true
+        front_left_wheel_link/8:
+          Value: true
         front_left_wheel_link/9:
           Value: true
-        front_right_wheel/0:
-          Value: false
-        front_right_wheel/1:
-          Value: false
-        front_right_wheel/2:
-          Value: false
-        front_right_wheel/3:
-          Value: false
-        front_right_wheel/4:
-          Value: false
-        front_right_wheel/5:
-          Value: false
-        front_right_wheel/6:
-          Value: false
-        front_right_wheel/7:
-          Value: false
-        front_right_wheel/8:
-          Value: false
+        front_right_wheel_link/0:
+          Value: true
+        front_right_wheel_link/1:
+          Value: true
+        front_right_wheel_link/2:
+          Value: true
+        front_right_wheel_link/3:
+          Value: true
+        front_right_wheel_link/4:
+          Value: true
+        front_right_wheel_link/5:
+          Value: true
+        front_right_wheel_link/6:
+          Value: true
+        front_right_wheel_link/7:
+          Value: true
+        front_right_wheel_link/8:
+          Value: true
         front_right_wheel_link/9:
-          Value: true
-        inf:
-          Value: true
-        inf_cam:
-          Value: true
-        inf_odom:
-          Value: true
-        inf_real_cam:
-          Value: true
-        infinitam:
-          Value: true
-        infinitam_cam:
-          Value: true
-        rear_left_wheel_link/9:
-          Value: true
-        rear_right_wheel_link/9:
-          Value: true
-        simple_cave_01:
-          Value: false
-        test1:
-          Value: false
-        test2:
-          Value: false
-        world:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -538,127 +480,96 @@ Visualization Manager:
       Show Names: true
       Tree:
         X1/map:
+          X1/base_link/0:
+            back_left_wheel_link/0:
+              {}
+            back_right_wheel_link/0:
+              {}
+            front_left_wheel_link/0:
+              {}
+            front_right_wheel_link/0:
+              {}
           X1/base_link/1:
-            back_left_wheel/1:
+            back_left_wheel_link/1:
               {}
-            back_right_wheel/1:
+            back_right_wheel_link/1:
               {}
-            front_left_wheel/1:
+            front_left_wheel_link/1:
               {}
-            front_right_wheel/1:
+            front_right_wheel_link/1:
               {}
           X1/base_link/2:
-            back_left_wheel/2:
+            back_left_wheel_link/2:
               {}
-            back_right_wheel/2:
+            back_right_wheel_link/2:
               {}
-            front_left_wheel/2:
+            front_left_wheel_link/2:
               {}
-            front_right_wheel/2:
+            front_right_wheel_link/2:
               {}
           X1/base_link/3:
-            back_left_wheel/3:
+            back_left_wheel_link/3:
               {}
-            back_right_wheel/3:
+            back_right_wheel_link/3:
               {}
-            front_left_wheel/3:
+            front_left_wheel_link/3:
               {}
-            front_right_wheel/3:
+            front_right_wheel_link/3:
               {}
           X1/base_link/4:
-            back_left_wheel/4:
+            back_left_wheel_link/4:
               {}
-            back_right_wheel/4:
+            back_right_wheel_link/4:
               {}
-            front_left_wheel/4:
+            front_left_wheel_link/4:
               {}
-            front_right_wheel/4:
+            front_right_wheel_link/4:
               {}
           X1/base_link/5:
-            back_left_wheel/5:
+            back_left_wheel_link/5:
               {}
-            back_right_wheel/5:
+            back_right_wheel_link/5:
               {}
-            front_left_wheel/5:
+            front_left_wheel_link/5:
               {}
-            front_right_wheel/5:
+            front_right_wheel_link/5:
               {}
           X1/base_link/6:
-            back_left_wheel/6:
+            back_left_wheel_link/6:
               {}
-            back_right_wheel/6:
+            back_right_wheel_link/6:
               {}
-            front_left_wheel/6:
+            front_left_wheel_link/6:
               {}
-            front_right_wheel/6:
+            front_right_wheel_link/6:
               {}
           X1/base_link/7:
-            back_left_wheel/7:
+            back_left_wheel_link/7:
               {}
-            back_right_wheel/7:
+            back_right_wheel_link/7:
               {}
-            front_left_wheel/7:
+            front_left_wheel_link/7:
               {}
-            front_right_wheel/7:
+            front_right_wheel_link/7:
               {}
           X1/base_link/8:
-            back_left_wheel/8:
+            back_left_wheel_link/8:
               {}
-            back_right_wheel/8:
+            back_right_wheel_link/8:
               {}
-            front_left_wheel/8:
+            front_left_wheel_link/8:
               {}
-            front_right_wheel/8:
+            front_right_wheel_link/8:
               {}
-          X1/odom:
-            X1:
-              X1/base_link:
-                X1/base_link/9:
-                  {}
-                X1/base_link/camera_down:
-                  X1/base_link/camera_down_optical:
-                    {}
-                X1/base_link/camera_front:
-                  X1/base_link/camera_front_optical:
-                    {}
-                X1/base_link/front_laser:
-                  {}
-                X1/base_link/imu_sensor:
-                  {}
-                X1/base_link/planar_laser:
-                  {}
-                base_link/9:
-                  {}
-              X1/front_left_wheel_link:
-                front_left_wheel_link/9:
-                  {}
-              X1/front_right_wheel_link:
-                front_right_wheel_link/9:
-                  {}
-              X1/pan_gimbal_link:
-                {}
-              X1/rear_left_wheel_link:
-                rear_left_wheel_link/9:
-                  {}
-              X1/rear_right_wheel_link:
-                rear_right_wheel_link/9:
-                  {}
-              X1/tilt_gimbal_link:
-                X1/tilt_gimbal_link/camera_pan_tilt:
-                  X1/tilt_gimbal_link/camera_pan_tilt_optical:
-                    {}
-          inf:
-            inf_odom:
-              inf_cam:
-                {}
-            inf_real_cam:
+          X1/base_link/9:
+            back_left_wheel_link/9:
               {}
-          infinitam:
-            infinitam_cam:
+            back_right_wheel_link/9:
               {}
-        world:
-          simple_cave_01:
-            {}
+            front_left_wheel_link/9:
+              {}
+            front_right_wheel_link/9:
+              {}
       Update Interval: 0
       Value: true
   Enabled: true
@@ -691,25 +602,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 2.905662775039673
+      Distance: 8.057631492614746
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 6.817651748657227
-        Y: -1.716876745223999
-        Z: 0.3419969379901886
+        X: 0.284015417098999
+        Y: -1.3937761783599854
+        Z: 0.341997891664505
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4103992283344269
+      Pitch: 0.4153992235660553
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 3.300394296646118
+      Yaw: 3.150395154953003
     Saved: ~
 Window Geometry:
   Displays:
