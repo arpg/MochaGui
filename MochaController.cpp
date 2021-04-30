@@ -31,6 +31,7 @@ MochaController::MochaController(ros::NodeHandle& private_nh_, ros::NodeHandle& 
     m_dTrajWeight(6) = CURV_WEIGHT;
 
     m_private_nh.param("map_frame", m_map_frame, m_map_frame);
+    m_private_nh.param("lookahead_time", m_dLookaheadTime, m_dLookaheadTime);
 
     m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), &MochaController::ControlLoopFunc, this);
     // m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), boost::bind(&MochaController::ControlLoopFunc, this, _1));

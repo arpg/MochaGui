@@ -178,8 +178,8 @@ private:
     bool m_bFirstPose;
     bool m_bStillRun;
 
-    float m_dMaxControlPlanTime;
-    float m_dLookaheadTime; 
+    double m_dMaxControlPlanTime;
+    double m_dLookaheadTime; 
 
     boost::thread* m_pControlPlannerThread;
 

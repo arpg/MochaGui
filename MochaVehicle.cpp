@@ -2133,7 +2133,7 @@ void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::St
 
     if(pWorld->m_pTerrainBody != NULL)
     {
-        btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Removing terrain body at %.2f %.2f %.2f in replaceMesh.",pos[0],pos[1],pos[2]);
+        // btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Removing terrain body at %.2f %.2f %.2f in replaceMesh.",pos[0],pos[1],pos[2]);
         pWorld->m_pDynamicsWorld->removeRigidBody(pWorld->m_pTerrainBody);
     }
 
@@ -2143,7 +2143,7 @@ void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::St
       btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
       btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
     pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
-    btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Setting terrain body at %.2f %.2f %.2f in replaceMesh.",pos[0],pos[1],pos[2]);
+    // btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Setting terrain body at %.2f %.2f %.2f in replaceMesh.",pos[0],pos[1],pos[2]);
     
     // boost::unique_lock<boost::mutex> unlock(*pWorld);
     pWorld->unlock();
@@ -2158,28 +2158,24 @@ void MochaVehicle::appendMesh(uint worldId, btCollisionShape* meshShape, tf::Sta
     // boost::unique_lock<boost::mutex> lock(*pWorld);
     pWorld->lock();
     
-    uint max_num_coll_objs = 2;
+    uint max_num_coll_objs = 3; // 1 for chassis, 1 for origin disk, 1 for terrain body
+    // ROS_WARN("appendMesh has %d objects.", pWorld->m_pDynamicsWorld->getCollisionWorld()->getNumCollisionObjects());
     if( pWorld->m_pDynamicsWorld->getCollisionWorld()->getNumCollisionObjects() >= max_num_coll_objs )
     {
         // boost::unique_lock<boost::mutex> unlock(*pWorld);
-        ROS_WARN_THROTTLE(1,"appendMesh has reached max num coll objects. replaceMesh called instead.");
+        // ROS_WARN("appendMesh has reached max num coll objects (%d). replaceMesh called instead.", max_num_coll_objs);
         pWorld->unlock();
         replaceMesh(worldId, meshShape, Twm);
         return;
     }
 
-    btTransform tr;
-    tr.setIdentity();
-    btDefaultMotionState* myMotionState = new btDefaultMotionState(tr);
-    
-    btRigidBody::btRigidBodyConstructionInfo cInfo(0.0,myMotionState,meshShape,btVector3(0,0,0));
-    btRigidBody* body = new btRigidBody(cInfo);
-    body->setContactProcessingThreshold(BT_LARGE_FLOAT);
-    body->setWorldTransform(btTransform(
+    pWorld->m_pTerrainShape = meshShape;
+    pWorld->m_pTerrainBody->setCollisionShape(pWorld->m_pTerrainShape);
+    pWorld->m_pTerrainBody->setWorldTransform(btTransform(
       btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
       btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
-    btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN_THROTTLE(1,"Setting terrain body at %.2f %.2f %.2f in appendMesh.",pos[0],pos[1],pos[2]);
-    pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
+    pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody); 
+    // btVector3 pos = pWorld->m_pTerrainBody->getCenterOfMassPosition(); ROS_WARN("Setting terrain body at %.2f %.2f %.2f in appendMesh.",pos[0],pos[1],pos[2]);
 
     // boost::unique_lock<boost::mutex> unlock(*pWorld);
     pWorld->unlock();
