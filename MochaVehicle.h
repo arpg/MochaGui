@@ -26,6 +26,7 @@
 #include <visualization_msgs/MarkerArray.h>
 
 #include <carplanner_msgs/SetDriveMode.h>
+#include <carplanner_msgs/SetSimMode.h>
 
 #include <nodelet/nodelet.h>
 
@@ -553,7 +554,7 @@ struct VehicleState
             frame += "_left";
         else
             frame += "_right";
-        frame += "_wheel";
+        frame += "_wheel_link";
         return frame;
     }
 
@@ -697,7 +698,7 @@ struct VehicleState
         return state;
     }
 
-    carplanner_msgs::VehicleState toROS() const
+    carplanner_msgs::VehicleState toROS(std::string map_frame="map", std::string base_link_frame="base_link", std::string wheel_link_frame="wheel_link") const
     {
     //   Sophus::SE3d rot_180_y(Eigen::Quaterniond(0,0,1,0),Eigen::Vector3d(0,0,0)); // Quat(w,x,y,z) , Vec(x,y,z)
     //   Sophus::SE3d rot_180_x(Eigen::Quaterniond(0,1,0,0),Eigen::Vector3d(0,0,0));
@@ -713,8 +714,8 @@ struct VehicleState
       state_msg.header.stamp.sec = floor(time);
       state_msg.header.stamp.nsec = (time-state_msg.pose.header.stamp.sec)*1e9;
       state_msg.pose.header.stamp = ros::Time::now();
-      state_msg.pose.header.frame_id = "world";
-      state_msg.pose.child_frame_id = "base_link";
+      state_msg.pose.header.frame_id = map_frame;
+      state_msg.pose.child_frame_id = base_link_frame;
       state_msg.pose.transform.translation.x = Twv.translation()[0];
       state_msg.pose.transform.translation.y = Twv.translation()[1];
       state_msg.pose.transform.translation.z = Twv.translation()[2];
@@ -727,8 +728,8 @@ struct VehicleState
       {
           geometry_msgs::TransformStamped tf;
           tf.header.stamp = ros::Time::now();
-          tf.header.frame_id = "world";
-          tf.child_frame_id = "wheel_link" + std::to_string(i);
+          tf.header.frame_id = map_frame;
+          tf.child_frame_id = wheel_link_frame + "/" + std::to_string(i);
 
           Sophus::SE3d Twv = (*this).m_vWheelStates[i];
           tf.transform.translation.x = Twv.translation()[0];
@@ -813,6 +814,23 @@ struct VehicleState
         (*this).m_dTime = msg.header.stamp.sec + (double)msg.header.stamp.nsec*(double)1e-9;
     }
 
+    // void fromROS(tf::StampedTransform msg)
+    // {
+    //     (*this).m_dTwv.translation() = Eigen::Vector3d(
+    //         msg.pose.transform.translation.x,
+    //         msg.pose.transform.translation.y,
+    //         msg.pose.transform.translation.z);
+    //     (*this).m_dTwv.setQuaternion(Eigen::Quaterniond(
+    //         msg.pose.transform.rotation.w,
+    //         msg.pose.transform.rotation.x,
+    //         msg.pose.transform.rotation.y,
+    //         msg.pose.transform.rotation.z));
+
+    //     reset
+
+    //     (*this).m_dTime = msg.header.stamp.sec + (double)msg.header.stamp.nsec*(double)1e-9;
+    // }
+
     std::string toString(std::string delimiter="\n")
     {
         Eigen::Vector6d vel; vel << m_dV[0], m_dV[1], m_dV[2], m_dW[0], m_dW[1], m_dW[2];
@@ -878,6 +896,7 @@ struct BulletWorldInstance : public boost::mutex
         m_bParametersChanged = false;
         m_dTotalCommandTime = 0;
         m_bEnableGUI = false;
+        m_nMode = 0;
     }
 
     ~BulletWorldInstance()
@@ -931,7 +950,7 @@ struct BulletWorldInstance : public boost::mutex
 
     int m_nIndex;
     bool m_bParametersChanged;
-
+    uint m_nMode; // 0=Simulation, 1=Experiment (real)
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -1245,6 +1264,7 @@ public:
     ros::NodeHandle m_nh;
     // tf::TransformBroadcaster m_tfbr;
     tf::TransformListener m_tflistener;
+    tf::TransformBroadcaster m_tfcaster;
     // tf2_ros::Buffer m_tfbuffer;
     // tf2_ros::TransformListener m_tflistener(m_tfbuffer);
     ros::Publisher m_vehiclePub;
@@ -1252,6 +1272,7 @@ public:
     bool reset_mesh_frame;
     // ros::ServiceServer m_resetmeshSrv;
     ros::ServiceServer m_srvSetDriveMode;
+    ros::ServiceServer m_srvSetSimMode;
         // ros::Subscriber m_meshSub2;
     // std::string m_meshSubTopic = "/infinitam/mesh";
     // std::string m_meshSubTopic = "/fake_mesh_publisher/mesh";
@@ -1270,8 +1291,6 @@ public:
     void _pubTFs(uint);
     void _pubPreviousCommands(uint);
 
-    void InitializeStatePublishers();
-    void InitializeCommandSubscribers();
 
     std::vector<ros::Publisher*> m_vStatePublishers;
     ros::Timer m_timerStatePubLoop;
@@ -1279,15 +1298,27 @@ public:
     void StatePubLoopFunc(const ros::TimerEvent&);
     void pubState(uint, ros::Publisher*);
     void pubState(VehicleState&, ros::Publisher*);
+    void InitializeStatePublishers();
 
     std::vector<ros::Subscriber*> m_vCommandSubscribers;
     void commandCb(const carplanner_msgs::Command::ConstPtr& , int);
+    void InitializeCommandSubscribers();
 
     ros::Publisher m_terrainMeshPub;
     ros::Timer m_timerTerrainMeshPubLoop;
     double m_dTerrainMeshPubRate = 1.0;
     void TerrainMeshPubLoopFunc(const ros::TimerEvent&);
     void pubTerrainMesh(uint);
+
+    std::vector<ros::Timer> m_vTransformLookupTimers;
+    double m_dTransformLookupRate = 100.0;
+    void TransformLookupLoopFunc(const ros::TimerEvent&, int);
+    void InitializeTransformSubscribers();
+
+    std::vector<ros::Timer> m_vTransformPubTimers;
+    double m_dTransformPubRate = 100.0;
+    void TransformPubLoopFunc(const ros::TimerEvent&, int);
+    void InitializeTransformPublishers();
 
     // void _pubMesh(uint);
     void _pubMesh(btCollisionShape*, ros::Publisher*);
@@ -1301,6 +1332,9 @@ public:
 
     bool SetDriveModeSvcCb(carplanner_msgs::SetDriveMode::Request&, carplanner_msgs::SetDriveMode::Response&);
     void SetDriveMode(uint nWorldId, uint mode);
+
+    bool SetSimModeSvcCb(carplanner_msgs::SetSimMode::Request&, carplanner_msgs::SetSimMode::Response&);
+    void SetSimMode(uint nWorldId, uint mode);
 
     void RaycastService(const carplanner_msgs::RaycastGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::RaycastAction> m_actionRaycast_server;
@@ -1450,7 +1484,7 @@ protected:
     // Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;
 
-    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2; }
+    static int GetNumWorldsRequired(const int nOptParams) { return nOptParams*2+2; } // 1+2 per opt dim for optimization, 1 for control 
 
     static void getCollisions(btDynamicsWorld* world, std::vector<CollisionEvent>& collisions)
     {

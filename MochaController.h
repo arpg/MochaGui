@@ -178,8 +178,8 @@ private:
     bool m_bFirstPose;
     bool m_bStillRun;
 
-    float m_dMaxControlPlanTime;
-    float m_dLookaheadTime; 
+    double m_dMaxControlPlanTime;
+    double m_dLookaheadTime; 
 
     boost::thread* m_pControlPlannerThread;
 
@@ -196,6 +196,8 @@ private:
     Eigen::Vector5d m_dLastDelta;
 
     Eigen::MatrixXd m_dTrajWeight;
+
+    std::string m_map_frame;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

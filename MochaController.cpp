@@ -12,7 +12,8 @@ MochaController::MochaController(ros::NodeHandle& private_nh_, ros::NodeHandle& 
     m_dLookaheadTime(1.0),
     m_pControlPlannerThread(NULL),
     m_ControllerState(IDLE),
-    m_dt(0.01)
+    m_dt(0.01),
+    m_map_frame("map")
     // m_bControllerRunning(false)
 {
     m_lControlPlans.clear();
@@ -28,6 +29,9 @@ MochaController::MochaController(ros::NodeHandle& private_nh_, ros::NodeHandle& 
     m_dTrajWeight(4) = VEL_WEIGHT_TRAJ;
     m_dTrajWeight(5) = TIME_WEIGHT;
     m_dTrajWeight(6) = CURV_WEIGHT;
+
+    m_private_nh.param("map_frame", m_map_frame, m_map_frame);
+    m_private_nh.param("lookahead_time", m_dLookaheadTime, m_dLookaheadTime);
 
     m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), &MochaController::ControlLoopFunc, this);
     // m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), boost::bind(&MochaController::ControlLoopFunc, this, _1));
@@ -427,6 +431,7 @@ bool MochaController::PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut)
         //     str += "\n" + convertEigenMatrix2String(trajectorySample.m_vStates[i].ToXYZTCV().transpose());
         // }
         // ROS_INFO("%s",str.c_str());
+        ROS_INFO("Pubbing Lookahead, frame %s", m_map_frame.c_str());
         PublishLookaheadTrajectory(trajectorySample);
 
         // SetNoDelay(true);
@@ -502,7 +507,7 @@ void MochaController::PublishLookaheadTrajectory(MotionSample& sample)
     
     // carplanner_msgs::MotionSample sample_msg = sample.toROS();
     nav_msgs::Path path_msg;
-    convertSomePath2PathMsg(sample, &path_msg);
+    convertSomePath2PathMsg(sample, &path_msg, m_map_frame);
 
     m_pubLookaheadTraj.publish(path_msg);
     ros::spinOnce();
