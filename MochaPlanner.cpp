@@ -2792,7 +2792,7 @@ void MochaPlanner::_pubActualTraj(Eigen::Vector3dAlignedVec& path_in)
     nav_msgs::Path path_msg;
     convertSomePath2PathMsg(some_path, &path_msg, m_config.map_frame);
     // path_msg.header.frame_id = m_config.map_frame;
-    m_pubActualTraj.publish(path_msg);
+    m_pubActualTraj.publish(path_msg);    
     ros::spinOnce();
 }
 

@@ -96,8 +96,8 @@ public:
                             ControlCommand& command,
                             Eigen::Vector3d& targetVel,
                             Sophus::SE3d &dT_target);
-    float* GetMaxControlPlanTimePtr(){ return &m_dMaxControlPlanTime; }
-    float* GetLookaheadTimePtr(){ return &m_dLookaheadTime; }
+    double* GetMaxControlPlanTimePtr(){ return &m_dMaxControlPlanTime; }
+    double* GetLookaheadTimePtr(){ return &m_dLookaheadTime; }
     double GetLastPlanStartTime();
     bool PlanControl(double dPlanStartTime, ControlPlan*& pPlanOut);
     static double AdjustStartingSample(const std::vector<MotionSample>& segmentSamples,

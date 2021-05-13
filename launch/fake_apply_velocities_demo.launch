@@ -6,7 +6,7 @@
   <arg name="wheel_mesh_file" default="$(find mochapc)/herbie/wheel.blend"/>
   <arg name="apply_velocities_topic" default="vehicle/apply_velocities"/>
 
-  <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager" output="screen" launch-prefix="gdb -ex run --args"/>
+  <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager" output="screen" launch-prefix=""/>
   
   <node pkg="nodelet" type="nodelet" name="fake_apply_velocities" args="load mochapc/FakeApplyVelocitiesNodelet mocha_manager">
     <param name="apply_velocities_topic" value="$(arg apply_velocities_topic)"/>

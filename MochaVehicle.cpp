@@ -1154,18 +1154,10 @@ void MochaVehicle::SetSimMode(uint nWorldId, uint mode=0)
     InitializeTransformPublishers();
 }
 
-// void MochaVehicle::CreateServerService(const carplanner_msgs::CreateServerGoalConstPtr &goal)
-// {
-//     actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> server(m_nh, "plan_car/apply_velocities/"+std::to_string(goal->id), boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), true); 
-//     servers_.push_back(&server);
-//     m_actionCreateSimpleServer_server.setSucceeded(carplanner_msgs::CreateServerResult());
-// }
-
 void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction> goalHandle)
 {
     goalHandle.setAccepted();
 
-    ROS_INFO("[ApplyVelocitiesService] Accepting new goal");
 
     auto fObj = boost::make_shared<ApplyVelocitiesFunctionObj>([this, goalHandle]() mutable {
         carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
@@ -1189,408 +1181,6 @@ void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner
     });
     ros::getGlobalCallbackQueue()->addCallback(fObj);
 }
-
-// void MochaVehicle::ApplyVelocitiesService0(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server0.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService1(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server1.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService2(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server2.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService3(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server3.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService4(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server4.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService5(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server5.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService6(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server6.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService7(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server7.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService8(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server8.setSucceeded(actionApplyVelocities_result);
-// }
-// void MochaVehicle::ApplyVelocitiesService9(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     m_actionApplyVelocities_server9.setSucceeded(actionApplyVelocities_result);
-// }
-
-
-// void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr &goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesGoalConstPtr new_goal(goal);
-//     boost::thread av_thread(boost::bind(&MochaVehicle::ApplyVelocities, this, goal));
-//     av_thread.join();
-// }
-// void MochaVehicle::ApplyVelocities(carplanner_msgs::ApplyVelocitiesGoalConstPtr& goal)
-// {
-//     carplanner_msgs::ApplyVelocitiesFeedback actionApplyVelocities_feedback;
-//     carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
-
-//     DLOG(INFO) << "ApplyVelocities called:" << 
-//       " world " << std::to_string(goal->world_id)
-//       // "\nstart " << std::to_string(VehicleState::fromROS(goal->initial_state))
-//       ;
-
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation);
-        
-//     actionApplyVelocities_result.motion_sample = sample.toROS();
-//     // actionApplyVelocities_result.last_state = sample.m_vStates.back().toROS();
-//     m_actionApplyVelocities_server.setSucceeded(actionApplyVelocities_result);
-
-//     DLOG(INFO) << "ApplyVelocities done:" << 
-//         " world " << std::to_string(goal->world_id)
-//         // << " poseOut " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x) 
-//         //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.x)  
-//         //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.y)
-//         //     << " " << std::to_string(actionApplyVelocities_result.motion_sample.states.back()->pose.transform.translation.z) 
-//         ;
-// }
-
-/////////////////////////
-
-// bool MochaVehicle::ApplyAllVelocitiesFromClient(ApplyAllVelocitiesClient* client,
-//                                     const std::vector<VehicleState>& startStates,
-//                                     std::vector<MotionSample>& samples,
-//                                     bool noCompensation /*= false*/,
-//                                     bool noDelay /*=false*/)
-// {
-//     ROS_INFO("Applying all velocities.");
-
-//     carplanner_msgs::ApplyAllVelocitiesGoal goal;
-//     carplanner_msgs::ApplyAllVelocitiesResultConstPtr result;
-
-//     if (!client)
-//     {
-//         ROS_WARN("No client provided, creating new one.");
-//         client = new ApplyAllVelocitiesClient("vehicle/apply_all_velocities",true);
-//         client->waitForServer();
-//     }
-    
-//     assert(samples.size()==startStates.size());
-//     for (uint i=0; i<samples.size(); i++)
-//     {
-//         // goal.initial_state = startState.toROS();
-//         // goal.initial_motion_sample = sample.toROS();
-//         // goal.world_id = nWorldId;
-//         // goal.no_compensation = noCompensation;
-//         // goal.no_delay = noDelay;
-//     }
-
-//     ROS_DBG("Sending goal.");
-//     double t1 = Tic();
-
-//     client->sendGoal(goal
-//         // , boost::bind(&MochaProblem::ApplyVelocitiesDoneCb, this, _1, _2)
-//         // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleActiveCallback()
-//         // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleFeedbackCallback()
-//         );
-
-//     bool success;
-
-//     float timeout(15.0);
-//     bool finished_before_timeout = client->waitForResult(ros::Duration(timeout));
-
-//     double t3 = Tic();
-//     ROS_DBG("Got goal result, took %fs", t3-t1);
-
-//     if (finished_before_timeout)
-//     {
-//         success = true;
-
-//         // actionlib::SimpleClientGoalState state = client->getState();
-
-//         result = client->getResult();
-//         // sample.fromROS(result->motion_sample);
-//     }
-//     else
-//     {
-//         success = false;
-//         ROS_ERROR("ApplyAllVelocities did not finish before the %fs timeout.", timeout);
-//     }
-    
-//     return success;
-// }
-
-// void MochaVehicle::ApplyAllCommands(std::vector<VehicleState>& startStates,
-//                                     std::vector<MotionSample>& samples,
-//                                     bool noCompensation /*= false*/,
-//                                     bool noDelay /*=false*/) 
-// {
-//     assert(startStates.size()==samples.size());
-//     for (uint i=0; i<startStates.size(); i++)
-//     {
-//         ApplyVelocities(startStates[i],
-//                         samples[i].m_vCommands,
-//                         samples[i].m_vStates,
-//                         0,
-//                         samples[i].m_vCommands.size(),
-//                         i,
-//                         noCompensation,
-//                         NULL,
-//                         noDelay);
-//     }
-// }
-
-// void MochaVehicle::ApplyCommands( VehicleState& startingState,
-//                                     std::vector<ControlCommand>& vCommands,
-//                                     std::vector<VehicleState>& vStatesOut,
-//                                     const int iMotionStart,
-//                                     const int iMotionEnd,
-//                                     const int nWorldId,
-//                                     const bool bNoCompensation /*= false (bUsingBestSolution)*/,
-//                                     const CommandList *pPreviousCommands /*= NULL*/,
-//                                     bool noDelay /*=false*/)
-// {
-//     double t0 = Tic();
-//     ROS_INFO("Applying commands (%d)", nWorldId);
-    
-
-
-//     double t1 = Tic();
-//     ROS_INFO("Done applying commands (%d), took %fs", nWorldId, t1-t0);
-// }
-
-///////////////////////
-
-// bool MochaVehicle::ApplyAllVelocitiesFromClient(ApplyAllVelocitiesClient* client,
-//                                     const std::vector<VehicleState>& startStates,
-//                                     std::vector<MotionSample>& samples,
-//                                     bool noCompensation /*= false*/,
-//                                     bool noDelay /*=false*/)
-// {
-//     ROS_INFO("Applying all velocities.");
-
-//     carplanner_msgs::ApplyAllVelocitiesGoal goal;
-//     carplanner_msgs::ApplyAllVelocitiesResultConstPtr result;
-
-//     if (!client)
-//     {
-//         ROS_WARN("No client provided, creating new one.");
-//         client = new ApplyAllVelocitiesClient("vehicle/apply_all_velocities",true);
-//         client->waitForServer();
-//     }
-    
-//     assert(samples.size()==startStates.size());
-//     for (uint i=0; i<samples.size(); i++)
-//     {
-//         // goal.initial_state = startState.toROS();
-//         // goal.initial_motion_sample = sample.toROS();
-//         // goal.world_id = nWorldId;
-//         // goal.no_compensation = noCompensation;
-//         // goal.no_delay = noDelay;
-//     }
-
-//     ROS_DBG("Sending goal.");
-//     double t1 = Tic();
-
-//     client->sendGoal(goal
-//         // , boost::bind(&MochaProblem::ApplyVelocitiesDoneCb, this, _1, _2)
-//         // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleActiveCallback()
-//         // , actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>::SimpleFeedbackCallback()
-//         );
-
-//     bool success;
-
-//     float timeout(15.0);
-//     bool finished_before_timeout = client->waitForResult(ros::Duration(timeout));
-
-//     double t3 = Tic();
-//     ROS_DBG("Got goal result, took %fs", t3-t1);
-
-//     if (finished_before_timeout)
-//     {
-//         success = true;
-
-//         // actionlib::SimpleClientGoalState state = client->getState();
-
-//         result = client->getResult();
-//         // sample.fromROS(result->motion_sample);
-//     }
-//     else
-//     {
-//         success = false;
-//         ROS_ERROR("ApplyAllVelocities did not finish before the %fs timeout.", timeout);
-//     }
-    
-//     return success;
-// }
-
-// void MochaVehicle::ApplyAllVelocities(std::vector<VehicleState>& startStates,
-//                                     std::vector<MotionSample>& samples,
-//                                     bool noCompensation /*= false*/,
-//                                     bool noDelay /*=false*/) 
-// {
-//     assert(startStates.size()==samples.size());
-//     for (uint i=0; i<startStates.size(); i++)
-//     {
-//         ApplyVelocities(startStates[i],
-//                         samples[i].m_vCommands,
-//                         samples[i].m_vStates,
-//                         0,
-//                         samples[i].m_vCommands.size(),
-//                         i,
-//                         noCompensation,
-//                         NULL,
-//                         noDelay);
-//     }
-// }
-
 
 bool MochaVehicle::ApplyVelocitiesFromClient(ApplyVelocitiesClient* client,
                                     const VehicleState& startState,
@@ -1910,13 +1500,12 @@ void MochaVehicle::_pubMesh(btCollisionShape* collisionShape, btTransform* paren
 
       ROS_INFO("[MochaVehicle] pubbing mesh, %d faces, %d vertices, %.2f sec", mesh->triangles.size(), mesh->vertices.size(), std::difftime(t1,t0)/CLOCKS_PER_SEC); 
       pub->publish(mesh_stamped);
-      ros::spinOnce();
       // ros::Rate(10).sleep();
 }
 
 void MochaVehicle::meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
-    if (mesh_msg->mesh.vertices.size()<=0) return;
+    if (mesh_msg->triangleVertices.size()<=0) return;
     double t0 = Tic();
     ROS_INFO_STREAM("[Vehicle::MeshCb] Received mesh addr " << mesh_msg);
     static tf::StampedTransform Twm;
@@ -2026,7 +1615,6 @@ void MochaVehicle::appendMesh(uint worldId, btCollisionShape* meshShape, tf::Sta
     pWorld->m_pTerrainBody->setWorldTransform(btTransform(
       btQuaternion(Twm.getRotation().getX(),Twm.getRotation().getY(),Twm.getRotation().getZ(),Twm.getRotation().getW()),
       btVector3(Twm.getOrigin().getX(),Twm.getOrigin().getY(),Twm.getOrigin().getZ())));
-    pWorld->m_pTerrainBody = body;
     pWorld->m_pDynamicsWorld->addRigidBody(pWorld->m_pTerrainBody);
 }
 
@@ -2430,11 +2018,9 @@ void MochaVehicle::_GetDelayedControl(int worldId, double timeDelay, ControlComm
     ControlCommand* pCurrentCommand = &(*it);
     //currentDelay = (*it).m_dT;
 
-    int count = 0;
     if(previousCommands.size() > 1) {
         it++; //move to the first element
         for(; it != previousCommands.end() ; it++) {
-            count++;
             if( currentDelay + (*it).m_dT >= timeDelay ) {
 
               //interpolate between the current and next commands
