@@ -558,6 +558,20 @@ struct VehicleState
         return frame;
     }
 
+    std::string GetWheelFrame(const Eigen::Vector3d& translation) const {
+        std::string frame;
+        if (translation[0]>0)
+            frame += "front";
+        else
+            frame += "back";
+        if (translation[1]>0)
+            frame += "_left";
+        else
+            frame += "_right";
+        frame += "_wheel_link";
+        return frame;
+    }
+
     bool IsWheelInContact(uint i) const
     {
         return m_vWheelContacts[i];

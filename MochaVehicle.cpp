@@ -1075,7 +1075,6 @@ void MochaVehicle::RaycastService(const carplanner_msgs::RaycastGoalConstPtr &go
 {
     carplanner_msgs::RaycastResult actionRaycast_result;
     Eigen::Vector3d dIntersect;
-    static int count=0;
 
     DLOG(INFO) << "Raycast service called.";
 
@@ -1514,7 +1513,7 @@ void MochaVehicle::meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& 
         m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(0.2));
         m_tflistener.lookupTransform(m_config.map_frame, "infinitam", mesh_msg->header.stamp, Twm);
     }
-    catch (tf::TransformException ex)
+    catch (const tf::TransformException& ex)
     {
         ROS_ERROR("%s",ex.what());
         usleep(10000);
@@ -1636,112 +1635,32 @@ void MochaVehicle::_pubTFs(uint nWorldId)
     // static tf::TransformBroadcaster tfcaster;
     // tf::Transform rot_180_x( tf::Quaternion(1, 0, 0, 0), tf::Vector3(0, 0, 0) );
     // map -> base_link
-    {
-        btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform(); // nwu
-        ros::Time now = ros::Time::now();
+    const btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform(); // nwu
+    const btTransform btform_chassis_inv = btform_chassis.inverse();
 
-        tf::Transform tform_chassis(
-            tf::Quaternion(btform_chassis.getRotation()[0], btform_chassis.getRotation()[1], btform_chassis.getRotation()[2], btform_chassis.getRotation()[3]),
-            tf::Vector3(btform_chassis.getOrigin()[0], btform_chassis.getOrigin()[1], btform_chassis.getOrigin()[2]) );
+    const tf::Transform tform_chassis(
+        tf::Quaternion(btform_chassis.getRotation()[0], btform_chassis.getRotation()[1], btform_chassis.getRotation()[2], btform_chassis.getRotation()[3]),
+        tf::Vector3(btform_chassis.getOrigin()[0], btform_chassis.getOrigin()[1], btform_chassis.getOrigin()[2]) );
 
-        // tform_chassis = rot_180_x*tform_chassis*rot_180_x;
+    // tform_chassis = rot_180_x*tform_chassis*rot_180_x;
 
-        tf::StampedTransform stform(tform_chassis, now, m_config.map_frame, m_config.base_link_frame+"/"+std::to_string(nWorldId));
-        m_tfcaster.sendTransform(stform);
-    }
-    // // base_link -> front_right_wheel
-    // {
-    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(0)->getBody()->getWorldTransform(); 
-    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(0).m_worldTransform;
-    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[0];
-    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
-    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 0, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-    //     ros::Time now = ros::Time::now();
+    const tf::StampedTransform stform(tform_chassis, ros::Time::now(), m_config.map_frame, m_config.base_link_frame+"/"+std::to_string(nWorldId));
+    m_tfcaster.sendTransform(stform);
 
-    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-    //     tf::Transform tform_wheel_cs(
-    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
-    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
-
-    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(0)+"/"+std::to_string(nWorldId));
-    //     tfcaster.sendTransform(stform);
-    // }
-    // // base_link -> front_left_wheel
-    // {
-    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(1)->getBody()->getWorldTransform();  
-    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(1).m_worldTransform;
-    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[1];
-    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
-    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 1, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-    //     ros::Time now = ros::Time::now();
-
-    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-    //     tf::Transform tform_wheel_cs(
-    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
-    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
-
-    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(1)+"/"+std::to_string(nWorldId));
-    //     tfcaster.sendTransform(stform);
-    // }
-    // // base_link -> back_left_wheel
-    // {
-    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(2)->getBody()->getWorldTransform();  
-    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(2).m_worldTransform;
-    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[2];
-    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z()));
-    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 2, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-    //     ros::Time now = ros::Time::now();
-
-    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-    //     tf::Transform tform_wheel_cs(
-    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
-    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
-
-    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(2)+"/"+std::to_string(nWorldId));
-    //     tfcaster.sendTransform(stform);
-    // }
-    // // base_link -> back_right_wheel
-    // {
-    //     btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-    //     // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(3)->getBody()->getWorldTransform(); 
-    //     btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(3).m_worldTransform;
-    //     // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[3];
-    //     // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z())); 
-    //     // ROS_INFO("Setting state %d w wheels %f %f %f", 3, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-    //     ros::Time now = ros::Time::now();
-
-    //     btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-    //     tf::Transform tform_wheel_cs(
-    //         tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
-    //         tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
-
-    //     tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(3)+"/"+std::to_string(nWorldId));
-    //     tfcaster.sendTransform(stform);
-    // }
-
+    // Wheels
     for (uint i=0; i<pWorld->m_pVehicle->getNumWheels(); i++)
     {
-        btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform();
-        // btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheel(3)->getBody()->getWorldTransform(); 
-        btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(i).m_worldTransform;
-        // Sophus::SE3d state = pWorld->m_state.m_vWheelStates[3];
-        // btTransform btform_wheel_ws = btTransform(btQuaternion(state.unit_quaternion().x(),state.unit_quaternion().y(),state.unit_quaternion().z(),state.unit_quaternion().w()),btVector3(state.translation().x(),state.translation().y(),state.translation().z())); 
-        // ROS_INFO("Setting state %d w wheels %f %f %f", 3, btform_wheel_ws.getOrigin().getX(), btform_wheel_ws.getOrigin().getY(), btform_wheel_ws.getOrigin().getZ());
-        ros::Time now = ros::Time::now();
+        const btTransform btform_wheel_ws = pWorld->m_pVehicle->getWheelInfo(i).m_worldTransform;
 
-        btTransform btform_wheel_cs = btform_chassis.inverse()*btform_wheel_ws; 
-        tf::Transform tform_wheel_cs(
+        const btTransform btform_wheel_cs = btform_chassis_inv * btform_wheel_ws; 
+        const tf::Transform tform_wheel_cs(
             tf::Quaternion(btform_wheel_cs.getRotation()[0], btform_wheel_cs.getRotation()[1], btform_wheel_cs.getRotation()[2], btform_wheel_cs.getRotation()[3]),
             tf::Vector3(btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2]) );
 
-        tf::StampedTransform stform(tform_wheel_cs, now, m_config.base_link_frame+"/"+std::to_string(nWorldId), pWorld->m_state.GetWheelFrame(i)+"/"+std::to_string(nWorldId));
+        const tf::StampedTransform stform(tform_wheel_cs, ros::Time::now(), m_config.base_link_frame+"/"+std::to_string(nWorldId), 
+            pWorld->m_state.GetWheelFrame({ btform_wheel_cs.getOrigin()[0], btform_wheel_cs.getOrigin()[1], btform_wheel_cs.getOrigin()[2] })+"/"+std::to_string(nWorldId));
         m_tfcaster.sendTransform(stform);
     }
-
-    ros::spinOnce();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -1832,7 +1751,6 @@ void MochaVehicle::_pubVehicleMesh(uint nWorldId)
     }
 
     m_vehiclePub.publish(veh_marker_array_msg);
-    ros::spinOnce();
 }
 
 void MochaVehicle::_pubPreviousCommands(uint nWorldId)
@@ -1927,7 +1845,7 @@ void MochaVehicle::TransformLookupLoopFunc(const ros::TimerEvent& event, int wor
         m_tflistener.waitForTransform(m_config.map_frame, base_link_frame, ros::Time::now(), ros::Duration(0.2));
         m_tflistener.lookupTransform(m_config.map_frame, base_link_frame, ros::Time(0), Tmv);
     }
-    catch (tf::TransformException ex)
+    catch (const tf::TransformException& ex)
     {
         ROS_ERROR("%s",ex.what());
         return;
