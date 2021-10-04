@@ -53,7 +53,6 @@ public:
                 client->sendGoal(goal);
                 NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Sent goal for world 0" );
             }
-
             // Receive goals for all clients
             for (unsigned int i = 0; i < m_actionClients.size(); ++i) {
                 m_actionClients[i]->getResult();

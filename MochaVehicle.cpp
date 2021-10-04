@@ -1255,60 +1255,6 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
     double t0 = Tic();
     ROS_INFO("[Vehicle] >>> (%d) Got velocities. Updating state.", nWorldId);
 
-/*
-    Eigen::Vector3d torques;
-    Eigen::Vector4dAlignedVec vCoefs;
-    BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
-
-    vStatesOut.clear();
-
-    double dTime = 0;
-
-    VehicleState currentState;
-    SetState(nWorldId,startingState);
-    GetVehicleState(nWorldId,currentState);
-    // VehicleState* pCurrentState = &currentState; //this is necessary as we need to get a pointer to the current state for compensations
-    //clear all the previous commands but chose between the member list or the one passed to the function
-    SetCommandHistory(nWorldId, pPreviousCommands == NULL ? m_lPreviousCommands : *pPreviousCommands);
-    // ResetCommandHistory(nWorldId);
-
-    vStatesOut.resize(iMotionEnd-iMotionStart);
-
-    // double t0 = Tic();
-
-    ControlCommand command;
-    for (int iMotion = iMotionStart; iMotion < iMotionEnd; iMotion++) {
-        // ROS_INFO("Updating state %d world %d", iMotion, nWorldId);
-
-        //update the vehicle state
-        //approximation for this dt
-        command = vCommands[iMotion];
-
-        double dCorrectedCurvature;
-        command.m_dPhi = GetSteeringAngle(command.m_dCurvature,
-                                                dCorrectedCurvature,nWorldId,3.);
-
-        //set the timestamp for this command
-        command.m_dTime = dTime;
-        dTime += command.m_dT;
-
-        UpdateState(nWorldId, command, command.m_dT, m_bNoDelay);
-        GetVehicleState(nWorldId, vStatesOut[iMotion-iMotionStart]);
-
-        // vStatesOut[iMotion-iMotionStart] = UpdateState(nWorldId,command,command.m_dT,m_bNoDelay);
-        
-        vStatesOut[iMotion-iMotionStart].m_dCurvature = command.m_dCurvature;
-        vStatesOut[iMotion-iMotionStart].m_dTime = dTime;
-        // pCurrentState = &vStatesOut[iMotion-iMotionStart];
-        // pCurrentState->m_dTime = dTime;
-
-        vCommands[iMotion] = command;
-    }
-
-    // double t1 = Tic();
-    // ROS_INFO("UpdateStates for world %d and %d states took %.2fs", nWorldId, iMotionEnd-iMotionStart, t1-t0);
-*/
-
     Eigen::Vector3d torques;
     Eigen::Vector4dAlignedVec vCoefs;
     BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
@@ -1619,31 +1565,16 @@ void MochaVehicle::appendMesh(uint worldId, btCollisionShape* meshShape, tf::Sta
 
 void MochaVehicle::_pubTFs(uint nWorldId)
 {
-    BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
+    const BulletWorldInstance* pWorld = GetWorldInstance(nWorldId);
 
-    // static tf::TransformListener tflistener;
-    // try
-    // {
-    //     tflistener.waitForTransform("/map", "/world", ros::Time.now(), ros::Duration(1.0));
-    //     tflistener.lookupTransform("/map", "world", ros::Time(0), local_transform);
-    // }
-    // catch (tf::TransformException& ex)
-    // {
-    //     ROS_ERROR("%s", ex.what());
-    // }
-
-    // static tf::TransformBroadcaster tfcaster;
-    // tf::Transform rot_180_x( tf::Quaternion(1, 0, 0, 0), tf::Vector3(0, 0, 0) );
-    // map -> base_link
-    const btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform(); // nwu
+    const btTransform btform_chassis = pWorld->m_pVehicle->getChassisWorldTransform(); 
     const btTransform btform_chassis_inv = btform_chassis.inverse();
 
     const tf::Transform tform_chassis(
         tf::Quaternion(btform_chassis.getRotation()[0], btform_chassis.getRotation()[1], btform_chassis.getRotation()[2], btform_chassis.getRotation()[3]),
         tf::Vector3(btform_chassis.getOrigin()[0], btform_chassis.getOrigin()[1], btform_chassis.getOrigin()[2]) );
 
-    // tform_chassis = rot_180_x*tform_chassis*rot_180_x;
-
+    // map -> base_link
     const tf::StampedTransform stform(tform_chassis, ros::Time::now(), m_config.map_frame, m_config.base_link_frame+"/"+std::to_string(nWorldId));
     m_tfcaster.sendTransform(stform);
 
