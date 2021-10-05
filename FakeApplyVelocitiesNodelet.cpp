@@ -31,39 +31,54 @@ public:
         ros::NodeHandle& nh = this->getMTNodeHandle();
         ros::NodeHandle& private_nh = this->getMTPrivateNodeHandle();
 
-        private_nh.param("apply_velocities_topic", m_applyVelocitiesTopic, m_applyVelocitiesTopic);
-        for (unsigned int i = 0; i < m_worlds; ++i) {
-            m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>(m_applyVelocitiesTopic, true));
-            m_actionClientsWorld0.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>(m_applyVelocitiesTopic, true));
-        }
-        
+        m_applyVelocitiesTopic = "vehicle";
+
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/0/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/1/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/2/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/3/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/4/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/5/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/6/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/7/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/8/apply_velocities", true));
+        m_actionClients.push_back(std::make_unique<actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction>>("vehicle/9/apply_velocities", true));
+
+       // m_actionClients[0].waitForServer();
         NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Initialized, ready to send goals to %s", m_applyVelocitiesTopic.c_str());
 
         m_loopTimer = nh.createTimer(ros::Duration(m_timeout_s), [ this ](const ros::TimerEvent &time) {
             // Send goals for all clients
             for (unsigned int i = 0; i < m_actionClients.size(); ++i) {
                 carplanner_msgs::ApplyVelocitiesGoal goal = generateRandomGoal(i);
+                goal.world_id = i;
                 m_actionClients[i]->sendGoal(goal);
                 NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Sent goal for world %d", i);
             }
+            ros::spinOnce();
 
             // Send goals for all world 0 clients
+            /*
             for (const auto& client: m_actionClientsWorld0) {
                 carplanner_msgs::ApplyVelocitiesGoal goal = generateRandomGoal(0);
                 client->sendGoal(goal);
                 NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Sent goal for world 0" );
             }
+            */
             // Receive goals for all clients
             for (unsigned int i = 0; i < m_actionClients.size(); ++i) {
+                m_actionClients[i]->waitForResult(ros::Duration(30.0));
                 m_actionClients[i]->getResult();
                 NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Received result for world %d", i);
             }
 
             // Receive goals for all world 0 clients
+            /*
             for (const auto& client: m_actionClientsWorld0) {
                 client->getResult();
                 NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Received result for world 0");
             }
+            */
         });
     }
 
