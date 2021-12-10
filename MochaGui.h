@@ -39,6 +39,7 @@
 #include "EventLogger.h"
 #include "ProcessModelFusion.h"
 
+#include <std_msgs/Float64.h>
 #include <nav_msgs/Path.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <carplanner_msgs/WayPoints.h>
@@ -266,6 +267,10 @@ protected:
 
     ros::NodeHandle* m_nh;
     tf::TransformListener m_tflistener;
+
+    ros::Publisher m_ControlRatePub;
+    inline void _pubControlRate() { _pubDouble(&m_ControlRatePub, m_dControlPlansPerS); }
+    void _pubDouble(ros::Publisher*, double);
     
     boost::thread* m_pStatePubThread;
     void _StatePubFunc();

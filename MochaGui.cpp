@@ -260,11 +260,14 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     double waypoints_vel_min, waypoints_vel_max;
     m_nh->param<double>("waypoints_vel_min", waypoints_vel_min, 1.0);
     m_nh->param<double>("waypoints_vel_max", waypoints_vel_max, 1.0);
-    double waypoints_radius, waypoints_offset_x, waypoints_offset_y, waypoints_offset_z;
+    double waypoints_radius, waypoints_offset_x, waypoints_offset_y, waypoints_offset_z, waypoints_offset_roll, waypoints_offset_pitch, waypoints_offset_yaw;
     m_nh->param<double>("waypoints_radius", waypoints_radius, 1.5);
     m_nh->param<double>("waypoints_offset_x", waypoints_offset_x, 0.0);
     m_nh->param<double>("waypoints_offset_y", waypoints_offset_y, 0.0);
     m_nh->param<double>("waypoints_offset_z", waypoints_offset_z, 0.3);
+    m_nh->param<double>("waypoints_offset_roll", waypoints_offset_roll, 0.0);
+    m_nh->param<double>("waypoints_offset_pitch", waypoints_offset_pitch, 0.0);
+    m_nh->param<double>("waypoints_offset_yaw", waypoints_offset_yaw, 0.0);
 
     // init other (old) mochagui items
     m_sPlaybackLogFile = sLogFile;
@@ -421,48 +424,40 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //initialize the debug drawer
     m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
-    /// Establish number of waypoints and where they are; set them to CVars. 
+    /// Establish number of waypoints and where they are; set them to CVars.         
+    Eigen::Matrix<double,6,1> offset; offset << waypoints_offset_x, waypoints_offset_y, waypoints_offset_z, waypoints_offset_roll, waypoints_offset_pitch, waypoints_offset_yaw;
     if (tf_utils::tolower(waypoints_config) == "eight")
     {
         // FIGURE EIGHT ****************************/  
         float radius = static_cast<float>(waypoints_radius);
-        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
         float vel  = static_cast<float>(waypoints_vel_min);
         int ii=0;
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << 0.0+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, vel, 0.0;
+            (*m_vWayPoints.back()) << 0.0+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], 0.0+offset[5], vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << radius+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI/2.f, vel, 0.0;
+            (*m_vWayPoints.back()) << radius+offset[0], radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], M_PI/2.f+offset[5], vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << 0.0+offset[0], 2*radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, vel, 0.0;
+            (*m_vWayPoints.back()) << 0.0+offset[0], 2*radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], M_PI+offset[5], vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << -radius+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, 3*M_PI/2.f, vel, 0.0;
-            m_Path.push_back(ii++);
-        }
-        {
-            // 4
-            char buf[100];
-            snprintf( buf, 100, "waypnt.%d", ii );
-            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << 0.0+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, vel, 0.0;
+            (*m_vWayPoints.back()) << -radius+offset[0], radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], 3*M_PI/2.f+offset[5], vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
@@ -470,7 +465,15 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << radius+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, -M_PI/2.f, vel, 0.0;
+            (*m_vWayPoints.back()) << 0.0+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], 0.0+offset[5], vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            // 4
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << radius+offset[0], -radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], -M_PI/2.f+offset[5], vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
@@ -478,14 +481,14 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << 0.0+offset[0], -2*radius+offset[1], 0.0+offset[2], 0.0, 0.0, -M_PI, vel, 0.0;
+            (*m_vWayPoints.back()) << 0.0+offset[0], -2*radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], -M_PI+offset[5], vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << -radius+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, -3*M_PI/2.f, vel, 0.0;
+            (*m_vWayPoints.back()) << -radius+offset[0], -radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], -3*M_PI/2.f+offset[5], vel, 0.0;
             m_Path.push_back(ii++);
         }
         m_Path.push_back(0);
@@ -497,7 +500,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
         float b = 4.f;
         float radius = b/2.f;
         float focal = a-(2.f*radius);
-        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
+        // Eigen::Vector6d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z, waypoints_offset_roll, waypoints_offset_pitch, waypoints_offset_yaw);
         float low_vel  = static_cast<float>(waypoints_vel_min);
         float high_vel = static_cast<float>(waypoints_vel_max);
         int ii=0;
@@ -505,28 +508,28 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << 0.0+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, high_vel, 0.0;
+            (*m_vWayPoints.back()) << 0.0+offset[0], -radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], 0.0+offset[5], high_vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << focal/2.f+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, low_vel, 0.0;
+            (*m_vWayPoints.back()) << focal/2.f+offset[0], -radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], 0.0+offset[5], low_vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << a/2.f+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI/2.f, low_vel, 0.0;
+            (*m_vWayPoints.back()) << a/2.f+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], M_PI/2.f+offset[5], low_vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << focal/2.f+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, low_vel, 0.0;
+            (*m_vWayPoints.back()) << focal/2.f+offset[0], radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], M_PI+offset[5], low_vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
@@ -534,14 +537,14 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << 0.0+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, high_vel, 0.0;
+            (*m_vWayPoints.back()) << 0.0+offset[0], radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], M_PI+offset[5], high_vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << -focal/2.f+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, low_vel, 0.0;
+            (*m_vWayPoints.back()) << -focal/2.f+offset[0], radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], M_PI+offset[5], low_vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
@@ -549,14 +552,14 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << -a/2.f+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, 3*M_PI/2.f, low_vel, 0.0;
+            (*m_vWayPoints.back()) << -a/2.f+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], 3*M_PI/2.f+offset[5], low_vel, 0.0;
             m_Path.push_back(ii++);
         }
         {
             char buf[100];
             snprintf( buf, 100, "waypnt.%d", ii );
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-            (*m_vWayPoints.back()) << -focal/2.f+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, low_vel, 0.0;
+            (*m_vWayPoints.back()) << -focal/2.f+offset[0], -radius+offset[1], 0.0+offset[2], 0.0+offset[3], 0.0+offset[4], 0.0+offset[5], low_vel, 0.0;
             m_Path.push_back(ii++);
         }
         m_Path.push_back(0);
@@ -564,7 +567,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     else if (tf_utils::tolower(waypoints_config) == "segment")
     {
         // ONE SEGMENT ****************************
-        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
+        // Eigen::Vector6d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z, waypoints_offset_roll, waypoints_offset_pitch, waypoints_offset_yaw);
         int numWaypoints = 2;
         for(int ii = 0; ii < numWaypoints ; ii++){
             char buf[100];
@@ -572,7 +575,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
             m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
 
             /// Linear waypoints.
-            (*m_vWayPoints.back()) << ii*1+offset(0), 0+offset(1), 0+offset(2), 0, 0, 0, 1, 0;
+            (*m_vWayPoints.back()) << ii*1+offset[0], 0+offset[1], 0+offset[2], 0+offset[3], 0+offset[4], 0+offset[5], 1, 0;
 
             m_Path.push_back(ii);
         }
@@ -581,7 +584,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     {
         // CIRCLE ****************************
         float radius = static_cast<float>(waypoints_radius);
-        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
+        // Eigen::Vector6d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z, waypoints_offset_roll, waypoints_offset_pitch, waypoints_offset_yaw);
         int numWaypoints = 8;
         float vel = static_cast<float>(waypoints_vel_min);
         for(int ii = 0; ii < numWaypoints ; ii++){
@@ -592,7 +595,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
             /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, air
             (*m_vWayPoints.back()) << radius*sin((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[0],
                 radius*cos((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[1],
-                0+offset[2], 0, 0, M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints, vel, 0;
+                0+offset[2], 0+offset[3], 0+offset[4], M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints+offset[5], vel, 0;
             /// Load this segment ID into a vector that enumerates the path elements.
             m_Path.push_back(ii);
         }
@@ -735,6 +738,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_actualTrajPub = m_nh->advertise<nav_msgs::Path>("actual_traj",1);
     m_controlTrajPub = m_nh->advertise<nav_msgs::Path>("control_traj",1);
     m_waypointPub = m_nh->advertise<geometry_msgs::PoseArray>("waypoints",1);
+    m_ControlRatePub = m_nh->advertise<std_msgs::Float64>("control_rate",1);
 
     m_resetMeshSrv = m_nh->advertiseService("reset_mesh", &MochaGui::ResetMeshFunc, this);
 
@@ -763,19 +767,29 @@ void MochaGui::_pubTerrainMesh(uint nWorldId)
 
     if (pWorld->m_pTerrainBody != NULL && m_terrainMeshPub.getNumSubscribers()>0) {
         boost::unique_lock<boost::mutex> lock(*pWorld);
-        ROS_INFO("Pubbing Terrain Mesh");
+        auto tt = Tic();
         _pubMesh(pWorld->m_pTerrainBody->getCollisionShape(), &(pWorld->m_pTerrainBody->getWorldTransform()), &m_terrainMeshPub);
+        auto uu = Toc(tt);
+        ROS_INFO("Pubbing Terrain Mesh took %f sec", uu);
+    }
+    else if (pWorld->m_pTerrainBody == NULL) {
+        ROS_WARN("Terrain Mesh is NULL");
+    }
+    else if (m_terrainMeshPub.getNumSubscribers()==0) {
+        ROS_WARN("Terrain Mesh has no Subscribers");
     }
     
     if (pWorld->m_pGroundplaneBody != NULL && m_groundplaneMeshPub.getNumSubscribers()>0) {
         boost::unique_lock<boost::mutex> lock(*pWorld);
-        ROS_INFO("Pubbing Ground Mesh");
+        auto tt = Tic();
         _pubMesh(pWorld->m_pGroundplaneBody->getCollisionShape(), &(pWorld->m_pGroundplaneBody->getWorldTransform()), &m_groundplaneMeshPub);
+        auto uu = Toc(tt);
+        ROS_INFO("Pubbing Ground Mesh took %f sec", uu);
     }
     else if (pWorld->m_pGroundplaneBody == NULL) {
         ROS_WARN("Ground Mesh is NULL");
     }
-    else if (m_groundplaneMeshPub.getNumSubscribers()>0) {
+    else if (m_groundplaneMeshPub.getNumSubscribers()==0) {
         ROS_WARN("Ground Mesh has no Subscribers");
     }
     
@@ -836,8 +850,13 @@ void MochaGui::_ProcessMeshFunc()
     {
         {
             boost::mutex::scoped_lock lock(m_mutexMeshMsg);
-            if (m_meshMsg!=NULL && processMesh(m_meshMsg))
-                m_meshMsg = NULL;
+            if (m_meshMsg!=NULL) {
+                auto t = Tic();
+                if (!processMesh(m_meshMsg))
+                    continue;
+                auto u = Toc(t);
+                ROS_INFO("processMesh took %f sec", u);
+            }
         }
         ros::spinOnce();
         ros::Rate(100).sleep();
@@ -1424,6 +1443,14 @@ void MochaGui::_pubPathArr(ros::Publisher* pub, std::vector<MotionSample>& path_
     carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("", 0.02, 0, 0, 0.0, 0.0, 1.0, 1.0);
     convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg, markarr_config, Eigen::Vector3d(0.0, 0.0, m_dPathZOffset));
     pub->publish(markarr_msg);
+    ros::spinOnce();
+}
+
+void MochaGui::_pubDouble(ros::Publisher* pub, double val)
+{
+    std_msgs::Float64 msg;
+    msg.data = val;
+    pub->publish(msg);
     ros::spinOnce();
 }
 
@@ -2054,6 +2081,8 @@ void MochaGui::_ControlFunc()
         m_bControllerRunning = false;
 
         while(m_StillControl) {
+            auto tt = Tic();
+
             boost::this_thread::interruption_point();
 
             m_pControlLine->Clear();
@@ -2154,7 +2183,10 @@ void MochaGui::_ControlFunc()
                 }
                 // {
                 //     boost::mutex::scoped_lock lock(m_ControlPlanMutex);
+                    auto t = Tic();
                     m_Controller.PlanControl(m_dPlanTime,pPlan);
+                    auto u = Toc(t);
+                    ROS_INFO("PlanControl took %f sec", u);
 
                     if(pPlan != NULL && m_bLoggerEnabled && m_Logger.IsReady()){
                         m_Logger.LogControlPlan(*pPlan);
@@ -2193,8 +2225,10 @@ void MochaGui::_ControlFunc()
 
                     //update control plan statistics if there is a new control plan available
                     nNumControlPlans++;
-                    if(Toc(dLastTime) > 0.5){
+                    // if(Toc(dLastTime) > 0.5)
+                    {
                         m_dControlPlansPerS = (double)nNumControlPlans / (Toc(dLastTime));
+                        _pubControlRate();
                         nNumControlPlans = 0;
                         dLastTime =Tic();
                     }
@@ -2220,6 +2254,9 @@ void MochaGui::_ControlFunc()
             }
 
             usleep(10000);
+
+            auto uu = Toc(tt);
+            ROS_INFO("_ControlFunc took %f sec", uu);
         }
     }catch(...){
         dout("Control thread exception caught...");
@@ -2258,6 +2295,7 @@ void MochaGui::_PhysicsFunc()
     double dPlanTimer = 0;
 
     while(m_StillRun){
+        auto tt = Tic();
 
         while(m_bSimulate3dPath == false && m_StillRun){
             dCurrentTic = Tic();
@@ -2410,6 +2448,9 @@ void MochaGui::_PhysicsFunc()
             dCurrentTic = -1;
             usleep(1000);
         }
+
+        auto uu = Toc(tt);
+        ROS_INFO("_PhysicsFunc took %f sec", uu);
     }
 }
 
@@ -2422,6 +2463,7 @@ void MochaGui::_PlannerFunc() {
     // now add line segments
     bool previousOpenLoopSetting = m_bPlannerOn;
     while (1) {
+        auto tt = Tic();
         boost::this_thread::interruption_point();
 
         //if the user has changed the openloop setting, dirty all
@@ -2536,7 +2578,11 @@ void MochaGui::_PlannerFunc() {
                         numInterations = 0;
                     }else{
                         //dout("Distance delta is " << problem.m_dDistanceDelta);
+
+                        auto t = Tic();
                         res = _IteratePlanner(problem,m_vSegmentSamples[ii],vActualTrajectory,vControlTrajectory);
+                        auto u = Toc(t);
+                        ROS_INFO("_IteratePlanner took %f sec", u);
                         numInterations++;
 
                         //lock the mutex as this next bit will modify object
@@ -2600,6 +2646,9 @@ void MochaGui::_PlannerFunc() {
         if(m_bPlanning == false) {
             usleep(10000);
         }
+        
+        auto uu = Toc(tt);
+        ROS_INFO_THROTTLE(0.5,"_PlannerFunc took %f sec", uu);
     }
 }
 
