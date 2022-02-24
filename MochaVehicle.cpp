@@ -394,7 +394,7 @@ void MochaVehicle::InitializeExternals()
 
     m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
     
-    // m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
+    m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
 
     m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
     m_srvSetSimMode = m_nh.advertiseService("vehicle/set_sim_mode", &MochaVehicle::SetSimModeSvcCb, this);
@@ -1714,9 +1714,9 @@ void MochaVehicle::_pubVehicleMesh(uint nWorldId)
     chassis_marker_msg.pose.orientation.y = 0; //Tchassis[4];
     chassis_marker_msg.pose.orientation.z = 0; //Tchassis[5];
     chassis_marker_msg.pose.orientation.w = 1; //Tchassis[6];
-    chassis_marker_msg.scale.x = (pWorld->m_Parameters[CarParameters::WheelBase]+pWorld->m_Parameters[CarParameters::WheelRadius])*2;
-    chassis_marker_msg.scale.y = pWorld->m_Parameters[CarParameters::Width]*2;
-    chassis_marker_msg.scale.z = pWorld->m_Parameters[CarParameters::Height]*2;
+    chassis_marker_msg.scale.x = (pWorld->m_Parameters[CarParameters::WheelBase]+pWorld->m_Parameters[CarParameters::WheelRadius]);
+    chassis_marker_msg.scale.y = pWorld->m_Parameters[CarParameters::Width];
+    chassis_marker_msg.scale.z = pWorld->m_Parameters[CarParameters::Height];
     chassis_marker_msg.color.a = 1.0; // Don't forget to set the alpha!
     chassis_marker_msg.color.r = (pWorld->m_state.IsChassisInCollision() ? 1.0 : 0.0);
     chassis_marker_msg.color.g = (pWorld->m_state.IsChassisInCollision() ? 0.0 : 1.0);
@@ -2667,6 +2667,12 @@ void MochaVehicle::SetStateNoReset( BulletWorldInstance *pWorld , const Sophus::
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaVehicle::SetState( int nWorldId, VehicleState& state /* in ned */ , bool raycast /* =false */)
 {
+    // if (abs(state.m_dTwv.unit_quaternion().norm()-1.f) > 0.01f)
+    // {
+    //     ROS_WARN("Got nonnormalized quaternion in SetState. Normalizing...");
+    //     state.m_dTwv.setQuaternion(state.m_dTwv.unit_quaternion().normalized());
+    // }
+
     BulletWorldInstance *pWorld = GetWorldInstance(nWorldId);
     boost::mutex::scoped_lock lock(*pWorld);
     //load the backup onto the vehicle
@@ -2687,10 +2693,20 @@ void MochaVehicle::SetState( int nWorldId, VehicleState& state /* in ned */ , bo
     if (raycast)
     {
         // ROS_INFO("raycasting %s",convertEigenMatrix2String(state.m_dTwv.translation().transpose()).c_str());
-        Eigen::Vector3d dIntersect;
-        RayCast(state.m_dTwv.translation(), -GetBasisVector(state.m_dTwv,2)*0.2, dIntersect, true, nWorldId);
-        state.m_dTwv.translation() = dIntersect;
-        //  ROS_INFO("done raycasting %s",convertEigenMatrix2String(state.m_dTwv.translation().transpose()).c_str());
+        {
+            Eigen::Vector3d dIntersect;
+            RayCast(state.m_dTwv.translation(), -GetBasisVector(state.m_dTwv,2)*0.2, dIntersect, true, nWorldId);
+            state.m_dTwv.translation() = dIntersect;
+        }
+         ROS_INFO("done raycasting %s",convertEigenMatrix2String(state.m_dTwv.translation().transpose()).c_str());
+
+        for (uint ii=0; ii<state.m_vWheelStates.size(); ii++)
+        {
+            Eigen::Vector3d dIntersect;
+            RayCast(state.m_vWheelStates[ii].translation(), -GetBasisVector(state.m_dTwv,2)*pWorld->m_Parameters[CarParameters::MaxSuspTravel], dIntersect, true, nWorldId);
+            state.m_vWheelStates[ii].translation() = dIntersect;
+            state.m_vWheelStates[ii].translation()[2] += pWorld->m_Parameters[CarParameters::WheelRadius];
+        }
     }
 
     /////////////////////////////////////////////////////////////////////////////

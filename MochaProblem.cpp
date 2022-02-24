@@ -584,9 +584,9 @@ Eigen::VectorXd MochaProblem::CalculatePointError(const MotionSample& sample) co
     //error.head(3) = cartError;
     //transform the angular velocity into the plane of goal pose
     
-    error.head(3) = m_dTransformedGoal.head(3) - endPose.head(3);
-    error[3] = rpg::AngleWrap(m_dTransformedGoal[3] - endPose[3]);
-    error[4] = m_dTransformedGoal[5] - endPose[5];
+    error.head(3) = m_dTransformedGoal.head(3) - endPose.head(3); // x y z
+    error[3] = rpg::AngleWrap(m_dTransformedGoal[3] - endPose[3]); // heading (theta)
+    error[4] = m_dTransformedGoal[5] - endPose[5];  // velocity
     //error[5] = state.m_dV.norm()*dW_goal[2] - m_GoalState.m_dCurvature;
 
     error[5] = sample.GetTiltCost();
@@ -1745,7 +1745,7 @@ bool MochaProblem::_IterateGaussNewton()
         ROS_DBG("Applied commands, took %fs.", Toc(t0));
 
         // ROS_INFO("Pubbing potential paths viz from Damped Solution.");
-        m_vPotentialPaths.push_back(this->m_CurrentSolution.m_Sample);
+        // m_vPotentialPaths.push_back(this->m_CurrentSolution.m_Sample);
         for( int ii = 0; ii < DAMPING_STEPS ; ii++ )
         {
             m_vPotentialPaths.push_back(vCubicProblems[ii]->m_CurrentSolution.m_Sample);
@@ -1847,6 +1847,8 @@ bool MochaProblem::_IterateGaussNewton()
     {
         // ROS_WARN("Local minimum detected.");
     }
+
+    // m_vPotentialPaths.push_back(this->m_CurrentSolution.m_Sample);
 
     // ROS_INFO("bestSoln is w norm %f", m_pBestSolution->m_dNorm);
     // for (uint i=0; i<m_pBestSolution->m_Sample.m_vStates.size(); i+=5)

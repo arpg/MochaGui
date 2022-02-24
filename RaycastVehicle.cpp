@@ -210,7 +210,7 @@ void RaycastVehicle::resetSuspension()
             wheel.m_raycastInfo.m_suspensionLength = wheel.getSuspensionRestLength();
             wheel.m_suspensionRelativeVelocity = btScalar(0.0);
 
-            wheel.m_raycastInfo.m_contactNormalWS = - wheel.m_raycastInfo.m_wheelDirectionWS;
+            wheel.m_raycastInfo.m_contactNormalWS = -wheel.m_raycastInfo.m_wheelDirectionWS;
             //wheel_info.setContactFriction(btScalar(0.0));
             wheel.m_clippedInvContactDotSuspension = btScalar(1.0);
     }

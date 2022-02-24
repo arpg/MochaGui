@@ -222,6 +222,7 @@ struct VehicleState
         m_dSteering = 0;
         m_dCurvature = 0 ;
         m_dTime = 0;
+        SetWheelParametersToDefault();
     }
 
     VehicleState(const Sophus::SE3d& dTwv, const double dV = 1, double dCurvature = 0)
@@ -233,6 +234,50 @@ struct VehicleState
         m_dV = m_dTwv.so3()*vecV;
         m_dW << 0,0,0;
         m_dSteering = 0;
+        SetWheelParametersToDefault();
+    }
+
+    void SetWheelParametersToDefault()
+    {
+        // learning_params
+        // m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        // m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        // m_dWheelBase = 0.27;
+        // m_dWheelRadius = 0.04;
+        // m_dChassisWidth = 0.21;
+        // m_dWheelWidth = 0.025;
+        // m_dSuspConnectionHeight = -0.04;
+        // m_dSuspRestLength = 0.045;
+
+        // working_params
+        // m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        // m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        // m_dWheelBase = 0.2;
+        // m_dWheelRadius = 0.165;
+        // m_dChassisWidth = 0.1;
+        // m_dWheelWidth = 0.125;
+        // m_dSuspConnectionHeight = 0.0;
+        // m_dSuspRestLength = 0.02;
+
+        // ninjacar_params
+        // m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        // m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        // m_dWheelBase = 0.15;
+        // m_dWheelRadius = 0.06;
+        // m_dChassisWidth = 0.075;
+        // m_dWheelWidth = 0.05;
+        // m_dSuspConnectionHeight = 0.075;
+        // m_dSuspRestLength = 0.02;
+
+        // ninjacar_params
+        m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        m_dWheelBase = 0.165;
+        m_dWheelRadius = 0.055;
+        m_dChassisWidth = 0.105;
+        m_dWheelWidth = 0.045;
+        m_dSuspConnectionHeight = -0.02;
+        m_dSuspRestLength = 0.011;
     }
 
     // VehicleState& operator= (const VehicleState& other)
@@ -287,15 +332,81 @@ struct VehicleState
         return stateOut;
     }
 
+    void ResetWheels(){
+        std::cout << "Resetting wheels..." << std::endl;
+        std::vector<Sophus::SE3d> vWheelTransformsCS;
+        vWheelTransformsCS.resize(4);
+        for (size_t ii=0; ii<vWheelTransformsCS.size(); ii++)
+        {
+            std::cout << "\t" << ii << std::endl;
+            bool bIsBackWheel = (ii==2 || ii==3);
+            bool bIsRightWheel = (ii==0 || ii==3);
+            std::cout << "\t\t" << (bIsBackWheel?"back":"front") << " " << (bIsRightWheel?"right":"left") << std::endl;
+            Eigen::Vector3d connectionPointCS(m_dWheelBase, m_dChassisWidth+0.5*m_dWheelWidth, -m_dSuspConnectionHeight);
+            if (bIsBackWheel)
+                connectionPointCS[0] *= -1.f;
+            if (bIsRightWheel)
+                connectionPointCS[1] *= -1.f;
+            std::cout << "\t\t" << connectionPointCS[0] << " " << connectionPointCS[1] << " " << connectionPointCS[2] << std::endl;
+            // Eigen::Vector4d connectionPointCSTemp; 
+            // connectionPointCSTemp << connectionPointCS[0], connectionPointCS[1], connectionPointCS[2], 1.f;
+            // Eigen::Vector4d connectionPointWSTemp = m_dTwv.matrix() * connectionPointCSTemp;
+            // Eigen::Vector3d connectionPointWS = connectionPointWSTemp.head(3);
+            // std::cout << "\t\t" << connectionPointWS[0] << " " << connectionPointWS[1] << " " << connectionPointWS[2] << std::endl;
+            Eigen::Vector3d vWheelDirectionWS = m_dTwv.rotationMatrix() * m_vWheelDirectionCS;
+            // std::cout << "\t\t" << vWheelDirectionWS[0] << " " << vWheelDirectionWS[1] << " " << vWheelDirectionWS[2] << std::endl;
+            // Eigen::Vector3d vWheelAxleWS = m_dTwv.rotationMatrix() * m_vWheelAxleCS;
+            // std::cout << "\t\t" << vWheelAxleWS[0] << " " << vWheelAxleWS[1] << " " << vWheelAxleWS[2] << std::endl;
+            double raylen = m_dSuspRestLength + m_dWheelRadius;
+            Eigen::Vector3d rayvector = m_vWheelDirectionCS * raylen;
+            Eigen::Vector3d vContactPointCS = connectionPointCS + rayvector;
+            std::cout << "\t\t" << vContactPointCS[0] << " " << vContactPointCS[1] << " " << vContactPointCS[2] << std::endl;
+            vWheelTransformsCS[ii].translation() = vContactPointCS;
+            
+            Eigen::Vector3d up = -vWheelDirectionWS;
+            // Eigen::Vector3d right = vWheelAxleWS;
+            // Eigen::Vector3d fwd = right.cross(up);
+
+            Eigen::AngleAxisd aWheelSteer(m_dSteering, up);
+            // Eigen::Matrix3d basis;
+            // basis << fwd[0],right[0],up[0],
+            //          fwd[1],right[1],up[1],
+            //          fwd[2],right[2],up[2];
+            // Eigen::Matrix3d mWheelOrnWS = aWheelSteer.toRotationMatrix() * basis;
+            Eigen::Quaterniond qWheelOrnCS(aWheelSteer);
+            std::cout << "\t\t" << qWheelOrnCS.x() << " " << qWheelOrnCS.y() << " " << qWheelOrnCS.z() << " " << qWheelOrnCS.w() << std::endl;
+            vWheelTransformsCS[ii].setQuaternion(qWheelOrnCS);
+        }
+        UpdateWheels(vWheelTransformsCS);
+    }
+
+    // store CS wheel poses as WS states
     void UpdateWheels(const std::vector<Sophus::SE3d>& vWheelTransforms){
         Sophus::SE3d bodyT = m_dTwv;
-        m_vWheelContacts.resize(4);
         m_vWheelStates.resize(4);
-        for(size_t ii = 0 ; ii < m_vWheelContacts.size() ; ii++){
+        for(size_t ii = 0 ; ii < m_vWheelStates.size() ; ii++){
             //position the wheels with respect to the body
             fflush(stdout);
             Sophus::SE3d T = bodyT* vWheelTransforms[ii];
             m_vWheelStates[ii] = T;
+        }
+    }
+
+    void ResetContacts(){
+        std::vector<bool> vWheelContacts;
+        vWheelContacts.resize(4);
+        for (size_t ii=0; ii<vWheelContacts.size(); ii++)
+        {
+            vWheelContacts[ii] = false;
+        }
+        UpdateContacts(vWheelContacts);
+    }
+
+    void UpdateContacts(const std::vector<bool>& vWheelContacts){
+        m_vWheelContacts.resize(4);
+        for(size_t ii = 0 ; ii < vWheelContacts.size() ; ii++)
+        {
+            m_vWheelContacts[ii] = vWheelContacts[ii];
         }
     }
 
@@ -783,6 +894,16 @@ struct VehicleState
 
     void fromROS(carplanner_msgs::VehicleState msg)
     {
+
+        if (abs(sqrt(pow(msg.pose.transform.rotation.x,2)+pow(msg.pose.transform.rotation.y,2)+pow(msg.pose.transform.rotation.z,2)+pow(msg.pose.transform.rotation.w,2))-0.f) < 0.01f)
+        {
+            ROS_WARN("Got zero quaternion in fromROS. Setting to identity...");
+            msg.pose.transform.rotation.x = 0.f;
+            msg.pose.transform.rotation.y = 0.f;
+            msg.pose.transform.rotation.z = 0.f;
+            msg.pose.transform.rotation.w = 1.f;        
+        }
+
         (*this).m_dTwv.translation() = Eigen::Vector3d(
             msg.pose.transform.translation.x,
             msg.pose.transform.translation.y,
@@ -793,25 +914,34 @@ struct VehicleState
             msg.pose.transform.rotation.y,
             msg.pose.transform.rotation.z));
 
-        m_vWheelStates.resize(msg.wheel_poses.size());
-        for( unsigned int i=0; i<(*this).m_vWheelStates.size(); i++ )
+        if (msg.wheel_poses.size() != 4)
+            ResetWheels();
+        else
         {
-            (*this).m_vWheelStates[i].translation() = Eigen::Vector3d(
-                msg.wheel_poses[i].transform.translation.x,
-                msg.wheel_poses[i].transform.translation.y,
-                msg.wheel_poses[i].transform.translation.z);
-            (*this).m_vWheelStates[i].setQuaternion(Eigen::Quaterniond(
-                msg.wheel_poses[i].transform.rotation.w,
-                msg.wheel_poses[i].transform.rotation.x,
-                msg.wheel_poses[i].transform.rotation.y,
-                msg.wheel_poses[i].transform.rotation.z));
+            for( unsigned int i=0; i<(*this).m_vWheelStates.size(); i++ )
+            {
+                (*this).m_vWheelStates[i].translation() = Eigen::Vector3d(
+                    msg.wheel_poses[i].transform.translation.x,
+                    msg.wheel_poses[i].transform.translation.y,
+                    msg.wheel_poses[i].transform.translation.z);
+                (*this).m_vWheelStates[i].setQuaternion(Eigen::Quaterniond(
+                    msg.wheel_poses[i].transform.rotation.w,
+                    msg.wheel_poses[i].transform.rotation.x,
+                    msg.wheel_poses[i].transform.rotation.y,
+                    msg.wheel_poses[i].transform.rotation.z));
+            }
         }
 
-        m_vWheelContacts.resize(msg.wheel_contacts.size());
-        for(uint i=0; i<m_vWheelContacts.size(); i++)
+        if (msg.wheel_contacts.size() != 4)
+            ResetContacts();
+        else
         {
-            m_vWheelContacts[i] = msg.wheel_contacts[i];
+            for(uint i=0; i<m_vWheelContacts.size(); i++)
+            {
+                m_vWheelContacts[i] = msg.wheel_contacts[i];
+            }
         }
+
         m_bChassisInCollision = msg.chassis_collision;
 
         (*this).m_dV[0] = msg.lin_vel.x;
@@ -867,6 +997,15 @@ struct VehicleState
     double m_dCurvature;                        //< The curvature at this point in the path
     double m_dSteering;                         //< The steering command given to the car at this point (used to reset rate limitations)
     double m_dTime;
+
+    Eigen::Vector3d m_vWheelDirectionCS; //wheel direction is z
+    Eigen::Vector3d m_vWheelAxleCS; //wheel axle in y direction
+    double m_dWheelBase;
+    double m_dChassisWidth;
+    double m_dWheelWidth;
+    double m_dSuspConnectionHeight;
+    double m_dSuspRestLength;
+    double m_dWheelRadius;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -1067,11 +1206,11 @@ struct MotionSample
             // Eigen::Vector3d error_weights(1,.25,0); // roll pitch yaw
 
             // const VehicleState& state = m_vStates[ii];
-            Eigen::Vector3d dWCS(m_vStates[ii].m_dW.transpose() * m_vStates[ii].m_dTwv.rotationMatrix());
-            Eigen::Vector3d last_dWCS(m_vStates[ii-1].m_dW.transpose() * m_vStates[ii-1].m_dTwv.rotationMatrix());
+            Eigen::Vector3d dWCS(m_vStates[ii].m_dW.transpose() * m_vStates[ii].m_dTwv.rotationMatrix()); // current velocity in body coordinates
+            Eigen::Vector3d last_dWCS(m_vStates[ii-1].m_dW.transpose() * m_vStates[ii-1].m_dTwv.rotationMatrix()); // previous velocity in body coordinates
             // for(uint i=0; i<dWCS.size(); i++) { dWCS[i] = fabs(dWCS[i]); }
             // cost += error_weights.dot(dWCS);
-            cost += fabs(dWCS[0]-last_dWCS[0]);
+            cost += fabs(dWCS[0]-last_dWCS[0]); // roll acceleration
             // cost += dWCS[1]*0.5;
             // cost += dWCS[0]*dWCS[0];
 
