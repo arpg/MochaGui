@@ -333,21 +333,21 @@ struct VehicleState
     }
 
     void ResetWheels(){
-        std::cout << "Resetting wheels..." << std::endl;
+        // std::cout << "Resetting wheels..." << std::endl;
         std::vector<Sophus::SE3d> vWheelTransformsCS;
         vWheelTransformsCS.resize(4);
         for (size_t ii=0; ii<vWheelTransformsCS.size(); ii++)
         {
-            std::cout << "\t" << ii << std::endl;
+            // std::cout << "\t" << ii << std::endl;
             bool bIsBackWheel = (ii==2 || ii==3);
             bool bIsRightWheel = (ii==0 || ii==3);
-            std::cout << "\t\t" << (bIsBackWheel?"back":"front") << " " << (bIsRightWheel?"right":"left") << std::endl;
+            // std::cout << "\t\t" << (bIsBackWheel?"back":"front") << " " << (bIsRightWheel?"right":"left") << std::endl;
             Eigen::Vector3d connectionPointCS(m_dWheelBase, m_dChassisWidth+0.5*m_dWheelWidth, -m_dSuspConnectionHeight);
             if (bIsBackWheel)
                 connectionPointCS[0] *= -1.f;
             if (bIsRightWheel)
                 connectionPointCS[1] *= -1.f;
-            std::cout << "\t\t" << connectionPointCS[0] << " " << connectionPointCS[1] << " " << connectionPointCS[2] << std::endl;
+            // std::cout << "\t\t" << connectionPointCS[0] << " " << connectionPointCS[1] << " " << connectionPointCS[2] << std::endl;
             // Eigen::Vector4d connectionPointCSTemp; 
             // connectionPointCSTemp << connectionPointCS[0], connectionPointCS[1], connectionPointCS[2], 1.f;
             // Eigen::Vector4d connectionPointWSTemp = m_dTwv.matrix() * connectionPointCSTemp;
@@ -360,7 +360,7 @@ struct VehicleState
             double raylen = m_dSuspRestLength + m_dWheelRadius;
             Eigen::Vector3d rayvector = m_vWheelDirectionCS * raylen;
             Eigen::Vector3d vContactPointCS = connectionPointCS + rayvector;
-            std::cout << "\t\t" << vContactPointCS[0] << " " << vContactPointCS[1] << " " << vContactPointCS[2] << std::endl;
+            // std::cout << "\t\t" << vContactPointCS[0] << " " << vContactPointCS[1] << " " << vContactPointCS[2] << std::endl;
             vWheelTransformsCS[ii].translation() = vContactPointCS;
             
             Eigen::Vector3d up = -vWheelDirectionWS;
@@ -374,7 +374,7 @@ struct VehicleState
             //          fwd[2],right[2],up[2];
             // Eigen::Matrix3d mWheelOrnWS = aWheelSteer.toRotationMatrix() * basis;
             Eigen::Quaterniond qWheelOrnCS(aWheelSteer);
-            std::cout << "\t\t" << qWheelOrnCS.x() << " " << qWheelOrnCS.y() << " " << qWheelOrnCS.z() << " " << qWheelOrnCS.w() << std::endl;
+            // std::cout << "\t\t" << qWheelOrnCS.x() << " " << qWheelOrnCS.y() << " " << qWheelOrnCS.z() << " " << qWheelOrnCS.w() << std::endl;
             vWheelTransformsCS[ii].setQuaternion(qWheelOrnCS);
         }
         UpdateWheels(vWheelTransformsCS);
