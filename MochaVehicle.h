@@ -21,6 +21,7 @@
 #include <carplanner_msgs/MotionSample.h>
 #include <carplanner_msgs/Command.h>
 #include <carplanner_msgs/ResetMesh.h>
+#include <carplanner_msgs/ApplyVelocitiesData.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -40,6 +41,7 @@
 
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
+// #include <carplanner_msgs/BatchApplyVelocitiesAction.h>
 #include <carplanner_msgs/ApplyVelocitiesAction.h>
 #include <carplanner_msgs/SetStateAction.h>
 #include <carplanner_msgs/GetStateAction.h>
@@ -139,8 +141,6 @@ struct CollisionEvent
     }
 };
 
-
-
 /// Structure to hold the steering, acceleration and reaction wheel caommands that are sent to the vehicle
 class ControlCommand
 {
@@ -180,7 +180,7 @@ public:
         return msg;
     }
 
-    void fromROS(carplanner_msgs::Command& msg)
+    void fromROS(const carplanner_msgs::Command& msg)
     {
         m_dForce = msg.force;
         m_dCurvature = msg.curvature;
@@ -892,27 +892,24 @@ struct VehicleState
       return state_msg;
     }
 
-    void fromROS(carplanner_msgs::VehicleState msg)
-    {
+    void fromROS(const carplanner_msgs::VehicleState msg)
+    {  
+        Eigen::Quaterniond quat(msg.pose.transform.rotation.w, msg.pose.transform.rotation.x, msg.pose.transform.rotation.y, msg.pose.transform.rotation.z);
 
-        if (abs(sqrt(pow(msg.pose.transform.rotation.x,2)+pow(msg.pose.transform.rotation.y,2)+pow(msg.pose.transform.rotation.z,2)+pow(msg.pose.transform.rotation.w,2))-0.f) < 0.01f)
+        if (abs(sqrt(pow(quat.x(),2)+pow(quat.y(),2)+pow(quat.z(),2)+pow(quat.w(),2))-0.f) < 0.01f)
         {
             ROS_WARN("Got zero quaternion in fromROS. Setting to identity...");
-            msg.pose.transform.rotation.x = 0.f;
-            msg.pose.transform.rotation.y = 0.f;
-            msg.pose.transform.rotation.z = 0.f;
-            msg.pose.transform.rotation.w = 1.f;        
+            quat.x() = 0.f;
+            quat.y() = 0.f;
+            quat.z() = 0.f;
+            quat.w() = 1.f;        
         }
 
         (*this).m_dTwv.translation() = Eigen::Vector3d(
             msg.pose.transform.translation.x,
             msg.pose.transform.translation.y,
             msg.pose.transform.translation.z);
-        (*this).m_dTwv.setQuaternion(Eigen::Quaterniond(
-            msg.pose.transform.rotation.w,
-            msg.pose.transform.rotation.x,
-            msg.pose.transform.rotation.y,
-            msg.pose.transform.rotation.z));
+        (*this).m_dTwv.setQuaternion(quat);
 
         if (msg.wheel_poses.size() != 4)
             ResetWheels();
@@ -1134,7 +1131,7 @@ struct MotionSample
         return sample_msg;
     }
 
-    void fromROS(carplanner_msgs::MotionSample sample_msg)
+    void fromROS(const carplanner_msgs::MotionSample sample_msg)
     {
         (*this).m_vStates.clear();
         (*this).m_vStates.resize(sample_msg.states.size());
@@ -1336,6 +1333,46 @@ struct MotionSample
     }
 };
 
+class ApplyVelocitiesData
+{
+public:
+    ApplyVelocitiesData(): m_InitialState(), m_nWorldId(0), m_bNoCompensation(true), m_bNoDelay(true)
+    {
+
+    }
+    
+    carplanner_msgs::ApplyVelocitiesData toROS()
+    {
+        carplanner_msgs::ApplyVelocitiesData msg;
+
+        msg.initial_state = m_InitialState.toROS();
+        msg.initial_motion_sample = m_InitialMotionSample.toROS();
+        msg.world_id = m_nWorldId;
+        msg.no_compensation = m_bNoCompensation;
+        msg.no_delay = m_bNoDelay;
+
+        return msg;
+    }
+
+    void fromROS(const carplanner_msgs::ApplyVelocitiesData& msg)
+    {
+        m_InitialState.fromROS(msg.initial_state);
+        m_InitialMotionSample.fromROS(msg.initial_motion_sample);
+        m_nWorldId = msg.world_id;
+        m_bNoCompensation = msg.no_compensation;
+        m_bNoDelay = msg.no_delay;
+
+        return;
+    }
+
+public:
+    VehicleState m_InitialState;
+    MotionSample m_InitialMotionSample;
+    uint m_nWorldId;
+    bool m_bNoCompensation;
+    bool m_bNoDelay;
+};
+
 class ApplyVelocitiesFunctionObj : public ros::CallbackInterface
 {
 public:
@@ -1376,6 +1413,7 @@ public:
     } m_config;
 
     MochaVehicle(ros::NodeHandle&, ros::NodeHandle&);
+    // MochaVehicle(const MochaVehicle& vehicle);
     ~MochaVehicle();
 
     // Initialization
@@ -1412,6 +1450,11 @@ public:
                                 int nWorldId = 0,
                                 bool noCompensation = false,
                                 bool noDelay = false);
+
+    VehicleState ApplyVelocities( ApplyVelocitiesData& );
+
+    // boost::threadpool::pool threadPool;
+    // void BatchApplyVelocities(std::vector<ApplyVelocitiesData>& );
 
     ros::NodeHandle m_private_nh;
     ros::NodeHandle m_nh;
@@ -1498,7 +1541,6 @@ public:
     // std::vector<actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>> servers_;
 
     // void ApplyVelocities(carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
-    void ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction>);
     // void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService0(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService1(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
@@ -1511,7 +1553,11 @@ public:
     // void ApplyVelocitiesService8(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService9(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
+    void ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction>);
     actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
+
+    // void BatchApplyVelocitiesService(const carplanner_msgs::BatchApplyVelocitiesGoalConstPtr&);
+    // actionlib::SimpleActionServer<carplanner_msgs::BatchApplyVelocitiesAction> m_actionBatchApplyVelocities_server;
     
     void SetStateService(const carplanner_msgs::SetStateGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::SetStateAction> m_actionSetState_server;

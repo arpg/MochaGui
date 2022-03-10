@@ -11,7 +11,8 @@
   <node pkg="nodelet" type="nodelet" name="fake_apply_velocities" args="load mochapc/FakeApplyVelocitiesNodelet mocha_manager">
     <param name="apply_velocities_topic" value="$(arg apply_velocities_topic)"/>
   </node>
-  <node pkg="nodelet" type="nodelet" name="mocha_vehicle" args="load mochapc/MochaVehicleNodelet mocha_manager">
+  
+  <node pkg="nodelet" type="nodelet" name="mocha_vehicle" args="load mochapc/MochaVehicleNodelet mocha_manager" output="screen">
     <param name="params_file" value="$(arg params_file)"/>
     <param name="mode" value="$(arg mode)"/>
     <param name="terrain_mesh_file" value="$(arg terrain_mesh_file)"/>

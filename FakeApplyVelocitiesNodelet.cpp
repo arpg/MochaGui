@@ -48,23 +48,28 @@ public:
             }
 
             // Send goals for all world 0 clients
-            for (const auto& client: m_actionClientsWorld0) {
-                carplanner_msgs::ApplyVelocitiesGoal goal = generateRandomGoal(0);
-                client->sendGoal(goal);
-                NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Sent goal for world 0" );
-            }
+            // for (const auto& client: m_actionClientsWorld0) {
+            //     carplanner_msgs::ApplyVelocitiesGoal goal = generateRandomGoal(0);
+            //     client->sendGoal(goal);
+            //     NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Sent goal for world 0" );
+            // }
 
             // Receive goals for all clients
             for (unsigned int i = 0; i < m_actionClients.size(); ++i) {
-                m_actionClients[i]->getResult();
-                NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Received result for world %d", i);
+                bool finished_before_timeout = m_actionClients[i]->waitForResult(ros::Duration(1.0));
+                actionlib::SimpleClientGoalState state = m_actionClients[i]->getState();
+                carplanner_msgs::ApplyVelocitiesResultConstPtr result = nullptr;
+                if (finished_before_timeout)
+                    result = m_actionClients[i]->getResult();
+
+                NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Received result for world %d: %s", i, state.toString().c_str());
             }
 
             // Receive goals for all world 0 clients
-            for (const auto& client: m_actionClientsWorld0) {
-                client->getResult();
-                NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Received result for world 0");
-            }
+            // for (const auto& client: m_actionClientsWorld0) {
+            //     client->getResult();
+            //     NODELET_INFO_NAMED("[FakeApplyVelocitiesNodelet]", "Received result for world 0");
+            // }
         });
     }
 
@@ -88,7 +93,7 @@ private:
 
         MotionSample sample;
         for (unsigned int j = 0; j < 200; ++j) {
-            sample.m_vStates.push_back({ Sophus::SE3d(Eigen::Matrix<double, 3, 3>::Identity(), Eigen::Matrix<double, 3, 1>::Random()) });
+            // sample.m_vStates.push_back({ Sophus::SE3d(Eigen::Matrix<double, 3, 3>::Identity(), Eigen::Matrix<double, 3, 1>::Random()) });
             sample.m_vCommands.push_back(generateRandomControl());
         }
 

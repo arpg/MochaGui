@@ -290,7 +290,7 @@ MochaProblem::MochaProblem(const MochaProblem& problem)
     m_dTrajWeight = problem.m_dTrajWeight;
     m_nPlanCounter = problem.m_nPlanCounter;
 
-    m_nh = problem.m_nh;
+    // m_nh = problem.m_nh;
 
     // m_clientsApplyVelocities.clear();
     // for (uint i=0; i<GetNumWorldsRequired(); i++)
