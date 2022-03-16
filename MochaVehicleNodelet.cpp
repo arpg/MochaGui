@@ -16,11 +16,9 @@ public:
     {
         ros::NodeHandle& nh = this->getMTNodeHandle();
         ros::NodeHandle& private_nh = this->getMTPrivateNodeHandle();
-        // ros::NodeHandle& nh = this->getNodeHandle();
-        // ros::NodeHandle& private_nh = this->getPrivateNodeHandle();
 
         vehicle_.reset(new MochaVehicle(private_nh, nh));
-      };
+    };
 private:
   boost::shared_ptr<MochaVehicle> vehicle_;
 };

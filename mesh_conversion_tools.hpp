@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
+#include <carplanner_msgs/TriangleMeshStamped.h>
 
 #include <Eigen/Eigen>
 
@@ -15,6 +16,7 @@
 #include "btBulletCollisionCommon.h"
 #include "BulletCollision/CollisionShapes/btShapeHull.h"
 #include "BulletCollision/CollisionShapes/btConvexPolyhedron.h"
+#include "BulletCollision/CollisionShapes/btTriangleIndexVertexArray.h"
 
 #include "tf/tfMessage.h"
 #include "tf/tf.h"
@@ -417,50 +419,55 @@ inline void convertMeshMsg2CollisionShape(const mesh_msgs::TriangleMeshStamped::
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMesh::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
+inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMesh& meshMsg, btCollisionShape*& collisionShape)
 {
-  btTriangleMesh* triangleMesh = new btTriangleMesh();
-  // triangleMesh->preallocateVertices(meshMsg->vertices.size());
-  // triangleMesh->preallocateIndices(meshMsg->triangles.size()*3);
+  btAlignedObjectArray<btVector3>* triangleVertices = new btAlignedObjectArray<btVector3>();
+  btAlignedObjectArray<unsigned int>* triangleIndices = new btAlignedObjectArray<unsigned int>();
 
-  for( uint it=0; it<meshMsg->triangles.size(); it++)
-  {
-    // geometry_msgs::Point vertex0 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]];
-    // geometry_msgs::Point vertex1 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]];
-    // geometry_msgs::Point vertex2 = meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]];
+  // Reserve memory and expand container to desired size
+  triangleVertices->resizeNoInitialize(meshMsg.vertices.size());
+  triangleIndices->resizeNoInitialize(meshMsg.triangles.size() * 3);
 
-    const btScalar* v0x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].x));
-    const btScalar* v0y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].y));
-    const btScalar* v0z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].z));
-    const btScalar* v1x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].x));
-    const btScalar* v1y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].y));
-    const btScalar* v1z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].z));
-    const btScalar* v2x(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].x));
-    const btScalar* v2y(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].y));
-    const btScalar* v2z(&(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].z));
-
-    triangleMesh->addTriangle(btVector3( *v0x, *v0y, *v0z ),
-                              btVector3( *v1x, *v1y, *v1z ),
-                              btVector3( *v2x, *v2y, *v2z ),
-                              it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
-
-    // triangleMesh->addTriangle(btVector3( &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].x), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].y), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[0]].z) ),
-    //                           btVector3( &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].x), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].y), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[1]].z) ),
-    //                           btVector3( &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].x), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].y), &(meshMsg->vertices[meshMsg->triangles[it].vertex_indices[2]].z) ),
-    //                           it==meshMsg->triangles.size()-1 /*last triangle*/ ? true : false);
+  for (unsigned int i = 0; i < meshMsg.vertices.size(); ++i) {
+    btVector3 vertex(meshMsg.vertices[i].x, meshMsg.vertices[i].y, meshMsg.vertices[i].z);
+    triangleVertices->at(i) = vertex;
   }
 
+  for (unsigned int i = 0; i < meshMsg.triangles.size(); ++i) {
+    triangleIndices->at(i * 3) = meshMsg.triangles[i].vertex_indices[0];
+    triangleIndices->at(i * 3 + 1) = meshMsg.triangles[i].vertex_indices[1];
+    triangleIndices->at(i * 3 + 2) = meshMsg.triangles[i].vertex_indices[2];
+  }
+
+
+  btTriangleIndexVertexArray* triangleMesh = new btTriangleIndexVertexArray(meshMsg.triangles.size(), (int *)&triangleIndices->at(0), 3 * sizeof(int), meshMsg.vertices.size(), (btScalar *)&triangleVertices->at(0), sizeof(btVector3));
   collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
-  // collisionShape = new
 
   return;
 }
 
 inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
 {
-  mesh_msgs::TriangleMesh::ConstPtr mesh = mesh_msgs::TriangleMesh::ConstPtr(&(meshMsg->mesh));
-  convertMeshMsg2CollisionShape_Shared(mesh, collisionShape);
+  convertMeshMsg2CollisionShape_Shared(meshMsg->mesh, collisionShape);
   return;
+}
+
+inline void convertMeshMsg2CollisionShape_Shared(const carplanner_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
+{  
+	btIndexedMesh mesh;
+
+	mesh.m_numTriangles = meshMsg->triangleIndices.size() / 3;
+	mesh.m_triangleIndexBase = (const unsigned char*)meshMsg->triangleIndices.data();
+	mesh.m_triangleIndexStride = sizeof(int) * 3;
+	mesh.m_numVertices = meshMsg->triangleVertices.size() / 3;
+	mesh.m_vertexBase = (const unsigned char*)meshMsg->triangleVertices.data();
+	mesh.m_vertexStride = sizeof(float) * 3;
+  mesh.m_vertexType = PHY_FLOAT;
+
+  btTriangleIndexVertexArray* triangleMesh = new btTriangleIndexVertexArray();
+	triangleMesh->addIndexedMesh(mesh);
+
+  collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -26,7 +26,7 @@ ENDIF()
 
 # TODO fix all these warnings instead of suppressing them!!
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual -fPIC" )
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual -fPIC -g" )
 add_definitions(-DBT_USE_DOUBLE_PRECISION)
 add_definitions(-DBT_NO_PROFILE)
 
@@ -124,7 +124,7 @@ set( _INCLUDE_DIRS
 set( LIBRARIES
                ${GLog_LIBRARIES}
                #${Node_LIBRARIES}
-	${BULLET_LIBRARIES}
+               ${BULLET_LIBRARIES}
                ${CeresSolver_LIBRARIES}
                #${SensorFusion_LIBRARIES}
                #${Pangolin_LIBRARIES}
@@ -203,6 +203,22 @@ set( LEARNING_SRC
 
 #add_executable( fake_mesh_publisher fake_mesh_publisher.cpp ${SHARED_HDRS} ${SHARED_SRC} ${catkin_INCLUDE_DIRS} )
 #target_link_libraries( fake_mesh_publisher ${LIBRARIES} ${catkin_LIBRARIES} )
+
+add_library( static_mesh_publisher_lib ${SHARED_HDRS} ${SHARED_SRC} )
+target_link_libraries( static_mesh_publisher_lib ${LIBRARIES} )
+add_library( static_mesh_publisher_nodelet StaticMeshPublisherNodelet.cpp )
+target_link_libraries( static_mesh_publisher_nodelet static_mesh_publisher_lib )       
+
+add_executable( static_mesh_publisher_standalone_nodelet StaticMeshPublisherStandaloneNodelet.cpp )
+target_link_libraries( static_mesh_publisher_standalone_nodelet static_mesh_publisher_nodelet )
+
+add_library( fake_apply_velocities_lib ${SHARED_HDRS} ${SHARED_SRC} )
+target_link_libraries( fake_apply_velocities_lib ${LIBRARIES} )
+add_library( fake_apply_velocities_nodelet FakeApplyVelocitiesNodelet.cpp )
+target_link_libraries( fake_apply_velocities_nodelet fake_apply_velocities_lib )       
+
+add_executable( fake_apply_velocities_standalone_nodelet FakeApplyVelocitiesStandaloneNodelet.cpp )
+target_link_libraries( fake_apply_velocities_standalone_nodelet fake_apply_velocities_nodelet )
 
 #add_executable( command2cmdvel Command2CmdVel.cpp ${SHARED_HDRS} ${SHARED_SRC} ${catkin_INCLUDE_DIRS} )
 #target_link_libraries( command2cmdvel ${LIBRARIES} ${catkin_LIBRARIES} )

@@ -3,6 +3,7 @@
 
 #include "ros/ros.h"
 #include "nodelet/nodelet.h"
+#include "ros/package.h"
 
 #include "CarPlannerCommon.h"
 // #include <CarPlanner/BulletCarModel.h>
@@ -121,8 +122,8 @@ class MochaPlanner
 {
 public:
     struct Config{
-        std::string params_file="/home/mike/code/mochagui/learning_params.csv", 
-            terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply",
+        std::string params_file=ros::package::getPath("mochapc") + "/learning_params.csv", 
+            terrain_mesh_file=ros::package::getPath("mochapc") + "/labLoop.ply",
             map_frame="map",
             base_link_frame="base_link";
         enum Mode{ Simulation=0, Experiment=1 } mode=Mode::Simulation;

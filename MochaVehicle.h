@@ -11,6 +11,8 @@
 // #include <mt_actionlib/server/mt_simple_action_server.h>
 
 #include <ros/ros.h>
+#include <ros/package.h>
+#include <ros/callback_queue_interface.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 // #include <tf2_ros/transform_listener.h>
@@ -19,6 +21,7 @@
 #include <carplanner_msgs/MotionSample.h>
 #include <carplanner_msgs/Command.h>
 #include <carplanner_msgs/ResetMesh.h>
+#include <carplanner_msgs/ApplyVelocitiesData.h>
 #include <mesh_msgs/TriangleMeshStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -28,6 +31,7 @@
 
 #include <nodelet/nodelet.h>
 
+#include "mesh_conversion_tools.hpp"
 #include <carplanner_msgs/mesh_conversion_tools.hpp>
 #include <carplanner_msgs/tf_conversion_tools.hpp>
 //#include "/home/ohrad/code/mochagui/mesh_conversion_tools.hpp"
@@ -37,6 +41,7 @@
 
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
+// #include <carplanner_msgs/BatchApplyVelocitiesAction.h>
 #include <carplanner_msgs/ApplyVelocitiesAction.h>
 #include <carplanner_msgs/SetStateAction.h>
 #include <carplanner_msgs/GetStateAction.h>
@@ -47,6 +52,7 @@
 // #include <carplanner_msgs/GetInertiaTensorAction.h>
 // #include <carplanner_msgs/SetNoDelayAction.h>
 #include <carplanner_msgs/RaycastAction.h>
+#include <carplanner_msgs/TriangleMeshStamped.h>
 
 // #include "btBulletDynamicsCommon.h"
 #include "BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h"
@@ -135,8 +141,6 @@ struct CollisionEvent
     }
 };
 
-
-
 /// Structure to hold the steering, acceleration and reaction wheel caommands that are sent to the vehicle
 class ControlCommand
 {
@@ -176,7 +180,7 @@ public:
         return msg;
     }
 
-    void fromROS(carplanner_msgs::Command& msg)
+    void fromROS(const carplanner_msgs::Command& msg)
     {
         m_dForce = msg.force;
         m_dCurvature = msg.curvature;
@@ -218,6 +222,7 @@ struct VehicleState
         m_dSteering = 0;
         m_dCurvature = 0 ;
         m_dTime = 0;
+        SetWheelParametersToDefault();
     }
 
     VehicleState(const Sophus::SE3d& dTwv, const double dV = 1, double dCurvature = 0)
@@ -229,6 +234,50 @@ struct VehicleState
         m_dV = m_dTwv.so3()*vecV;
         m_dW << 0,0,0;
         m_dSteering = 0;
+        SetWheelParametersToDefault();
+    }
+
+    void SetWheelParametersToDefault()
+    {
+        // learning_params
+        // m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        // m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        // m_dWheelBase = 0.27;
+        // m_dWheelRadius = 0.04;
+        // m_dChassisWidth = 0.21;
+        // m_dWheelWidth = 0.025;
+        // m_dSuspConnectionHeight = -0.04;
+        // m_dSuspRestLength = 0.045;
+
+        // working_params
+        // m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        // m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        // m_dWheelBase = 0.2;
+        // m_dWheelRadius = 0.165;
+        // m_dChassisWidth = 0.1;
+        // m_dWheelWidth = 0.125;
+        // m_dSuspConnectionHeight = 0.0;
+        // m_dSuspRestLength = 0.02;
+
+        // ninjacar_params
+        // m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        // m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        // m_dWheelBase = 0.15;
+        // m_dWheelRadius = 0.06;
+        // m_dChassisWidth = 0.075;
+        // m_dWheelWidth = 0.05;
+        // m_dSuspConnectionHeight = 0.075;
+        // m_dSuspRestLength = 0.02;
+
+        // ninjacar_params
+        m_vWheelAxleCS = Eigen::Vector3d(0.f, -1.f, 0.f);
+        m_vWheelDirectionCS = Eigen::Vector3d(0.f, 0.f, -1.f);
+        m_dWheelBase = 0.165;
+        m_dWheelRadius = 0.055;
+        m_dChassisWidth = 0.105;
+        m_dWheelWidth = 0.045;
+        m_dSuspConnectionHeight = -0.02;
+        m_dSuspRestLength = 0.011;
     }
 
     // VehicleState& operator= (const VehicleState& other)
@@ -283,15 +332,81 @@ struct VehicleState
         return stateOut;
     }
 
+    void ResetWheels(){
+        // std::cout << "Resetting wheels..." << std::endl;
+        std::vector<Sophus::SE3d> vWheelTransformsCS;
+        vWheelTransformsCS.resize(4);
+        for (size_t ii=0; ii<vWheelTransformsCS.size(); ii++)
+        {
+            // std::cout << "\t" << ii << std::endl;
+            bool bIsBackWheel = (ii==2 || ii==3);
+            bool bIsRightWheel = (ii==0 || ii==3);
+            // std::cout << "\t\t" << (bIsBackWheel?"back":"front") << " " << (bIsRightWheel?"right":"left") << std::endl;
+            Eigen::Vector3d connectionPointCS(m_dWheelBase, m_dChassisWidth+0.5*m_dWheelWidth, -m_dSuspConnectionHeight);
+            if (bIsBackWheel)
+                connectionPointCS[0] *= -1.f;
+            if (bIsRightWheel)
+                connectionPointCS[1] *= -1.f;
+            // std::cout << "\t\t" << connectionPointCS[0] << " " << connectionPointCS[1] << " " << connectionPointCS[2] << std::endl;
+            // Eigen::Vector4d connectionPointCSTemp; 
+            // connectionPointCSTemp << connectionPointCS[0], connectionPointCS[1], connectionPointCS[2], 1.f;
+            // Eigen::Vector4d connectionPointWSTemp = m_dTwv.matrix() * connectionPointCSTemp;
+            // Eigen::Vector3d connectionPointWS = connectionPointWSTemp.head(3);
+            // std::cout << "\t\t" << connectionPointWS[0] << " " << connectionPointWS[1] << " " << connectionPointWS[2] << std::endl;
+            Eigen::Vector3d vWheelDirectionWS = m_dTwv.rotationMatrix() * m_vWheelDirectionCS;
+            // std::cout << "\t\t" << vWheelDirectionWS[0] << " " << vWheelDirectionWS[1] << " " << vWheelDirectionWS[2] << std::endl;
+            // Eigen::Vector3d vWheelAxleWS = m_dTwv.rotationMatrix() * m_vWheelAxleCS;
+            // std::cout << "\t\t" << vWheelAxleWS[0] << " " << vWheelAxleWS[1] << " " << vWheelAxleWS[2] << std::endl;
+            double raylen = m_dSuspRestLength + m_dWheelRadius;
+            Eigen::Vector3d rayvector = m_vWheelDirectionCS * raylen;
+            Eigen::Vector3d vContactPointCS = connectionPointCS + rayvector;
+            // std::cout << "\t\t" << vContactPointCS[0] << " " << vContactPointCS[1] << " " << vContactPointCS[2] << std::endl;
+            vWheelTransformsCS[ii].translation() = vContactPointCS;
+            
+            Eigen::Vector3d up = -vWheelDirectionWS;
+            // Eigen::Vector3d right = vWheelAxleWS;
+            // Eigen::Vector3d fwd = right.cross(up);
+
+            Eigen::AngleAxisd aWheelSteer(m_dSteering, up);
+            // Eigen::Matrix3d basis;
+            // basis << fwd[0],right[0],up[0],
+            //          fwd[1],right[1],up[1],
+            //          fwd[2],right[2],up[2];
+            // Eigen::Matrix3d mWheelOrnWS = aWheelSteer.toRotationMatrix() * basis;
+            Eigen::Quaterniond qWheelOrnCS(aWheelSteer);
+            // std::cout << "\t\t" << qWheelOrnCS.x() << " " << qWheelOrnCS.y() << " " << qWheelOrnCS.z() << " " << qWheelOrnCS.w() << std::endl;
+            vWheelTransformsCS[ii].setQuaternion(qWheelOrnCS);
+        }
+        UpdateWheels(vWheelTransformsCS);
+    }
+
+    // store CS wheel poses as WS states
     void UpdateWheels(const std::vector<Sophus::SE3d>& vWheelTransforms){
         Sophus::SE3d bodyT = m_dTwv;
-        m_vWheelContacts.resize(4);
         m_vWheelStates.resize(4);
-        for(size_t ii = 0 ; ii < m_vWheelContacts.size() ; ii++){
+        for(size_t ii = 0 ; ii < m_vWheelStates.size() ; ii++){
             //position the wheels with respect to the body
             fflush(stdout);
             Sophus::SE3d T = bodyT* vWheelTransforms[ii];
             m_vWheelStates[ii] = T;
+        }
+    }
+
+    void ResetContacts(){
+        std::vector<bool> vWheelContacts;
+        vWheelContacts.resize(4);
+        for (size_t ii=0; ii<vWheelContacts.size(); ii++)
+        {
+            vWheelContacts[ii] = false;
+        }
+        UpdateContacts(vWheelContacts);
+    }
+
+    void UpdateContacts(const std::vector<bool>& vWheelContacts){
+        m_vWheelContacts.resize(4);
+        for(size_t ii = 0 ; ii < vWheelContacts.size() ; ii++)
+        {
+            m_vWheelContacts[ii] = vWheelContacts[ii];
         }
     }
 
@@ -512,7 +627,6 @@ struct VehicleState
         state = m_dTwv.inverse() * state;
         Eigen::Vector3d trans = state.translation();
         Eigen::Quaterniond quat = state.unit_quaternion();
-
         Eigen::Vector7d pose;
         pose << trans[0],
                 trans[1],
@@ -548,6 +662,20 @@ struct VehicleState
         else
             frame += "back";
         if (pose[1]>0)
+            frame += "_left";
+        else
+            frame += "_right";
+        frame += "_wheel_link";
+        return frame;
+    }
+
+    std::string GetWheelFrame(const Eigen::Vector3d& translation) const {
+        std::string frame;
+        if (translation[0]>0)
+            frame += "front";
+        else
+            frame += "back";
+        if (translation[1]>0)
             frame += "_left";
         else
             frame += "_right";
@@ -764,37 +892,53 @@ struct VehicleState
       return state_msg;
     }
 
-    void fromROS(carplanner_msgs::VehicleState msg)
-    {
+    void fromROS(const carplanner_msgs::VehicleState msg)
+    {  
+        Eigen::Quaterniond quat(msg.pose.transform.rotation.w, msg.pose.transform.rotation.x, msg.pose.transform.rotation.y, msg.pose.transform.rotation.z);
+
+        if (abs(sqrt(pow(quat.x(),2)+pow(quat.y(),2)+pow(quat.z(),2)+pow(quat.w(),2))-0.f) < 0.01f)
+        {
+            ROS_WARN("Got zero quaternion in fromROS. Setting to identity...");
+            quat.x() = 0.f;
+            quat.y() = 0.f;
+            quat.z() = 0.f;
+            quat.w() = 1.f;        
+        }
+
         (*this).m_dTwv.translation() = Eigen::Vector3d(
             msg.pose.transform.translation.x,
             msg.pose.transform.translation.y,
             msg.pose.transform.translation.z);
-        (*this).m_dTwv.setQuaternion(Eigen::Quaterniond(
-            msg.pose.transform.rotation.w,
-            msg.pose.transform.rotation.x,
-            msg.pose.transform.rotation.y,
-            msg.pose.transform.rotation.z));
+        (*this).m_dTwv.setQuaternion(quat);
 
-        m_vWheelStates.resize(msg.wheel_poses.size());
-        for( unsigned int i=0; i<(*this).m_vWheelStates.size(); i++ )
+        if (msg.wheel_poses.size() != 4)
+            ResetWheels();
+        else
         {
-            (*this).m_vWheelStates[i].translation() = Eigen::Vector3d(
-                msg.wheel_poses[i].transform.translation.x,
-                msg.wheel_poses[i].transform.translation.y,
-                msg.wheel_poses[i].transform.translation.z);
-            (*this).m_vWheelStates[i].setQuaternion(Eigen::Quaterniond(
-                msg.wheel_poses[i].transform.rotation.w,
-                msg.wheel_poses[i].transform.rotation.x,
-                msg.wheel_poses[i].transform.rotation.y,
-                msg.wheel_poses[i].transform.rotation.z));
+            for( unsigned int i=0; i<(*this).m_vWheelStates.size(); i++ )
+            {
+                (*this).m_vWheelStates[i].translation() = Eigen::Vector3d(
+                    msg.wheel_poses[i].transform.translation.x,
+                    msg.wheel_poses[i].transform.translation.y,
+                    msg.wheel_poses[i].transform.translation.z);
+                (*this).m_vWheelStates[i].setQuaternion(Eigen::Quaterniond(
+                    msg.wheel_poses[i].transform.rotation.w,
+                    msg.wheel_poses[i].transform.rotation.x,
+                    msg.wheel_poses[i].transform.rotation.y,
+                    msg.wheel_poses[i].transform.rotation.z));
+            }
         }
 
-        m_vWheelContacts.resize(msg.wheel_contacts.size());
-        for(uint i=0; i<m_vWheelContacts.size(); i++)
+        if (msg.wheel_contacts.size() != 4)
+            ResetContacts();
+        else
         {
-            m_vWheelContacts[i] = msg.wheel_contacts[i];
+            for(uint i=0; i<m_vWheelContacts.size(); i++)
+            {
+                m_vWheelContacts[i] = msg.wheel_contacts[i];
+            }
         }
+
         m_bChassisInCollision = msg.chassis_collision;
 
         (*this).m_dV[0] = msg.lin_vel.x;
@@ -850,6 +994,15 @@ struct VehicleState
     double m_dCurvature;                        //< The curvature at this point in the path
     double m_dSteering;                         //< The steering command given to the car at this point (used to reset rate limitations)
     double m_dTime;
+
+    Eigen::Vector3d m_vWheelDirectionCS; //wheel direction is z
+    Eigen::Vector3d m_vWheelAxleCS; //wheel axle in y direction
+    double m_dWheelBase;
+    double m_dChassisWidth;
+    double m_dWheelWidth;
+    double m_dSuspConnectionHeight;
+    double m_dSuspRestLength;
+    double m_dWheelRadius;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -978,7 +1131,7 @@ struct MotionSample
         return sample_msg;
     }
 
-    void fromROS(carplanner_msgs::MotionSample sample_msg)
+    void fromROS(const carplanner_msgs::MotionSample sample_msg)
     {
         (*this).m_vStates.clear();
         (*this).m_vStates.resize(sample_msg.states.size());
@@ -1050,11 +1203,11 @@ struct MotionSample
             // Eigen::Vector3d error_weights(1,.25,0); // roll pitch yaw
 
             // const VehicleState& state = m_vStates[ii];
-            Eigen::Vector3d dWCS(m_vStates[ii].m_dW.transpose() * m_vStates[ii].m_dTwv.rotationMatrix());
-            Eigen::Vector3d last_dWCS(m_vStates[ii-1].m_dW.transpose() * m_vStates[ii-1].m_dTwv.rotationMatrix());
+            Eigen::Vector3d dWCS(m_vStates[ii].m_dW.transpose() * m_vStates[ii].m_dTwv.rotationMatrix()); // current velocity in body coordinates
+            Eigen::Vector3d last_dWCS(m_vStates[ii-1].m_dW.transpose() * m_vStates[ii-1].m_dTwv.rotationMatrix()); // previous velocity in body coordinates
             // for(uint i=0; i<dWCS.size(); i++) { dWCS[i] = fabs(dWCS[i]); }
             // cost += error_weights.dot(dWCS);
-            cost += fabs(dWCS[0]-last_dWCS[0]);
+            cost += fabs(dWCS[0]-last_dWCS[0]); // roll acceleration
             // cost += dWCS[1]*0.5;
             // cost += dWCS[0]*dWCS[0];
 
@@ -1180,7 +1333,65 @@ struct MotionSample
     }
 };
 
+class ApplyVelocitiesData
+{
+public:
+    ApplyVelocitiesData(): m_InitialState(), m_nWorldId(0), m_bNoCompensation(true), m_bNoDelay(true)
+    {
 
+    }
+    
+    carplanner_msgs::ApplyVelocitiesData toROS()
+    {
+        carplanner_msgs::ApplyVelocitiesData msg;
+
+        msg.initial_state = m_InitialState.toROS();
+        msg.initial_motion_sample = m_InitialMotionSample.toROS();
+        msg.world_id = m_nWorldId;
+        msg.no_compensation = m_bNoCompensation;
+        msg.no_delay = m_bNoDelay;
+
+        return msg;
+    }
+
+    void fromROS(const carplanner_msgs::ApplyVelocitiesData& msg)
+    {
+        m_InitialState.fromROS(msg.initial_state);
+        m_InitialMotionSample.fromROS(msg.initial_motion_sample);
+        m_nWorldId = msg.world_id;
+        m_bNoCompensation = msg.no_compensation;
+        m_bNoDelay = msg.no_delay;
+
+        return;
+    }
+
+public:
+    VehicleState m_InitialState;
+    MotionSample m_InitialMotionSample;
+    uint m_nWorldId;
+    bool m_bNoCompensation;
+    bool m_bNoDelay;
+};
+
+class ApplyVelocitiesFunctionObj : public ros::CallbackInterface
+{
+public:
+    ApplyVelocitiesFunctionObj(const boost::function<void()> &callback) :
+        m_Callback(callback)
+    {}
+
+    virtual ros::CallbackInterface::CallResult call() override {
+        m_Callback();
+        return ros::CallbackInterface::CallResult::Success;
+    }
+
+    virtual bool ready() override {
+        return true;
+    }
+
+private:
+    boost::function<void()> m_Callback;
+};
 
 typedef actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> ApplyVelocitiesClient;
 typedef std::vector<ApplyVelocitiesClient*> ApplyVelocitiesClients;
@@ -1191,10 +1402,10 @@ class MochaVehicle
 {
 public:
     struct Config{
-        std::string params_file="/home/mike/code/mochagui/learning_params.csv",
-            terrain_mesh_file="/home/mike/code/mochagui/labLoop.ply",
-            car_mesh_file="/home/mike/code/mochagui/herbie/herbie.blend",
-            wheel_mesh_file="/home/mike/code/mochagui/herbie/wheel.blend",
+        std::string params_file=ros::package::getPath("mochapc") + "/learning_params.csv",
+            terrain_mesh_file=ros::package::getPath("mochapc") + "/labLoop.ply",
+            car_mesh_file=ros::package::getPath("mochapc") + "/herbie/herbie.blend",
+            wheel_mesh_file=ros::package::getPath("mochapc") + "/herbie/wheel.blend",
             map_frame="map",
             base_link_frame="base_link";
         int opt_dim = 4;
@@ -1202,6 +1413,7 @@ public:
     } m_config;
 
     MochaVehicle(ros::NodeHandle&, ros::NodeHandle&);
+    // MochaVehicle(const MochaVehicle& vehicle);
     ~MochaVehicle();
 
     // Initialization
@@ -1238,6 +1450,11 @@ public:
                                 int nWorldId = 0,
                                 bool noCompensation = false,
                                 bool noDelay = false);
+
+    VehicleState ApplyVelocities( ApplyVelocitiesData& );
+
+    // boost::threadpool::pool threadPool;
+    // void BatchApplyVelocities(std::vector<ApplyVelocitiesData>& );
 
     ros::NodeHandle m_private_nh;
     ros::NodeHandle m_nh;
@@ -1324,7 +1541,7 @@ public:
     // std::vector<actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>> servers_;
 
     // void ApplyVelocities(carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
-    void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
+    // void ApplyVelocitiesService(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService0(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService1(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService2(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
@@ -1336,17 +1553,12 @@ public:
     // void ApplyVelocitiesService8(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // void ApplyVelocitiesService9(const carplanner_msgs::ApplyVelocitiesGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server2;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server3;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server4;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server5;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server6;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server7;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8;
-    actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9;
+    void ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction>);
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
 
+    // void BatchApplyVelocitiesService(const carplanner_msgs::BatchApplyVelocitiesGoalConstPtr&);
+    // actionlib::SimpleActionServer<carplanner_msgs::BatchApplyVelocitiesAction> m_actionBatchApplyVelocities_server;
+    
     void SetStateService(const carplanner_msgs::SetStateGoalConstPtr&);
     actionlib::SimpleActionServer<carplanner_msgs::SetStateAction> m_actionSetState_server;
 
@@ -1368,7 +1580,7 @@ public:
     // void SetNoDelayService(const carplanner_msgs::SetNoDelayGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server;
 
-    void meshCb(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
+    void meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr&);
 
     void replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm);
     void appendMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm);
@@ -1465,6 +1677,8 @@ protected:
     boost::thread* m_pPublisherThread;
     // boost::thread* m_pStatePublisherThread;
     boost::thread* m_pTerrainMeshPublisherThread;
+
+    carplanner_msgs::TriangleMeshStamped::ConstPtr m_pMeshMsg;
 
     // Eigen::Vector3d m_dGravity;
     unsigned int m_nNumWorlds;

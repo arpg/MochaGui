@@ -31,6 +31,7 @@ MochaController::MochaController(ros::NodeHandle& private_nh_, ros::NodeHandle& 
     m_dTrajWeight(6) = CURV_WEIGHT;
 
     m_private_nh.param("map_frame", m_map_frame, m_map_frame);
+    m_private_nh.param("lookahead_time", m_dLookaheadTime, m_dLookaheadTime);
 
     m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), &MochaController::ControlLoopFunc, this);
     // m_timerControlLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dControlRate), boost::bind(&MochaController::ControlLoopFunc, this, _1));
@@ -80,7 +81,7 @@ void MochaController::InitController( ) {
 void MochaController::Reset()
 {
     {
-        boost::mutex::scoped_lock(m_PlanMutex);
+        boost::mutex::scoped_lock lock(m_PlanMutex);
         while(m_lControlPlans.begin() != m_lControlPlans.end()) {
             //delete this plan
             delete(m_lControlPlans.front());
@@ -962,7 +963,7 @@ bool MochaController::ApplyVelocities(const VehicleState& startState,
 
     double t0 = Tic();
 
-    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> actionApplyVelocities_client("vehicle/"+std::to_string(nWorldId)+"/apply_velocities",true);
+    actionlib::SimpleActionClient<carplanner_msgs::ApplyVelocitiesAction> actionApplyVelocities_client("vehicle/apply_velocities",true);
     actionApplyVelocities_client.waitForServer();
 
 

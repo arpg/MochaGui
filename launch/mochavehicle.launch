@@ -1,14 +1,14 @@
 <launch>
 
   <!-- <arg name="input_mesh" default="/infinitam/mesh"/> -->
-  <arg name="params_file" default="/home/mike/code/mochagui/learning_params.csv"/>
+  <arg name="params_file" default="$(find mochapc)/learning_params.csv"/>
   <arg name="mode" default="0"/>
-  <arg name="terrain_mesh_file" default="/home/mike/code/mochagui/labLoop.ply"/>
-  <arg name="car_mesh_file" default="/home/mike/code/mochagui/herbie/herbie.blend"/>
-  <arg name="wheel_mesh_file" default="/home/mike/code/mochagui/herbie/wheel.blend"/>
+  <arg name="terrain_mesh_file" default="$(find mochapc)/labLoop.ply"/>
+  <arg name="car_mesh_file" default="$(find mochapc)/herbie/herbie.blend"/>
+  <arg name="wheel_mesh_file" default="$(find mochapc)/herbie/wheel.blend"/>
 
   <node pkg="nodelet" type="nodelet" name="mocha_manager"  args="manager"/>
-  <node pkg="nodelet" type="nodelet" name="mocha_vehicle" args="load mochagui/MochaVehicleNodelet mocha_manager">
+  <node pkg="nodelet" type="nodelet" name="mocha_vehicle" args="load mochapc/MochaVehicleNodelet mocha_manager">
     <!-- <remap from="input_mesh" to="$(arg input_mesh)"/> -->
     <param name="params_file" value="$(arg params_file)"/>
     <param name="mode" value="$(arg mode)"/>

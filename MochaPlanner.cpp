@@ -74,9 +74,6 @@ MochaPlanner::~MochaPlanner()
 
 void MochaPlanner::Initialize()
 {
-    InitializeParameters();
-    InitializeExternals();
-
     ROS_INFO_NAMED("planner","[Planner] initialized.");   
 }
 
@@ -2551,6 +2548,7 @@ bool MochaPlanner::_IteratePlanner(
             // pub path viz's
             m_vPotentialPaths.clear();
             problem.GetPotentialPaths(m_vPotentialPaths);
+            m_vPotentialPaths.push_back(sample);
             m_vPotentialNorms.clear();
             for(uint i=0; i<m_vPotentialPaths.size(); i++)
             {
@@ -2626,49 +2624,28 @@ void MochaPlanner::pubPotentialPathsViz()
 {
     Eigen::Vector3d offset(0,0,.2);
 
-    if (m_vPotentialPaths.size()==0)
-    {
-        visualization_msgs::MarkerArray pathviz_msg;
-        m_pubPotentialPaths.publish(pathviz_msg);
-        visualization_msgs::MarkerArray normviz_msg;
-        normviz_msg.markers.resize(1);
-        normviz_msg.markers[0].header.frame_id = m_config.map_frame;
-        normviz_msg.markers[0].action = visualization_msgs::Marker::DELETE;
-        m_pubPotentialNorms.publish(normviz_msg);
-        return;
-    }
+    // if (m_vPotentialPaths.size()==0)
+    // {
+    //     visualization_msgs::MarkerArray pathviz_msg;
+    //     pathviz_msg.markers.resize(1);
+    //     pathviz_msg.markers[0].action = visualization_msgs::Marker::DELETEALL;
+    //     pathviz_msg.markers[0].id = 0;
+    //     m_pubPotentialPaths.publish(pathviz_msg);
 
-    visualization_msgs::MarkerArray pathviz_msg;
-    convertSomePath2LineStripArrayMsg(m_vPotentialPaths, &pathviz_msg, m_config.map_frame, carplanner_msgs::MarkerArrayConfig("", 0.01, 0.01, 0.01, 0.678, 0.847, 0.902, 1.0));
-    for (uint i=0; i<pathviz_msg.markers.size(); i++)
-    {
-        pathviz_msg.markers[i].pose.position.x += offset[0];
-        pathviz_msg.markers[i].pose.position.y += offset[1];
-        pathviz_msg.markers[i].pose.position.z += offset[2];
-    }
-    // previous current solution is blue
-    pathviz_msg.markers[0].color.r = 0;
-    pathviz_msg.markers[0].color.g = 0;
-    pathviz_msg.markers[0].color.b = 1.0;
-    pathviz_msg.markers[0].color.a = 1.0;
-    // coordinate descent solutions are purple
-    for (uint i=1; i<std::min(10,(int)pathviz_msg.markers.size()); i++)
-    {
-        pathviz_msg.markers[i].color.r = 0.5;
-        pathviz_msg.markers[i].color.g = 0;
-        pathviz_msg.markers[i].color.b = 0.5;
-        pathviz_msg.markers[i].color.a = 1.0;
-    }
-    // damped solutions are green
-    for (uint i=10; i<pathviz_msg.markers.size(); i++)
-    {
-        pathviz_msg.markers[i].color.r = 0;
-        pathviz_msg.markers[i].color.g = 1.0;
-        pathviz_msg.markers[i].color.b = 0;
-        pathviz_msg.markers[i].color.a = 1.0;
-    }
-    m_pubPotentialPaths.publish(pathviz_msg);
+    //     visualization_msgs::MarkerArray normviz_msg;
+    //     normviz_msg.markers.resize(1);
+    //     normviz_msg.markers[0].action = visualization_msgs::Marker::DELETEALL;
+    //     normviz_msg.markers[0].id = 0;
+    //     m_pubPotentialNorms.publish(normviz_msg);
 
+    //     return;
+    // }
+
+    clearPotentialPathsViz();
+
+    //// pub norm viz
+    int min_norm_idx = -1;
+    float min_norm = FLT_MAX;
     visualization_msgs::MarkerArray normviz_msg;
     normviz_msg.markers.resize(m_vPotentialPaths.size());
     // normviz_msg.markers[i].action = visualization_msgs::Marker::DELETE;
@@ -2693,19 +2670,71 @@ void MochaPlanner::pubPotentialPathsViz()
         normviz_msg.markers[i].text = std::to_string(m_vPotentialNorms[i]);
         normviz_msg.markers[i].action = visualization_msgs::Marker::ADD;
         // ROS_INFO("norm %f at %f %f %f", m_vPotentialNorms[i], m_vPotentialPaths[i].m_vStates[m_vPotentialPaths[i].m_vStates.size()-1].m_dTwv.translation().x(), m_vPotentialPaths[i].m_vStates[m_vPotentialPaths[i].m_vStates.size()-1].m_dTwv.translation().y(), m_vPotentialPaths[i].m_vStates[m_vPotentialPaths[i].m_vStates.size()-1].m_dTwv.translation().z());
+
+        if (m_vPotentialNorms[i]<min_norm)
+        {
+            min_norm = m_vPotentialNorms[i];
+            min_norm_idx = i;
+        }
     }
     m_pubPotentialNorms.publish(normviz_msg);
+
+    //// pub path viz
+    visualization_msgs::MarkerArray pathviz_msg;
+    convertSomePath2LineStripArrayMsg(m_vPotentialPaths, &pathviz_msg, m_config.map_frame, carplanner_msgs::MarkerArrayConfig("", 0.01, 0.01, 0.01, 0.678, 0.847, 0.902, 1.0));
+    for (uint i=0; i<pathviz_msg.markers.size(); i++)
+    {
+        pathviz_msg.markers[i].pose.position.x += offset[0];
+        pathviz_msg.markers[i].pose.position.y += offset[1];
+        pathviz_msg.markers[i].pose.position.z += offset[2];
+
+        pathviz_msg.markers[i].color.a = 0.9;
+    }
+    // previous current solution is blue
+    pathviz_msg.markers[0].color.r = 0;
+    pathviz_msg.markers[0].color.g = 0;
+    pathviz_msg.markers[0].color.b = 1.0;
+    // coordinate descent solutions are purple
+    for (uint i=1; i<std::min(10,(int)pathviz_msg.markers.size()); i++)
+    {
+        pathviz_msg.markers[i].color.r = 0.5;
+        pathviz_msg.markers[i].color.g = 0;
+        pathviz_msg.markers[i].color.b = 0.5;
+    }
+    // damped solutions are green
+    for (uint i=10; i<pathviz_msg.markers.size()-1; i++)
+    {
+        pathviz_msg.markers[i].color.r = 0;
+        pathviz_msg.markers[i].color.g = 1.0;
+        pathviz_msg.markers[i].color.b = 0;
+    }
+    // final solution is light blue
+    pathviz_msg.markers[pathviz_msg.markers.size()-1].color.r = 0.0;
+    pathviz_msg.markers[pathviz_msg.markers.size()-1].color.g = 0.5;
+    pathviz_msg.markers[pathviz_msg.markers.size()-1].color.b = 1.0;
+    // best solution is red
+    if (min_norm_idx>-1)
+    {
+        pathviz_msg.markers[min_norm_idx].color.r = 1.0;
+        pathviz_msg.markers[min_norm_idx].color.g = 0.0;
+        pathviz_msg.markers[min_norm_idx].color.b = 0.0;
+
+        pathviz_msg.markers[min_norm_idx].pose.position.z += 0.01; // just make it slightly higher in case it's the same as any other paths
+    }
+    m_pubPotentialPaths.publish(pathviz_msg);
 }
 
 void MochaPlanner::clearPotentialPathsViz()
 {
     visualization_msgs::MarkerArray pathviz_msg;
     pathviz_msg.markers.resize(1);
+    pathviz_msg.markers[0].id = 0;
     pathviz_msg.markers[0].action = visualization_msgs::Marker::DELETEALL;
     m_pubPotentialPaths.publish(pathviz_msg);
 
     visualization_msgs::MarkerArray normviz_msg;
     normviz_msg.markers.resize(1);
+    normviz_msg.markers[0].id = 0;
     normviz_msg.markers[0].action = visualization_msgs::Marker::DELETEALL;
     m_pubPotentialNorms.publish(normviz_msg);
 
@@ -2795,7 +2824,7 @@ void MochaPlanner::_pubActualTraj(Eigen::Vector3dAlignedVec& path_in)
     nav_msgs::Path path_msg;
     convertSomePath2PathMsg(some_path, &path_msg, m_config.map_frame);
     // path_msg.header.frame_id = m_config.map_frame;
-    m_pubActualTraj.publish(path_msg);
+    m_pubActualTraj.publish(path_msg);    
     ros::spinOnce();
 }
 

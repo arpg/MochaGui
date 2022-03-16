@@ -20,5 +20,19 @@
     </description>
   </class>
 </library>
+<library path="lib/libstatic_mesh_publisher_nodelet">
+  <class name="mochapc/StaticMeshPublisherNodelet" type="mochapc::StaticMeshPublisherNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet for periodically publishing a static mesh file
+    </description>
+  </class>
+</library>
+<library path="lib/libfake_apply_velocities_nodelet">
+  <class name="mochapc/FakeApplyVelocitiesNodelet" type="mochapc::FakeApplyVelocitiesNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet for sending test goals to the MochaVehicle ApplyVelocities server
+    </description>
+  </class>
+</library>
 </class_libraries>
 
