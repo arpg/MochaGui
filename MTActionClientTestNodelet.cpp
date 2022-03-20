@@ -1,7 +1,7 @@
 
 #include "ros/ros.h"
 #include "nodelet/nodelet.h"
-#include "MTActionClientTest.hpp"
+#include "MTActionClientTest.h"
 #include <pluginlib/class_list_macros.h>
 
 namespace mochapc{
@@ -19,7 +19,7 @@ public:
         // ros::NodeHandle& nh = this->getNodeHandle();
         // ros::NodeHandle& private_nh = this->getPrivateNodeHandle();
 
-        clinet_.reset(new MTActionClientTest(private_nh, nh));
+        client_.reset(new MTActionClientTest(private_nh, nh));
       };
 private:
   boost::shared_ptr<MTActionClientTest> client_;

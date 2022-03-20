@@ -299,6 +299,33 @@ target_link_libraries( controller_standalone_nodelet controller_nodelet )
 #  vehicle
 #)
 
+set( MT_TEST_ACTION_LIBRARIES ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_TIMER_LIBRARY} ${catkin_LIBRARIES})
+
+### mt test action client libraries ###
+add_library( mt_action_client_test MTActionClientTest.cpp)
+target_link_libraries(mt_action_client_test ${MT_TEST_ACTION_LIBRARIES})
+# add_dependencies( mt_test_action_client
+#   carplanner_msgs_gencfg
+#   carplanner_msgs_gencfg
+# )
+
+add_library( mt_action_client_test_nodelet MTActionClientTestNodelet.cpp)
+target_link_libraries( mt_action_client_test_nodelet mt_action_client_test)
+
+# add_executable(  planner_standalone_nodelet MochaPlannerStandaloneNodelet.cpp )
+# target_link_libraries( planner_standalone_nodelet planner_nodelet )
+
+### mt test action server libraries ###
+add_library( mt_action_server_test MTActionServerTest.cpp)
+target_link_libraries(mt_action_server_test ${MT_TEST_ACTION_LIBRARIES})
+#add_dependencies(vehicle vehicle_gencfg)
+
+add_library( mt_action_server_test_nodelet MTActionServerTestNodelet.cpp)
+target_link_libraries( mt_action_server_test_nodelet mt_action_server_test)
+
+# add_executable(  vehicle_standalone_nodelet MochaVehicleStandaloneNodelet.cpp )
+# target_link_libraries( vehicle_standalone_nodelet vehicle_nodelet )
+
 # Generate config file for use in headers
 CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"

@@ -1,0 +1,11 @@
+<launch>
+
+  <arg name="manager" default="mt_test_action_manager"/>
+
+  <node pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" output="screen"/>
+  <node pkg="nodelet" type="nodelet" name="mt_test_client" args="load mochapc/MTActionClientTestNodelet $(arg manager)">
+  </node>
+  <node pkg="nodelet" type="nodelet" name="mt_test_server" args="load mochapc/MTActionServerTestNodelet $(arg manager)">
+  </node>
+
+</launch>

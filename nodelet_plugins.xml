@@ -34,5 +34,17 @@
     </description>
   </class>
 </library>
+<library path="lib/libmt_action_client_test_nodelet">
+  <class name="mochapc/MTActionClientTestNodelet" type="mochapc::MTActionClientTestNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+    </description>
+  </class>
+</library>
+<library path="lib/libmt_action_server_test_nodelet">
+  <class name="mochapc/MTActionServerTestNodelet" type="mochapc::MTActionServerTestNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+    </description>
+  </class>
+</library>
 </class_libraries>
 

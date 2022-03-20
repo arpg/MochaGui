@@ -1,7 +1,7 @@
 
 #include "ros/ros.h"
 #include "nodelet/nodelet.h"
-#include "MTActionServerTest.hpp"
+#include "MTActionServerTest.h"
 #include <pluginlib/class_list_macros.h>
 
 namespace mochapc{
