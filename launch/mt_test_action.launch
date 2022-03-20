@@ -1,8 +1,12 @@
 <launch>
 
   <arg name="manager" default="mt_test_action_manager"/>
+  <arg name="enable_debug"      default="false"/>
 
-  <node pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" output="screen"/>
+  <arg name="launch_prefix" default="gdb -ex run --args" if="$(arg enable_debug)"/>
+  <arg name="launch_prefix" default="" unless="$(arg enable_debug)"/>
+
+  <node pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" output="screen" launch-prefix="$(arg launch_prefix)"/>
   <node pkg="nodelet" type="nodelet" name="mt_test_client" args="load mochapc/MTActionClientTestNodelet $(arg manager)">
   </node>
   <node pkg="nodelet" type="nodelet" name="mt_test_server" args="load mochapc/MTActionServerTestNodelet $(arg manager)">

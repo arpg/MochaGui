@@ -38,10 +38,12 @@ void MTActionServerTest::MTTestActionService(const carplanner_msgs::MTTestGoalCo
 {
     ROS_INFO("[Server] Got TestAction call for %d.", goal->thread_id);
 
-    double wait = MAX_SERVER_TIME*((double) rand() / (RAND_MAX));
+    double wait = goal->delay;
     ROS_INFO("[Server] TestAction %d waiting for %f sec...", goal->thread_id, wait);
     double start = Tic();
     while (Toc(start)<wait);
+
+    ROS_INFO("[Server] TestAction %d done waiting.", goal->thread_id);
 
     // carplanner_msgs::MTTestActionFeedback feedback;
     carplanner_msgs::MTTestResult result;
