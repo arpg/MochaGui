@@ -129,6 +129,17 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     // m_actionCreateSimpleServer_server(m_nh, "plan_car/create_server", boost::bind(&MochaVehicle::CreateServerService, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
     m_actionApplyVelocities_server(m_nh, "vehicle/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*0*/, this, _1), false),
+    // m_actionApplyVelocities_server0(m_nh, "vehicle/apply_velocities/0", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server1(m_nh, "vehicle/apply_velocities/1", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server2(m_nh, "vehicle/apply_velocities/2", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server3(m_nh, "vehicle/apply_velocities/3", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server4(m_nh, "vehicle/apply_velocities/4", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server5(m_nh, "vehicle/apply_velocities/5", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server6(m_nh, "vehicle/apply_velocities/6", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server7(m_nh, "vehicle/apply_velocities/7", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server8(m_nh, "vehicle/apply_velocities/8", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server9(m_nh, "vehicle/apply_velocities/9", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    
     // m_actionBatchApplyVelocities_server(m_nh, "vehicle/batch_apply_velocities", boost::bind(&MochaVehicle::BatchApplyVelocitiesService, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "vehicle/apply_all_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
     m_actionSetState_server(m_nh, "vehicle/set_state", boost::bind(&MochaVehicle::SetStateService, this, _1), false),
@@ -440,7 +451,6 @@ void MochaVehicle::InitializeExternals()
  
     m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
 
-
     m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
 
     m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
@@ -456,6 +466,17 @@ void MochaVehicle::InitializeExternals()
     InitializeTransformPublishers();
 
     m_actionApplyVelocities_server.start();
+    // m_actionApplyVelocities_server0.start();
+    // m_actionApplyVelocities_server1.start();
+    // m_actionApplyVelocities_server2.start();
+    // m_actionApplyVelocities_server3.start();
+    // m_actionApplyVelocities_server4.start();
+    // m_actionApplyVelocities_server5.start();
+    // m_actionApplyVelocities_server6.start();
+    // m_actionApplyVelocities_server7.start();
+    // m_actionApplyVelocities_server8.start();
+    // m_actionApplyVelocities_server9.start();
+
     // m_actionBatchApplyVelocities_server.start();
 
     m_actionSetState_server.start();
@@ -917,72 +938,84 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-void MochaVehicle::InitROS()
-{
-    DLOG(INFO) << "Initing ROS";
+// void MochaVehicle::InitROS()
+// {
+//     DLOG(INFO) << "Initing ROS";
 
-    // m_private_nh.param("params_file", m_config.params_file, m_config.params_file);
-    // m_private_nh.param("mode", (int&)m_config.mode, (int&)m_config.mode);
-    // m_private_nh.param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
-    // m_private_nh.param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
-    // m_private_nh.param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
+//     // m_private_nh.param("params_file", m_config.params_file, m_config.params_file);
+//     // m_private_nh.param("mode", (int&)m_config.mode, (int&)m_config.mode);
+//     // m_private_nh.param("terrain_mesh_file", m_config.terrain_mesh_file, m_config.terrain_mesh_file);
+//     // m_private_nh.param("car_mesh_file", m_config.car_mesh_file, m_config.car_mesh_file);
+//     // m_private_nh.param("wheel_mesh_file", m_config.wheel_mesh_file, m_config.wheel_mesh_file);
 
-    std::string terrain_mesh_topic;
-    m_private_nh.param("terrain_mesh_topic", terrain_mesh_topic, std::string("vehicle/input_terrain_mesh"));
+//     std::string terrain_mesh_topic;
+//     m_private_nh.param("terrain_mesh_topic", terrain_mesh_topic, std::string("vehicle/input_terrain_mesh"));
 
-    // m_statePub = m_nh.advertise<carplanner_msgs::VehicleState>("state",1);
-    m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
-    m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
-    // m_meshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>(m_meshSubTopic, 1, boost::bind(&MochaVehicle::_meshCB, this, _1))
-    // m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("input_terrain_mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
-    // m_meshSub2 = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("/fake_mesh_publisher/mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
+//     // m_statePub = m_nh.advertise<carplanner_msgs::VehicleState>("state",1);
+//     m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
+//     m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
+//     // m_meshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>(m_meshSubTopic, 1, boost::bind(&MochaVehicle::_meshCB, this, _1))
+//     // m_terrainMeshSub = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("input_terrain_mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
+//     // m_meshSub2 = m_nh.subscribe<mesh_msgs::TriangleMeshStamped>("/fake_mesh_publisher/mesh", 1, boost::bind(&MochaVehicle::_meshCB, this, _1));
 
-    // m_resetmeshSrv = m_nh.advertiseService("reset_mesh", &MochaVehicle::ResetMesh, this);
+//     // m_resetmeshSrv = m_nh.advertiseService("reset_mesh", &MochaVehicle::ResetMesh, this);
 
-    m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>(terrain_mesh_topic, 1, &MochaVehicle::meshCb, this);
+//     m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>(terrain_mesh_topic, 1, &MochaVehicle::meshCb, this);
 
-    m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
-    // m_pStatePublisherThread = new boost::thread( std::bind( &MochaVehicle::_StatePublisherFunc, this ));
+//     m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
+//     // m_pStatePublisherThread = new boost::thread( std::bind( &MochaVehicle::_StatePublisherFunc, this ));
 
-    m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
+//     m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
 
-    // m_pTerrainMeshPublisherThread = new boost::thread( std::bind( &MochaVehicle::_TerrainMeshPublisherFunc, this ));
-    m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
+//     // m_pTerrainMeshPublisherThread = new boost::thread( std::bind( &MochaVehicle::_TerrainMeshPublisherFunc, this ));
+//     m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
 
-    m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
+//     m_srvSetDriveMode = m_nh.advertiseService("vehicle/set_drive_mode", &MochaVehicle::SetDriveModeSvcCb, this);
 
-    InitializeStatePublishers();
-    InitializeCommandSubscribers();
+//     InitializeStatePublishers();
+//     InitializeCommandSubscribers();
 
-    DLOG(INFO) << "Starting services";
+//     DLOG(INFO) << "Starting services";
 
-    // m_actionCreateSimpleServer_server.start();
+//     // m_actionCreateSimpleServer_server.start();
 
-    // m_actionApplyVelocities_server = new actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>(m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1));
-    // m_actionApplyVelocities_server.registerGoalCallback(boost::bind(&MochaVehicle::ApplyVelocitiesGoalCb, this, _1));
-    m_actionApplyVelocities_server.start();
-    // m_actionBatchApplyVelocities_server.start();
+//     // m_actionApplyVelocities_server = new actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction>(m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1));
+//     // m_actionApplyVelocities_server.registerGoalCallback(boost::bind(&MochaVehicle::ApplyVelocitiesGoalCb, this, _1));
 
-    m_actionSetState_server.start();
+//     m_actionApplyVelocities_server.start();
+//     // m_actionApplyVelocities_server0.start();
+//     // m_actionApplyVelocities_server1.start();
+//     // m_actionApplyVelocities_server2.start();
+//     // m_actionApplyVelocities_server3.start();
+//     // m_actionApplyVelocities_server4.start();
+//     // m_actionApplyVelocities_server5.start();
+//     // m_actionApplyVelocities_server6.start();
+//     // m_actionApplyVelocities_server7.start();
+//     // m_actionApplyVelocities_server8.start();
+//     // m_actionApplyVelocities_server9.start();
 
-    // m_actionUpdateState_server = new actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>(m_nh, "plan_car/update_state", boost::bind(&MochaVehicle::UpdateStateService, this, _1));
-    m_actionUpdateState_server.start();
+//     // m_actionBatchApplyVelocities_server.start();
 
-    // m_actionGetGravityCompensation_server = new actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>(m_nh, "plan_car/get_gravity_compensation", boost::bind(&MochaVehicle::GetGravityCompensationService, this, _1));
-    // m_actionGetGravityCompensation_server->start();
+//     m_actionSetState_server.start();
 
-    // m_actionGetControlDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>(m_nh, "plan_car/get_control_delay", boost::bind(&MochaVehicle::GetControlDelayService, this, _1));
-    // m_actionGetControlDelay_server->start();
+//     // m_actionUpdateState_server = new actionlib::SimpleActionServer<carplanner_msgs::UpdateStateAction>(m_nh, "plan_car/update_state", boost::bind(&MochaVehicle::UpdateStateService, this, _1));
+//     m_actionUpdateState_server.start();
 
-    // m_actionGetInertiaTensor_server = new actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction>(m_nh, "plan_car/get_inertia_tensor", boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1));
-    // m_actionGetInertiaTensor_server.start();
+//     // m_actionGetGravityCompensation_server = new actionlib::SimpleActionServer<carplanner_msgs::GetGravityCompensationAction>(m_nh, "plan_car/get_gravity_compensation", boost::bind(&MochaVehicle::GetGravityCompensationService, this, _1));
+//     // m_actionGetGravityCompensation_server->start();
 
-    // m_actionSetNoDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction>(m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1));
-    // m_actionSetNoDelay_server.start();
+//     // m_actionGetControlDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::GetControlDelayAction>(m_nh, "plan_car/get_control_delay", boost::bind(&MochaVehicle::GetControlDelayService, this, _1));
+//     // m_actionGetControlDelay_server->start();
 
-    m_actionRaycast_server.start();
+//     // m_actionGetInertiaTensor_server = new actionlib::SimpleActionServer<carplanner_msgs::GetInertiaTensorAction>(m_nh, "plan_car/get_inertia_tensor", boost::bind(&MochaVehicle::GetInertiaTensorService, this, _1));
+//     // m_actionGetInertiaTensor_server.start();
+
+//     // m_actionSetNoDelay_server = new actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction>(m_nh, "plan_car/set_no_delay", boost::bind(&MochaVehicle::SetNoDelayService, this, _1));
+//     // m_actionSetNoDelay_server.start();
+
+//     m_actionRaycast_server.start();
     
-}
+// }
 
 void MochaVehicle::SetStateService(const carplanner_msgs::SetStateGoalConstPtr &goal)
 {
@@ -1233,6 +1266,64 @@ void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner
     ros::getGlobalCallbackQueue()->addCallback(fObj);
 }
 
+// void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction> goalHandle)
+// {
+//     goalHandle.setAccepted();
+
+//     carplanner_msgs::ApplyVelocitiesResult result;
+//     const carplanner_msgs::ApplyVelocitiesGoalConstPtr goal = goalHandle.getGoal();
+//     ROS_DBG("[ApplyVelocitiesService] Running ApplyVelocities on world %d, %d states, %d commands", goal->world_id, goal->initial_motion_sample.states.size(), goal->initial_motion_sample.commands.size());
+
+//     VehicleState state;
+//     state.fromROS(goal->initial_state);
+//     MotionSample sample;
+//     sample.fromROS(goal->initial_motion_sample);
+//     ApplyVelocities(
+//         state,
+//         sample,
+//         goal->world_id,
+//         goal->no_compensation,
+//         goal->no_delay);
+
+//     result.motion_sample = sample.toROS();
+
+//     switch (goal->world_id)
+//     {
+//         case 0:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 1:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 2:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 3:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 4:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 5:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 6:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 7:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 8:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         case 9:
+//             goalHandle.setSucceeded(result);
+//             break;
+//         default:
+//             break;
+//     }    
+// }
+
 // void MochaVehicle::BatchApplyVelocitiesService(const carplanner_msgs::BatchApplyVelocitiesGoalConstPtr &goal)
 // {
 //     // ROS_INFO("Goal %d received at %.2fs", goal->world_id, ros::Time::now().toSec());
@@ -1337,7 +1428,7 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
                                     bool noDelay /*=false*/)
 {
     double t0 = Tic();
-    ROS_INFO("[Vehicle] >>> (%d) Got velocities. Updating state.", nWorldId);
+    ROS_DBG("[Vehicle] >>> (%d) Got velocities. Updating state.", nWorldId);
 
 /*
     Eigen::Vector3d torques;
@@ -1507,7 +1598,7 @@ void MochaVehicle::ApplyVelocities( VehicleState& startingState,
     }
 
     double t1 = Tic();
-    ROS_INFO("[Vehicle] <<< (%d) Done updating state, took %fs", nWorldId, t1-t0);
+    ROS_DBG("[Vehicle] <<< (%d) Done updating state, took %fs", nWorldId, t1-t0);
 }
 
 VehicleState MochaVehicle::ApplyVelocities( VehicleState& startState,
@@ -2832,7 +2923,7 @@ void MochaVehicle::SetState( int nWorldId, VehicleState& state /* in ned */ , bo
             RayCast(state.m_dTwv.translation(), -GetBasisVector(state.m_dTwv,2)*0.2, dIntersect, true, nWorldId);
             state.m_dTwv.translation() = dIntersect;
         }
-         ROS_INFO("done raycasting %s",convertEigenMatrix2String(state.m_dTwv.translation().transpose()).c_str());
+        ROS_INFO("[Vehicle] Done raycasting: %s.",convertEigenMatrix2String(state.m_dTwv.translation().transpose()).c_str());
 
         for (uint ii=0; ii<state.m_vWheelStates.size(); ii++)
         {

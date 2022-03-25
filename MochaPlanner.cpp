@@ -275,7 +275,7 @@ void MochaPlanner::Init()
 
 void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, uint32_t level)
 {
-    ROS_INFO("Reconfigure requested.");
+    ROS_INFO("[Planner] Reconfigure requested.");
 
     m_dPointWeight(0) = config.x_weight;
     m_dPointWeight(1) = config.y_weight;
@@ -2267,7 +2267,7 @@ bool MochaPlanner::replan()
             boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
             if (m_vWaypoints.empty())
             {
-                DLOG(INFO) << "Aborting replan bc waypoints vector is empty.";
+                DLOG(INFO) << "[Planner] Aborting replan bc waypoints vector is empty.";
                 return false;
             }
             
@@ -2276,7 +2276,7 @@ bool MochaPlanner::replan()
                 Eigen::Vector7d wp = m_vWaypoints[i]->state.ToXYZQuat();
                 if (!std::isfinite(wp.norm()))
                 {
-                    DLOG(INFO) << "Aborting replan bc waypoint " << std::to_string(i) << " is not finite:"
+                    DLOG(INFO) << "[Planner] Aborting replan bc waypoint " << std::to_string(i) << " is not finite:"
                         << " " << std::to_string(wp[0])
                         << " " << std::to_string(wp[1])
                         << " " << std::to_string(wp[2])
@@ -2293,7 +2293,7 @@ bool MochaPlanner::replan()
         }
         if (dirtyWaypointIds.empty())
         {
-            DLOG(INFO) << "Aborting replan bc all waypoints are clean.";
+            DLOG(INFO) << "[Planner] Aborting replan bc all waypoints are clean.";
             return false;
         }
 
@@ -2317,7 +2317,7 @@ bool MochaPlanner::replan()
                 //make sure both waypoints have well defined poses (no nans)
                 if(std::isfinite(a->state.ToXYZTCV().norm()) == false || std::isfinite(b->state.ToXYZTCV().norm()) == false )
                 {
-                    DLOG(INFO) << "Aborting replan bc poorly defined waypoint.";
+                    DLOG(INFO) << "[Planner] Aborting replan bc poorly defined waypoint.";
                     return false;
                 }
 
@@ -2353,7 +2353,7 @@ bool MochaPlanner::replan()
                 goalState = b->state;
             }
 
-            ROS_INFO("Replanning.");
+            ROS_INFO("[Planner] Replanning.");
             // ROS_INFO_NAMED("planner","Replanning\n from %s\n to   %s", startState.toString().c_str(), goalState.toString().c_str());
 
     //                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
@@ -2404,19 +2404,19 @@ bool MochaPlanner::replan()
                 if(numIterations+1 > g_nIterationLimit)
                 {
                     // dout("Reached iteration limit. Skipping");
-                    ROS_INFO("Reached iteration limit. Skipping.");
+                    ROS_INFO("[Planner] Reached iteration limit. Skipping.");
                     success = true;
                 }
                 else if(problem.m_CurrentSolution.m_dNorm < g_dSuccessNorm) 
                 {
                     // DLOG(INFO) << problem.m_nPlanId << ":Succeeded to plan. Norm = " << problem.m_CurrentSolution.m_dNorm;
                     // ROS_DBG("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
-                    ROS_INFO("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
+                    ROS_INFO("[Planner] Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
                     success = true;
                 }
                 else if(fabs(this_norm - last_norm)<g_dImprovementNorm)
                 {
-                    ROS_INFO("Norm not improving. Skipping.");
+                    ROS_INFO("[Planner] Norm not improving. Skipping.");
                     success = true;
                 }
                 else
@@ -2425,7 +2425,7 @@ bool MochaPlanner::replan()
                     // m_vActualTrajectory.clear();
                     // m_vControlTrajectory.clear();
                     last_norm = this_norm;
-                    ROS_DBG("Iterating planner.");
+                    ROS_DBG("[Planner] Iterating planner.");
                     double t0 = Tic();
                     success = _IteratePlanner(problem, m_vSegmentSamples[dirtySegmentId], m_vActualTrajectory, m_vControlTrajectory);
                     double t1 = Tic();
@@ -2437,7 +2437,7 @@ bool MochaPlanner::replan()
                     Eigen::VectorXd weights = problem._GetWeightVector();
                     Eigen::VectorXd weightedErrors = (Eigen::MatrixXd(finalErrors.asDiagonal()) * Eigen::MatrixXd(weights.asDiagonal())).diagonal();
                     double finalNorm = problem._CalculateErrorNorm(finalErrors);
-                    ROS_INFO("Segment %d planner %s after %dth iteration took %fs for %d states (%fs/state)",
+                    ROS_INFO("[Planner] Segment %d planner %s after %dth iteration took %fs for %d states (%fs/state)",
                         dirtySegmentId,
                         (success ? "succeeded" : "failed"),
                         numIterations+1,

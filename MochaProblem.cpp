@@ -683,7 +683,7 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
     const double dEps = m_dEps;// * m_CurrentSolution.m_dNorm;
     // DLOG(INFO) << "Calcing Jacobian";
     // ROS_INFO("Calculating Jacobian.");
-    ROS_INFO("Calcing Jacobian on %d threads", OPT_DIM*2+1);
+    ROS_DBG("[Problem] Calcing Jacobian on %d threads", OPT_DIM*2+1);
     double t0 = Tic();
     //g_bUseCentralDifferences = false;
     for( int ii = 0; ii < OPT_DIM; ii++ )
@@ -762,7 +762,7 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
     m_ThreadPool.wait();
     // DLOG(INFO) << "Done waiting.";
     // ROS_INFO("Done waiting.");
-    ROS_DBG("Jacobian calulation done, took %fs.", Toc(t0));
+    ROS_INFO("[Problem] Jacobian calculation done, took %fs.", Toc(t0));
 
     // ROS_INFO("Pubbing potential paths viz from Coordinate Descent.");
     for( int ii = 0; ii < OPT_DIM ; ii++ )
@@ -776,7 +776,7 @@ bool MochaProblem::_CalculateJacobian(Eigen::VectorXd& dCurrentErrorVec,
     }
     // pubPotentialPathsViz();
 
-    ROS_DBG("Calculating coordinate descent solution.");
+    ROS_DBG("[Problem] Calculating coordinate descent solution.");
 
     dCurrentErrorVec = dCurrentError;
 
@@ -937,7 +937,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
                                                  const int iWorld /*= 0*/,
                                                  const bool& bBestSolution /* = false */)
 {
-    ROS_INFO("[Problem] > (%d) Simulating trajectory", iWorld);
+    ROS_DBG("[Problem] > (%d) Simulating trajectory", iWorld);
     double t0 = Tic();
 
     sample.Clear();
@@ -968,7 +968,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
         // }
 
         ApplyVelocities( m_StartState, sample, iWorld, bUsingBestSolution, m_bNoDelay);
-        ROS_INFO("[Problem] < (%d) Applied velocities",iWorld);
+        ROS_DBG("[Problem] < (%d) Applied velocities",iWorld);
 
         // DLOG(INFO) << "States(" << sample.m_vStates.size() << "):";
         // for(uint i=0; i<sample.m_vStates.size(); i++) {
@@ -1013,7 +1013,7 @@ Eigen::Vector6d MochaProblem::SimulateTrajectory(MotionSample& sample,
     Eigen::Vector6d dRes = _Transform3dGoalPose(vState);
     double t5 = Tic();
 
-    ROS_INFO("[Problem] < (%d) Simulated trajectory w %s soln w norm %f, accel took %fs, AV took %fs, error calc took %fs, norm calc took %fs, res tform took %fs",iWorld,(bUsingBestSolution ? "best" : "new"),finalNorm,t1-t0,t2-t1,t3-t2,t4-t3,t5-t4);
+    ROS_DBG("[Problem] < (%d) Simulated trajectory w %s soln w norm %f, accel took %fs, AV took %fs, error calc took %fs, norm calc took %fs, res tform took %fs",iWorld,(bUsingBestSolution ? "best" : "new"),finalNorm,t1-t0,t2-t1,t3-t2,t4-t3,t5-t4);
 
     return dRes;
 }
@@ -1115,7 +1115,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
 
     // ROS_INFO("ApplyVelocities for world %d started", nWorldId);
 
-    ROS_INFO("[Problem] >> (%d) Applying velocities.", nWorldId);
+    ROS_DBG("[Problem] >> (%d) Applying velocities.", nWorldId);
 
     double t0 = Tic();
 
@@ -1125,7 +1125,9 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     //     return false;
     // }
     // ApplyVelocitiesClient* client = m_clientsApplyVelocities[nWorldId];
+
     ApplyVelocitiesClient client("vehicle/apply_velocities",true);
+    // ApplyVelocitiesClient client("vehicle/apply_velocities/"+std::to_string(nWorldId),true);
     client.waitForServer();
 
     carplanner_msgs::ApplyVelocitiesGoal goal;
@@ -1138,7 +1140,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     goal.no_delay = noDelay;
 
     double t1 = Tic();
-    ROS_INFO("[Problem] >> (%d) Sending AV goal with %d commands, prep took %fs", nWorldId, goal.initial_motion_sample.commands.size(),t1-t0);
+    ROS_DBG("[Problem] >> (%d) Sending AV goal with %d commands, prep took %fs", nWorldId, goal.initial_motion_sample.commands.size(),t1-t0);
     
     // while(!client.isServerConnected())s
     // {
@@ -1171,7 +1173,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     bool finished_before_timeout = client.waitForResult(ros::Duration(timeout));
 
     double t3 = Tic();
-    ROS_INFO("[Problem] << (%d) Got goal result, send/receive took %fs", nWorldId, t3-t1);
+    ROS_DBG("[Problem] << (%d) Got goal result, send/receive took %fs", nWorldId, t3-t1);
     if (finished_before_timeout)
     {
         success = true;
@@ -1184,7 +1186,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
         sample.fromROS(result->motion_sample);
         
         double t4 = Tic();
-        ROS_INFO("[Problem] << (%d) Goal result conv to sample, took %fs",nWorldId,t4-t3);
+        ROS_DBG("[Problem] << (%d) Goal result conv to sample, took %fs",nWorldId,t4-t3);
     }
     else
     {
@@ -1420,7 +1422,7 @@ bool MochaProblem::Initialize(const double dStartTime,
 ///////////////////////////////////////////////////////////////////////
 bool MochaProblem::Iterate()
 {
-    ROS_INFO("Iterating problem %s id %d", m_problemName.c_str(), m_nPlanId);
+    ROS_INFO("[Planner] Iterating problem %s id %d.", m_problemName.c_str(), m_nPlanId);
     try
     {
                 //get the current state and norm for the first iteration
@@ -1607,7 +1609,7 @@ void MochaProblem::CalculateTorqueCoefficients(MotionSample& pSample)
 ///////////////////////////////////////////////////////////////////////
 bool MochaProblem::_IterateGaussNewton()
 {
-    ROS_DBG("Iterating Gauss Newton.");
+    ROS_DBG("[Problem] Iterating Gauss Newton.");
 
     Eigen::IOFormat CleanFmt(8, 0, ", ", "\n", "[", "]");
     Eigen::VectorXd dDeltaP;
@@ -1663,7 +1665,7 @@ bool MochaProblem::_IterateGaussNewton()
 
     //this is a hack for now, but it should take care of large deltas
     if(dDeltaP.norm() > 100 ){
-        ROS_WARN("Large delta P detected. Hacking...");
+        ROS_WARN("[Problem] Large delta P detected. Hacking...");
         JtJ += Eigen::Matrix<double,OPT_DIM,OPT_DIM>::Identity();
         dDeltaP = J.transpose()*dW*error;
         (JtJ).llt().solveInPlace(dDeltaP);
@@ -1676,12 +1678,12 @@ bool MochaProblem::_IterateGaussNewton()
 
 
     if(std::isfinite(dDeltaP.norm()) == false){
-        ROS_ERROR("%f:Deltas are NAN. Dump => \nJ: %s\nb: %s",m_nPlanId, J.format(CleanFmt), error.transpose().format(CleanFmt));
+        ROS_ERROR("[Problem] %f:Deltas are NAN. Dump => \nJ: %s\nb: %s",m_nPlanId, J.format(CleanFmt), error.transpose().format(CleanFmt));
         m_eError = eDeltaNan;
         return false;
     }
 
-    ROS_INFO("Finished CD with norm %f, opts [%s]", coordinateDescent.m_dNorm, convertEigenMatrix2String(coordinateDescent.m_dOptParams.transpose()).c_str());
+    ROS_INFO("[Problem] Finished CD with norm %f, opts [%s]", coordinateDescent.m_dNorm, convertEigenMatrix2String(coordinateDescent.m_dOptParams.transpose()).c_str());
 
     //if no damping is required, just pick the result of the gauss newton
     if(g_bDisableDamping == true){
@@ -1689,7 +1691,7 @@ bool MochaProblem::_IterateGaussNewton()
 //        m_BoundaryProblem->m_dGoalPose.head(3) = m_CurrentSolution.m_dOptParams.head(3);
 //        m_BoundaryProblem->m_dAggressiveness = m_CurrentSolution.m_dOptParams[OPT_AGGR_DIM];
         UpdateOptParams(m_CurrentSolution.m_dOptParams.head(OPT_DIM) + dDeltaP);
-        ROS_DBG("Solving boundary problem.");
+        ROS_DBG("[Problem] Solving boundary problem.");
         m_pBoundarySovler->Solve(&m_BoundaryProblem);
         SimulateTrajectory(m_CurrentSolution.m_Sample);
         m_CurrentSolution.m_dNorm = _CalculateErrorNorm(_CalculateSampleError());
@@ -1700,7 +1702,7 @@ bool MochaProblem::_IterateGaussNewton()
         //     m_pBestSolution = &m_lSolutions.back();
         // }
         // DLOG(INFO) << "Iteration with no damping finished with norm " << m_CurrentSolution.m_dNorm << " and opts "<< m_CurrentSolution.m_dOptParams.transpose().format(CleanFmt);
-        ROS_DBG("Finished Gauss Newton iteration without dampening.");
+        ROS_DBG("[Problem] Finished Gauss Newton iteration without dampening.");
         return true;
     }
 
@@ -1720,7 +1722,7 @@ bool MochaProblem::_IterateGaussNewton()
     double dampings[DAMPING_STEPS];
     damping = 1.0;
 
-    ROS_INFO("Calculating damped soln on %d threads", DAMPING_STEPS);
+    ROS_INFO("[Problem] Calculating damped soln on %d threads", DAMPING_STEPS);
 
     Solution dampedSolution;
     dampedSolution.m_dNorm = DBL_MAX;
@@ -1742,7 +1744,7 @@ bool MochaProblem::_IterateGaussNewton()
             damping/= DAMPING_DIVISOR;
         }
         m_ThreadPool.wait();
-        ROS_DBG("Applied commands, took %fs.", Toc(t0));
+        ROS_DBG("[Problem] Applied commands, took %fs.", Toc(t0));
 
         // ROS_INFO("Pubbing potential paths viz from Damped Solution.");
         // m_vPotentialPaths.push_back(this->m_CurrentSolution.m_Sample);
@@ -1779,12 +1781,12 @@ bool MochaProblem::_IterateGaussNewton()
 
     }else{
         Eigen::IOFormat CleanFmt(2, 0, ", ", "\n", "[", "]");
-        ROS_ERROR("%d:Deltas are NAN. Dump => J:%s", m_nPlanId, J.format(CleanFmt));
+        ROS_ERROR("[Problem] %d:Deltas are NAN. Dump => J:%s", m_nPlanId, J.format(CleanFmt));
         m_eError = eDeltaNan;
         return false;
     }
 
-    ROS_INFO("Finished Damping with norm %f, opts [%s]", dampedSolution.m_dNorm, convertEigenMatrix2String(dampedSolution.m_dOptParams.transpose()).c_str());
+    ROS_INFO("[Problem] Finished Damping with norm %f, opts [%s]", dampedSolution.m_dNorm, convertEigenMatrix2String(dampedSolution.m_dOptParams.transpose()).c_str());
 
     Solution newSolution;
     Eigen::VectorXd bestSolutionErrors;
@@ -1805,19 +1807,19 @@ bool MochaProblem::_IterateGaussNewton()
     if(coordinateDescent.m_dNorm > m_CurrentSolution.m_dNorm && dampedSolution.m_dNorm > m_CurrentSolution.m_dNorm && g_bMonotonicCost)
     {
         m_bInLocalMinimum = true;
-        ROS_WARN("Local minimum detected.");
+        ROS_WARN("[Problem] Local minimum detected.");
     }
     else
     {
         if (coordinateDescent.m_dNorm < dampedSolution.m_dNorm)
         {
-            ROS_INFO("Setting newSoln to CD norm %f", coordinateDescent.m_dNorm);
+            ROS_INFO("[Problem] Setting newSoln to CD norm %f", coordinateDescent.m_dNorm);
             newSolution = coordinateDescent;
             bestSolutionErrors = error;
         }
         else
         {
-            ROS_INFO("Setting newSoln to Damp norm %f", dampedSolution.m_dNorm);
+            ROS_INFO("[Problem] Setting newSoln to Damp norm %f", dampedSolution.m_dNorm);
             newSolution = dampedSolution;
             bestSolutionErrors = pDampingErrors[nBestDampingIdx];
         }
@@ -1867,7 +1869,7 @@ bool MochaProblem::_IterateGaussNewton()
     // ROS_INFO("Finished GN dampening for plan %d with coordinated descent solution, final state [%s], errors [%s]", m_nPlanId, newSolution.m_dNorm, convertEigenMatrix2String(pDampingStates[ii].transpose()).c_str(), convertEigenMatrix2String(pDampingErrors[ii].transpose()).c_str());
 
     UpdateOptParams(m_CurrentSolution.m_dOptParams.head(OPT_DIM));
-    ROS_DBG("Solving boundary problem.");
+    ROS_DBG("[Problem] Solving boundary problem.");
     m_pBoundarySovler->Solve(&m_BoundaryProblem);
 
 //    if(m_pCurrentMotionSample == NULL) {
