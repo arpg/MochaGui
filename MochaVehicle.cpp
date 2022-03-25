@@ -128,17 +128,17 @@ MochaVehicle::MochaVehicle(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_nh(nh),
     // m_actionCreateSimpleServer_server(m_nh, "plan_car/create_server", boost::bind(&MochaVehicle::CreateServerService, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "plan_car/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    m_actionApplyVelocities_server(m_nh, "vehicle/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*0*/, this, _1), false),
-    // m_actionApplyVelocities_server0(m_nh, "vehicle/apply_velocities/0", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server1(m_nh, "vehicle/apply_velocities/1", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server2(m_nh, "vehicle/apply_velocities/2", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server3(m_nh, "vehicle/apply_velocities/3", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server4(m_nh, "vehicle/apply_velocities/4", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server5(m_nh, "vehicle/apply_velocities/5", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server6(m_nh, "vehicle/apply_velocities/6", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server7(m_nh, "vehicle/apply_velocities/7", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server8(m_nh, "vehicle/apply_velocities/8", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
-    // m_actionApplyVelocities_server9(m_nh, "vehicle/apply_velocities/9", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    // m_actionApplyVelocities_server(m_nh, "vehicle/apply_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService/*0*/, this, _1), false),
+    m_actionApplyVelocities_server0(m_nh, "vehicle/apply_velocities/0", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server1(m_nh, "vehicle/apply_velocities/1", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server2(m_nh, "vehicle/apply_velocities/2", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server3(m_nh, "vehicle/apply_velocities/3", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server4(m_nh, "vehicle/apply_velocities/4", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server5(m_nh, "vehicle/apply_velocities/5", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server6(m_nh, "vehicle/apply_velocities/6", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server7(m_nh, "vehicle/apply_velocities/7", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server8(m_nh, "vehicle/apply_velocities/8", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
+    m_actionApplyVelocities_server9(m_nh, "vehicle/apply_velocities/9", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
     
     // m_actionBatchApplyVelocities_server(m_nh, "vehicle/batch_apply_velocities", boost::bind(&MochaVehicle::BatchApplyVelocitiesService, this, _1), false),
     // m_actionApplyVelocities_server(m_nh, "vehicle/apply_all_velocities", boost::bind(&MochaVehicle::ApplyVelocitiesService, this, _1), false),
@@ -465,17 +465,17 @@ void MochaVehicle::InitializeExternals()
     InitializeTransformSubscribers();
     InitializeTransformPublishers();
 
-    m_actionApplyVelocities_server.start();
-    // m_actionApplyVelocities_server0.start();
-    // m_actionApplyVelocities_server1.start();
-    // m_actionApplyVelocities_server2.start();
-    // m_actionApplyVelocities_server3.start();
-    // m_actionApplyVelocities_server4.start();
-    // m_actionApplyVelocities_server5.start();
-    // m_actionApplyVelocities_server6.start();
-    // m_actionApplyVelocities_server7.start();
-    // m_actionApplyVelocities_server8.start();
-    // m_actionApplyVelocities_server9.start();
+    // m_actionApplyVelocities_server.start();
+    m_actionApplyVelocities_server0.start();
+    m_actionApplyVelocities_server1.start();
+    m_actionApplyVelocities_server2.start();
+    m_actionApplyVelocities_server3.start();
+    m_actionApplyVelocities_server4.start();
+    m_actionApplyVelocities_server5.start();
+    m_actionApplyVelocities_server6.start();
+    m_actionApplyVelocities_server7.start();
+    m_actionApplyVelocities_server8.start();
+    m_actionApplyVelocities_server9.start();
 
     // m_actionBatchApplyVelocities_server.start();
 
@@ -1239,14 +1239,41 @@ void MochaVehicle::SetSimMode(uint nWorldId, uint mode=0)
     InitializeTransformPublishers();
 }
 
+// void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction> goalHandle)
+// {
+//     goalHandle.setAccepted();
+
+//     auto fObj = boost::make_shared<ApplyVelocitiesFunctionObj>([this, goalHandle]() mutable {
+//         carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+//         const carplanner_msgs::ApplyVelocitiesGoalConstPtr goal = goalHandle.getGoal();
+//         ROS_INFO("[ApplyVelocitiesService] Running ApplyVelocities on world %d, %d states, %d commands", goal->world_id, goal->initial_motion_sample.states.size(), goal->initial_motion_sample.commands.size());
+
+//         VehicleState state;
+//         state.fromROS(goal->initial_state);
+//         MotionSample sample;
+//         sample.fromROS(goal->initial_motion_sample);
+//         ApplyVelocities(
+//             state,
+//             sample,
+//             goal->world_id,
+//             goal->no_compensation,
+//             goal->no_delay);
+
+//         actionApplyVelocities_result.motion_sample = sample.toROS();
+
+//         goalHandle.setSucceeded(actionApplyVelocities_result);
+//     });
+//     ros::getGlobalCallbackQueue()->addCallback(fObj);
+// }
+
 void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction> goalHandle)
 {
     goalHandle.setAccepted();
 
     auto fObj = boost::make_shared<ApplyVelocitiesFunctionObj>([this, goalHandle]() mutable {
-        carplanner_msgs::ApplyVelocitiesResult actionApplyVelocities_result;
+        carplanner_msgs::ApplyVelocitiesResult result;
         const carplanner_msgs::ApplyVelocitiesGoalConstPtr goal = goalHandle.getGoal();
-        ROS_INFO("[ApplyVelocitiesService] Running ApplyVelocities on world %d, %d states, %d commands", goal->world_id, goal->initial_motion_sample.states.size(), goal->initial_motion_sample.commands.size());
+        ROS_DBG("[ApplyVelocitiesService] Running ApplyVelocities on world %d, %d states, %d commands", goal->world_id, goal->initial_motion_sample.states.size(), goal->initial_motion_sample.commands.size());
 
         VehicleState state;
         state.fromROS(goal->initial_state);
@@ -1259,70 +1286,46 @@ void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner
             goal->no_compensation,
             goal->no_delay);
 
-        actionApplyVelocities_result.motion_sample = sample.toROS();
+        result.motion_sample = sample.toROS();
 
-        goalHandle.setSucceeded(actionApplyVelocities_result);
+        switch (goal->world_id)
+        {
+            case 0:
+                goalHandle.setSucceeded(result);
+                break;
+            case 1:
+                goalHandle.setSucceeded(result);
+                break;
+            case 2:
+                goalHandle.setSucceeded(result);
+                break;
+            case 3:
+                goalHandle.setSucceeded(result);
+                break;
+            case 4:
+                goalHandle.setSucceeded(result);
+                break;
+            case 5:
+                goalHandle.setSucceeded(result);
+                break;
+            case 6:
+                goalHandle.setSucceeded(result);
+                break;
+            case 7:
+                goalHandle.setSucceeded(result);
+                break;
+            case 8:
+                goalHandle.setSucceeded(result);
+                break;
+            case 9:
+                goalHandle.setSucceeded(result);
+                break;
+            default:
+                break;
+        }    
     });
     ros::getGlobalCallbackQueue()->addCallback(fObj);
 }
-
-// void MochaVehicle::ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction> goalHandle)
-// {
-//     goalHandle.setAccepted();
-
-//     carplanner_msgs::ApplyVelocitiesResult result;
-//     const carplanner_msgs::ApplyVelocitiesGoalConstPtr goal = goalHandle.getGoal();
-//     ROS_DBG("[ApplyVelocitiesService] Running ApplyVelocities on world %d, %d states, %d commands", goal->world_id, goal->initial_motion_sample.states.size(), goal->initial_motion_sample.commands.size());
-
-//     VehicleState state;
-//     state.fromROS(goal->initial_state);
-//     MotionSample sample;
-//     sample.fromROS(goal->initial_motion_sample);
-//     ApplyVelocities(
-//         state,
-//         sample,
-//         goal->world_id,
-//         goal->no_compensation,
-//         goal->no_delay);
-
-//     result.motion_sample = sample.toROS();
-
-//     switch (goal->world_id)
-//     {
-//         case 0:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 1:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 2:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 3:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 4:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 5:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 6:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 7:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 8:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         case 9:
-//             goalHandle.setSucceeded(result);
-//             break;
-//         default:
-//             break;
-//     }    
-// }
 
 // void MochaVehicle::BatchApplyVelocitiesService(const carplanner_msgs::BatchApplyVelocitiesGoalConstPtr &goal)
 // {

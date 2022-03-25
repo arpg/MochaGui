@@ -1555,18 +1555,18 @@ public:
     // actionlib::SimpleActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
 
     void ApplyVelocitiesService(actionlib::ServerGoalHandle<carplanner_msgs::ApplyVelocitiesAction>);
-
-    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server2;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server3;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server4;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server5;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server6;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server7;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8;
-    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9;
+    
+    // actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server0;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server1;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server2;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server3;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server4;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server5;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server6;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server7;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server8;
+    actionlib::ActionServer<carplanner_msgs::ApplyVelocitiesAction> m_actionApplyVelocities_server9;
 
     // void BatchApplyVelocitiesService(const carplanner_msgs::BatchApplyVelocitiesGoalConstPtr&);
     // actionlib::SimpleActionServer<carplanner_msgs::BatchApplyVelocitiesAction> m_actionBatchApplyVelocities_server;
