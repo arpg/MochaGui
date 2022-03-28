@@ -21,7 +21,6 @@
 #include <carplanner_msgs/MotionSample.h>
 #include <carplanner_msgs/Command.h>
 #include <carplanner_msgs/ResetMesh.h>
-#include <mesh_msgs/TriangleMeshStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <visualization_msgs/MarkerArray.h>
 
@@ -856,10 +855,10 @@ struct VehicleState
         return str;
     }
 
-    Sophus::SE3d m_dTwv;                     //< 4x4 matrix denoting the state of the car
+    Sophus::SE3d m_dTwv{};                     //< 4x4 matrix denoting the state of the car
     std::vector<Sophus::SE3d> m_vWheelStates;   //< 4x4 matrices which denote the pose of each wheel
     std::vector<bool> m_vWheelContacts;         //< Angular velocity of the vehicle in world coordinates
-    bool m_bChassisInCollision;
+    bool m_bChassisInCollision{false};
 
     Eigen::Vector3d m_dV;                       //< Linear velocity of the vehicle in world coordinates
     Eigen::Vector3d m_dW;                       //< Angular velocity of the vehicle in world coordinates
@@ -1396,6 +1395,7 @@ public:
     // actionlib::SimpleActionServer<carplanner_msgs::SetNoDelayAction> m_actionSetNoDelay_server;
 
     void meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr&);
+    void partialMeshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr&);
 
     void replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm);
     void appendMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm);

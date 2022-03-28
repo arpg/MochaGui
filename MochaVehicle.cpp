@@ -387,12 +387,13 @@ void MochaVehicle::InitializeExternals()
     m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
     m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
  
-    m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
-
+    // m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
+    m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::partialMeshCb, this);
 
     m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
 
-    m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
+    // Disabling publishing 
+    // m_pPublisherThread = new boost::thread( std::bind( &MochaVehicle::_PublisherFunc, this ));
     
     // m_timerTerrainMeshPubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dTerrainMeshPubRate), &MochaVehicle::TerrainMeshPubLoopFunc, this);
 
@@ -844,6 +845,7 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
     //m_pCarChassis->setCenterOfMassTransform(btTransform::getIdentity());
     pWorld->m_pCarChassis->setLinearVelocity(btVector3(0,0,0));
     pWorld->m_pCarChassis->setAngularVelocity(btVector3(0,0,0));
+
     pWorld->m_pDynamicsWorld->getBroadphase()->getOverlappingPairCache()->cleanProxyFromPairs(pWorld->m_pCarChassis->getBroadphaseHandle(),pWorld->m_pDynamicsWorld->getDispatcher());
     if (pWorld->m_pVehicle)
     {
@@ -1518,6 +1520,49 @@ void MochaVehicle::meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& 
       t3-t2 );
 }
 
+void MochaVehicle::partialMeshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
+{
+    if (mesh_msg->triangleVertices.size()<=0) return;
+    double t0 = Tic();
+    ROS_INFO_STREAM("[Vehicle::partialMeshCb] Received mesh addr " << mesh_msg);
+    static tf::StampedTransform Twm;
+    try
+    {
+        m_tflistener.waitForTransform(m_config.map_frame, "infinitam", ros::Time::now(), ros::Duration(0.2));
+        m_tflistener.lookupTransform(m_config.map_frame, "infinitam", mesh_msg->header.stamp, Twm);
+    }
+    catch (const tf::TransformException& ex)
+    {
+        ROS_ERROR("%s",ex.what());
+        usleep(10000);
+        return;
+    }
+
+    double t1 = Tic();
+    ROS_INFO("[Vehicle::partialMeshCb] tform lookup took %fs", t1-t0);
+
+    btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+    convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape);
+
+
+
+    BulletWorldInstance* pWorld = GetWorldInstance(0);
+    btTriangleIndexVertexArray* oldMesh = dynamic_cast<btTriangleIndexVertexArray*>(
+        dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainShape)->getMeshInterface());
+    
+    btTriangleIndexVertexArray* newMesh = dynamic_cast<btTriangleIndexVertexArray*>(
+        dynamic_cast<btBvhTriangleMeshShape*>(meshShape)->getMeshInterface());
+
+    mergeMeshes(oldMesh, newMesh);
+
+    double t2 = Tic();
+    ROS_INFO("[Vehicle::partialMeshCb] Merge meshes took %fs", t2 - t1);
+
+    // temp to have a working mesh through the entire run as mergeMeshes deletes triangles in the old mesh
+    meshCb(mesh_msg);
+}
+
+
 void MochaVehicle::replaceMesh(uint worldId, btCollisionShape* meshShape, tf::StampedTransform& Twm)
 {
     // btAssert((!meshShape || meshShape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
@@ -1811,7 +1856,7 @@ void MochaVehicle::commandCb(const carplanner_msgs::Command::ConstPtr& msg, int 
 //////////////////////////////////////////////////////////////////////////////////////////
 void MochaVehicle::StatePubLoopFunc(const ros::TimerEvent& event)
 {
-    for (uint i=0; i<GetNumWorlds(); i++)
+    for (uint i=0; i<m_vStatePublishers.size(); i++)
     {
         pubState(i, m_vStatePublishers[i]);
     }

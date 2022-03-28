@@ -470,6 +470,123 @@ inline void convertMeshMsg2CollisionShape_Shared(const carplanner_msgs::Triangle
   collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
 }
 
+inline std::vector<std::pair<uint32_t, uint32_t>> getMeshBorder(const btTriangleIndexVertexArray* mesh) 
+{
+  const btIndexedMesh& rawMesh = mesh->getIndexedMeshArray()[0];
+  
+  // Border vertices have at least one outgoing edge that does not belong to two triangles. 
+  // Count the number of triangles that use each edge
+  std::map<std::pair<uint32_t, uint32_t>, int> edgeCounts;
+  for (unsigned i = 0; i < rawMesh.m_numTriangles; ++i) {
+    const uint32_t* currentTriangle = (uint32_t *)(rawMesh.m_triangleIndexBase + (rawMesh.m_triangleIndexStride * i));
+    uint32_t indexOne = *currentTriangle;
+    uint32_t indexTwo = *(currentTriangle + sizeof(uint32_t));
+    uint32_t indexThree = *(currentTriangle + 2 * sizeof(uint32_t));
+    // Sort indexOne indexTwo and indexThree for consistent ordering in the edge list
+    if (indexOne > indexTwo) std::swap(indexOne, indexTwo);
+    if (indexTwo > indexThree) std::swap(indexTwo, indexThree);
+    if (indexOne > indexTwo) std::swap(indexOne, indexTwo);
+
+    const auto edgeOne = std::make_pair<const uint32_t&, const uint32_t&>(indexOne, indexTwo);
+    const auto edgeTwo = std::make_pair<const uint32_t&, const uint32_t&>(indexOne, indexThree);
+    const auto edgeThree = std::make_pair<const uint32_t&, const uint32_t&>(indexTwo, indexThree);
+
+    edgeCounts[edgeOne] += 1;
+    edgeCounts[edgeTwo] += 1;
+    edgeCounts[edgeThree] += 1;
+  }
+
+  std::vector<std::pair<uint32_t, uint32_t>> borderEdges;
+  for (const auto& [edge, count]: edgeCounts) {
+    if (count == 1) {
+        borderEdges.push_back(edge);
+    }
+  }
+
+  return borderEdges;
+}
+
+inline void mergeMeshes(const btTriangleIndexVertexArray* oldMesh, const btTriangleIndexVertexArray* newMesh)
+{
+  const std::vector<std::pair<uint32_t, uint32_t>> newBorder = getMeshBorder(newMesh);
+
+  const auto pointInsideBorder = [](const std::vector<std::pair<uint32_t, uint32_t>>& border, const btTriangleIndexVertexArray* oldMesh, float x, float y) {
+    const btIndexedMesh& rawMesh = oldMesh->getIndexedMeshArray()[0];
+    // Draw a line in the +x direction from the (x, y) point, counting the number of edges it crosses. 
+    // The point is inside the border polygon iff it crosses an odd number of edges
+    int crosses = 0;
+    const float tol = 1e-5;
+    for (const auto& [indexOne, indexTwo]: border) {
+      float* vertexBaseOne = (float *)(rawMesh.m_vertexBase + rawMesh.m_vertexStride * indexOne);
+      float* vertexBaseTwo = (float *)(rawMesh.m_vertexBase + rawMesh.m_vertexStride * indexTwo);
+
+      float x0 = *vertexBaseOne;
+      float y0 = *(vertexBaseOne + sizeof(float));
+
+      float x1 = *vertexBaseTwo;
+      float y1 = *(vertexBaseTwo + sizeof(float));
+
+      // If the line is horizontal, there is no intersection
+      if (std::abs(y1 - y0) > tol) {
+        float t = (y - y0) / (y1 - y0);
+        // Line is between ymin and ymax
+        if (t >= 0 && t <= 1) {
+          float xt = x0 + (x1 - x0) * t;
+          // Line intersects with edge
+          if (xt >= x) {
+            crosses += 1;
+          }
+        }
+      }
+    }
+    return crosses % 2 == 1;
+  };
+
+  const auto deleteInsideBorder = [&pointInsideBorder](const std::vector<std::pair<uint32_t, uint32_t>>& border, 
+                                     btTriangleIndexVertexArray* oldMesh, 
+                                     const btTriangleIndexVertexArray* newMesh) {
+    btIndexedMesh& rawMesh = oldMesh->getIndexedMeshArray()[0];
+    int previousTriangles = rawMesh.m_numTriangles; 
+
+    // Consider getting vertex counts so we know when to delete vertices. 
+    for (unsigned i = 0; i < rawMesh.m_numTriangles; ++i) {
+      uint32_t* currentTriangle = (uint32_t *)(rawMesh.m_triangleIndexBase + (rawMesh.m_triangleIndexStride * i));
+      const uint32_t indexOne = *currentTriangle;
+      const uint32_t indexTwo = *(currentTriangle + sizeof(uint32_t));
+      const uint32_t indexThree = *(currentTriangle + 2 * sizeof(uint32_t));
+
+      std::vector<float*> vertexBases; 
+      vertexBases.push_back((float *)(rawMesh.m_vertexBase + rawMesh.m_vertexStride * indexOne));
+      vertexBases.push_back((float *)(rawMesh.m_vertexBase + rawMesh.m_vertexStride * indexTwo));
+      vertexBases.push_back((float *)(rawMesh.m_vertexBase + rawMesh.m_vertexStride * indexThree));
+      // if any vertex is inside the x-y projection of the mesh border polygon, remove the triangle
+      for (const auto& vertexBase: vertexBases) {
+        float x = *vertexBase;
+        float y = *(vertexBase + sizeof(float));
+
+        if (pointInsideBorder(border, oldMesh, x, y)) {
+          // Implementation: swap with last element and repeat this iteration. 
+          // Removes the need to copy most triangles we're keeping
+          uint32_t* lastTriangleBase = (uint32_t *)(rawMesh.m_triangleIndexBase + rawMesh.m_triangleIndexStride * rawMesh.m_numTriangles);
+          std::swap(*lastTriangleBase, *currentTriangle);
+
+          uint32_t* current = (uint32_t *)(currentTriangle + sizeof(uint32_t));
+          uint32_t* last = (uint32_t *)(lastTriangleBase + sizeof(uint32_t));
+          std::swap(*current, *last);
+
+          current = (uint32_t *)(currentTriangle + 2 * sizeof(uint32_t));
+          last = (uint32_t *)(lastTriangleBase + 2 * sizeof(uint32_t));
+          std::swap(*current, *last);
+          rawMesh.m_numTriangles -= 1;
+          --i;
+          break;
+        }
+      }
+    }
+  };
+  
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 inline void convertAssimpMeshToMeshMsg(aiMesh* sMesh, mesh_msgs::TriangleMesh** mesh)
