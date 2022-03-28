@@ -7,14 +7,16 @@ class MTActionClientTest;
 
 struct MTTestActionThreadFunctor 
 {
-    MTTestActionThreadFunctor(std::shared_ptr<MTActionClientTest> clientTest, uint threadId, unsigned char& success);
+    MTTestActionThreadFunctor(std::shared_ptr<MTActionClientTest> clientTest, uint threadId, std::string& result, double& duration, double& wait);
     ~MTTestActionThreadFunctor();
 
     void operator()();
 
     std::shared_ptr<MTActionClientTest> m_clientTest;
     uint m_threadId;
-    unsigned char* m_successPtr;
+    std::string* m_resultPtr;
+    double* m_durationPtr;
+    double* m_waitPtr;
 
 public:
     // EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -29,7 +31,7 @@ public:
     MTActionClientTest(ros::NodeHandle& private_nh, ros::NodeHandle& nh);
     ~MTActionClientTest();
 
-    bool TestActionCall(uint threadId, double delay);
+    bool TestActionCall(uint threadId, double delay, std::string& result);
 
     void callLoopFunc(const ros::TimerEvent& event);
 

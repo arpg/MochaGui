@@ -1,11 +1,13 @@
 
 #include <sys/time.h>
 #include <ros/ros.h>
+#include <ros/callback_queue.h>
 #include <nodelet/nodelet.h>
 #include <carplanner_msgs/MTTestAction.h>
 #include "threadpool.hpp"
 #include <boost/thread.hpp>
 #include <boost/format.hpp>
+#include <numeric>
 
 #ifdef __APPLE__
 #include "pthread.h"
@@ -17,8 +19,11 @@
 #define SetThreadName(x) prctl(PR_SET_NAME,x,0,0,0);
 #endif
 
-#define NUM_THREADS 3
+#define NUM_THREADS 10
 #define MAX_SERVER_TIME 1.0
+
+// #define USE_SIMPLE_ACTIONS
+#define USE_MANY_SERVERS
 
 inline double Tic() {
 
