@@ -22,7 +22,7 @@
 #define NUM_THREADS 10
 #define MAX_SERVER_TIME 1.0
 
-// #define USE_SIMPLE_ACTIONS
+#define USE_SIMPLE_ACTIONS
 #define USE_MANY_SERVERS
 
 inline double Tic() {
