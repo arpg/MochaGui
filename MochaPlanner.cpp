@@ -53,7 +53,8 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_bServersInitialized(false),
     m_bSubToVehicleWp(true), 
     m_dWpLookupDuration(5.0),
-    m_bPlanContinuously(false)
+    m_bPlanContinuously(false),
+    m_bIterateGN(true)
 {
     ROS_INFO("[Planner] constructed.");
     Init();
@@ -1124,7 +1125,7 @@ void MochaPlanner::WaitForPlannerVehicles()
 
 bool MochaPlanner::EnableTerrainPlanningSvcCb(carplanner_msgs::EnableTerrainPlanning::Request &req, carplanner_msgs::EnableTerrainPlanning::Response &res)
 {   
-    DLOG(INFO) << "EnableTerrainPlanning service called.";
+    ROS_INFO("[Planner] EnableTerrainPlanning service called.");
 
     {
     boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);

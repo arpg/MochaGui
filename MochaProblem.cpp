@@ -1164,7 +1164,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     // DLOG(INFO) << "AV called:" 
     //     << " world " << std::to_string(goal.world_id) 
       // "\nstart " << std::to_string(VehicleState::fromROS(goal->initial_state))
-      ;
+    //   ;
 
     bool success;
 
@@ -1178,7 +1178,7 @@ bool MochaProblem::ApplyVelocities(const VehicleState& startState,
     {
         success = true;
         actionlib::SimpleClientGoalState state = client.getState();
-        // DLOG(INFO) << "ApplyVelocities finished: " << state.toString();
+        ROS_DBG("[Problem] << (%d) Goal result: %s.", nWorldId, state.toString().c_str());
 
         // ROS_INFO("Applying velocities (%d) succeeded, took %.2fs.", nWorldId, t3-t1);
 
