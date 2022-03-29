@@ -495,6 +495,7 @@ void MochaVehicle::_InitWorld(BulletWorldInstance* pWorld, btCollisionShape *pGr
     pWorld->m_pOverlappingPairCache = new btAxisSweep3(dMin,dMax);
     pWorld->m_pConstraintSolver = new btSequentialImpulseConstraintSolver();
     pWorld->m_pDynamicsWorld = new btDiscreteDynamicsWorld(pWorld->m_pDispatcher,pWorld->m_pOverlappingPairCache,pWorld->m_pConstraintSolver,pWorld->m_pCollisionConfiguration);
+    pWorld->m_pDynamicsWorld->setBroadphase(pWorld->m_pOverlappingPairCache);
     // pWorld->m_pDynamicsWorld->setDebugDrawer(&pWorld->m_DebugDrawer);
     // pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_DrawWireframe || btIDebugDraw::DBG_FastWireframe);
     //pWorld->m_pDynamicsWorld->getDebugDrawer()->setDebugMode(btIDebugDraw::DBG_DrawAabb);
@@ -845,7 +846,7 @@ void MochaVehicle::_InitVehicle(BulletWorldInstance* pWorld, CarParameterMap& pa
     //m_pCarChassis->setCenterOfMassTransform(btTransform::getIdentity());
     pWorld->m_pCarChassis->setLinearVelocity(btVector3(0,0,0));
     pWorld->m_pCarChassis->setAngularVelocity(btVector3(0,0,0));
-
+    
     pWorld->m_pDynamicsWorld->getBroadphase()->getOverlappingPairCache()->cleanProxyFromPairs(pWorld->m_pCarChassis->getBroadphaseHandle(),pWorld->m_pDynamicsWorld->getDispatcher());
     if (pWorld->m_pVehicle)
     {
@@ -2923,6 +2924,7 @@ btRigidBody*	MochaVehicle::_LocalAddRigidBody(BulletWorldInstance *pWorld, doubl
 
     btRigidBody::btRigidBodyConstructionInfo cInfo(mass,myMotionState,shape,localInertia);
     btRigidBody* body = new btRigidBody(cInfo);
+    body->setMotionState(myMotionState);
     body->setContactProcessingThreshold(BT_LARGE_FLOAT);
 
     pWorld->m_pDynamicsWorld->addRigidBody(body,group,mask);
