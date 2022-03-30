@@ -1289,12 +1289,12 @@ void MochaVehicle::ApplyVelocitiesService(const carplanner_msgs::ApplyVelocities
             goal->no_delay);
         result.motion_sample = sample.toROS();
 
-        double min_wait = 0.5;
-        double max_wait = 1.0;
-        double wait = min_wait + (max_wait-min_wait)*((double) rand() / (RAND_MAX));
-        double wait_start = Tic();
-        double wait_dur = Toc(wait_start);
-        while (wait_dur<wait) { wait_dur = Toc(wait_start); }
+        // double min_wait = 0.5;
+        // double max_wait = 1.0;
+        // double wait = min_wait + (max_wait-min_wait)*((double) rand() / (RAND_MAX));
+        // double wait_start = Tic();
+        // double wait_dur = Toc(wait_start);
+        // while (wait_dur<wait) { wait_dur = Toc(wait_start); }
 
         // goalHandle.setSucceeded(result); 
         switch (goal->world_id)

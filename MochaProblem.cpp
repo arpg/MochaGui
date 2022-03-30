@@ -320,6 +320,16 @@ void MochaProblem::Reset()
     m_dTrajWeight.setIdentity();
 }
 
+void MochaProblem::SetStartState(VehicleState state)
+{   
+    m_StartState = state;
+}
+
+void MochaProblem::SetGoalState(VehicleState state)
+{   
+    m_GoalState = state;
+}
+
 void MochaProblem::SetTimeInterval(double dt)
 {   
     if (dt<=0)
@@ -1203,7 +1213,6 @@ void MochaProblem::GetPotentialPaths(std::vector<MotionSample>& paths)
     {
         paths.push_back(m_vPotentialPaths[ii]);
     }
-    m_vPotentialPaths.clear();
 }
 
 // double MochaProblem::GetControlDelay(int nWorldId)
@@ -1295,7 +1304,7 @@ bool MochaProblem::Initialize(const double dStartTime,
     ROS_DBG("Initializing problem %s starting %f",m_problemName.c_str(), dStartTime);
     boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
 
-    Reset();
+    // Reset();
     m_nPlanId = m_nPlanCounter++;
 
     //if there are previous commands, apply them so we may make a more educated guess
@@ -1399,7 +1408,7 @@ bool MochaProblem::Initialize(const double dStartTime,
     m_dMaxSegmentTime = m_dSegmentTime*5;
 
     //reset optimization parameters
-    m_CurrentSolution.m_dNorm = DBL_MAX;
+    // m_CurrentSolution.m_dNorm = DBL_MAX;
     m_bInLocalMinimum = false;
     m_CurrentSolution.m_dOptParams.head(3) = m_BoundaryProblem.m_dGoalPose.head(3); //  x y t 
     m_CurrentSolution.m_dOptParams[OPT_ACCEL_DIM] = 0.0; // this is the percentage of the calculated acceleration
@@ -1407,7 +1416,7 @@ bool MochaProblem::Initialize(const double dStartTime,
         m_CurrentSolution.m_dOptParams[OPT_AGGR_DIM] = m_BoundaryProblem.m_dAggressiveness;
     }
     m_dInitOptParams = m_CurrentSolution.m_dOptParams;
-    m_pBestSolution = &m_CurrentSolution;
+    // m_pBestSolution = &m_CurrentSolution;
 
     //the transformed final position
     m_dTransformedGoal = _TransformGoalPose(m_dGoalPose);
@@ -1425,9 +1434,13 @@ bool MochaProblem::Iterate()
     ROS_INFO("[Planner] Iterating problem %s id %d.", m_problemName.c_str(), m_nPlanId);
     try
     {
-                //get the current state and norm for the first iteration
+        m_vPotentialPaths.clear();
+
+        // get the current state and norm for the first iteration
         if(m_lSolutions.size() == 0 ) {
             //here we have to re-evaluate the segment time of the trajectory
+            ROS_INFO("[Problem] No solutions yet. Simulation baseline trajectory...");
+            double prof_start_baselinesim = Tic();
 
             SimulateTrajectory(m_CurrentSolution.m_Sample,0,false);
             //m_dDistanceDelta = m_pCurrentMotionSample->GetDistance() - m_BoundaryProblem->m_dDistance;
@@ -1449,6 +1462,9 @@ bool MochaProblem::Iterate()
             }
             m_lSolutions.push_back(m_CurrentSolution);
             m_pBestSolution = &m_lSolutions.back();
+
+            double prof_dur_baselinesim = Toc(prof_start_baselinesim);
+            ROS_INFO("[Problem] Done simulating baseline trajectory, took %f s.", prof_dur_baselinesim);
         }
 
         if( m_dEps > 5 || m_bInLocalMinimum == true) {
@@ -1460,7 +1476,7 @@ bool MochaProblem::Iterate()
 
         _IterateGaussNewton();
 
-        return false;
+        return true;
     }catch(...){
         return false;
     }
@@ -1609,6 +1625,7 @@ void MochaProblem::CalculateTorqueCoefficients(MotionSample& pSample)
 ///////////////////////////////////////////////////////////////////////
 bool MochaProblem::_IterateGaussNewton()
 {
+    double prof_start_iterategn = Tic();
     ROS_DBG("[Problem] Iterating Gauss Newton.");
 
     Eigen::IOFormat CleanFmt(8, 0, ", ", "\n", "[", "]");
@@ -1723,6 +1740,7 @@ bool MochaProblem::_IterateGaussNewton()
     damping = 1.0;
 
     ROS_INFO("[Problem] Calculating damped soln on %d threads", DAMPING_STEPS);
+    double prof_start_damping = Tic();
 
     Solution dampedSolution;
     dampedSolution.m_dNorm = DBL_MAX;
@@ -1786,7 +1804,8 @@ bool MochaProblem::_IterateGaussNewton()
         return false;
     }
 
-    ROS_INFO("[Problem] Finished Damping with norm %f, opts [%s]", dampedSolution.m_dNorm, convertEigenMatrix2String(dampedSolution.m_dOptParams.transpose()).c_str());
+    double prof_dur_damping = Toc(prof_start_damping);
+    ROS_INFO("[Problem] Finished Damping, took %f s, with norm %f, opts [%s]", prof_dur_damping, dampedSolution.m_dNorm, convertEigenMatrix2String(dampedSolution.m_dOptParams.transpose()).c_str());
 
     Solution newSolution;
     Eigen::VectorXd bestSolutionErrors;
@@ -1813,13 +1832,13 @@ bool MochaProblem::_IterateGaussNewton()
     {
         if (coordinateDescent.m_dNorm < dampedSolution.m_dNorm)
         {
-            ROS_INFO("[Problem] Setting newSoln to CD norm %f", coordinateDescent.m_dNorm);
+            ROS_INFO("[Problem] Setting newSoln to CD norm %f(>%f)", coordinateDescent.m_dNorm, dampedSolution.m_dNorm);
             newSolution = coordinateDescent;
             bestSolutionErrors = error;
         }
         else
         {
-            ROS_INFO("[Problem] Setting newSoln to Damp norm %f", dampedSolution.m_dNorm);
+            ROS_INFO("[Problem] Setting newSoln to Damp norm %f(>%f)", dampedSolution.m_dNorm, coordinateDescent.m_dNorm);
             newSolution = dampedSolution;
             bestSolutionErrors = pDampingErrors[nBestDampingIdx];
         }
@@ -1830,8 +1849,9 @@ bool MochaProblem::_IterateGaussNewton()
     //update the best solution if necessary
     if(m_bInLocalMinimum == false){
         if(newSolution.m_dNorm < m_CurrentSolution.m_dNorm){
-            // ROS_INFO("newSoln w norm %f better than currSoln w norm %f", newSolution.m_dNorm, m_CurrentSolution.m_dNorm);
-            // ROS_DBG("Updating best solution for plan %d with norm %f.", m_nPlanId, newSolution.m_dNorm);
+            ROS_INFO("newSoln w norm %f better than currSoln w norm %f", newSolution.m_dNorm, m_CurrentSolution.m_dNorm);
+            // ROS_DBG("Updating best solution for plan %d with norm %f(>%f).", m_nPlanId, newSolution.m_dNorm, m_CurrentSolution.m_dNorm);
+            m_vPotentialPaths.push_back(m_CurrentSolution.m_Sample);
             //add this solution to the list
             m_lSolutions.push_back(newSolution);
             if (newSolution.m_dNorm < m_pBestSolution->m_dNorm)
@@ -1850,7 +1870,7 @@ bool MochaProblem::_IterateGaussNewton()
         // ROS_WARN("Local minimum detected.");
     }
 
-    // m_vPotentialPaths.push_back(this->m_CurrentSolution.m_Sample);
+    m_vPotentialPaths.push_back(m_pBestSolution->m_Sample);
 
     // ROS_INFO("bestSoln is w norm %f", m_pBestSolution->m_dNorm);
     // for (uint i=0; i<m_pBestSolution->m_Sample.m_vStates.size(); i+=5)
@@ -1876,5 +1896,9 @@ bool MochaProblem::_IterateGaussNewton()
 //        assert(false);
 //    }
     m_eError = eSuccess;
+
+    double prof_dur_iterategn = Toc(prof_start_iterategn);
+    ROS_INFO("[Problem] Done iterating GN, took %f s.", prof_dur_iterategn);
+
     return true;
 }

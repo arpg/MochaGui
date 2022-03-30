@@ -247,17 +247,19 @@ private:
     // std::vector<actionlib::GoalID> m_vApplyVelocitiesGoalIds;
     // std::vector<MotionSample*> m_vApplyVelocitiesMotionSamples;
     
-    bool g_bUseCentralDifferences = true;
+    // bool g_bUseCentralDifferences = true;
     double g_dTimeTarget = 0.0;
     //bool& g_bUseGoalPoseStepping = CVarUtils::CreateGetCVar("debug.UseGoalPoseStepping",false);
-    bool g_bDisableDamping = false;
-    bool g_bMonotonicCost = true;
-    bool g_bVerbose = false;
+    // bool g_bDisableDamping = false;
+    // bool g_bMonotonicCost = true;
+    // bool g_bVerbose = false;
     bool g_bTrajectoryCost = true;
-    int g_nTrajectoryCostSegments = 10;
+    // int g_nTrajectoryCostSegments = 10;
     int g_nIterationLimit = 10;
-    double g_dSuccessNorm = 50;
+    double g_dSuccessNorm = 10.0;
     double g_dImprovementNorm = 0.1;
+
+    MochaProblem problem;
 
 public:
     /// Initializes the Problem structu which is passed in using the given parameters

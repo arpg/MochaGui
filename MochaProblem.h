@@ -239,14 +239,14 @@ public:
     
     bool g_bUseCentralDifferences = true;
     double g_dTimeTarget = 0.00;
-    // bool g_bUseGoalPoseStepping = bug.UseGoalPoseStepping",false);
+    // // bool g_bUseGoalPoseStepping = bug.UseGoalPoseStepping",false);
     bool g_bDisableDamping = false;
     bool g_bMonotonicCost = true;
     bool g_bVerbose = false;
-    bool g_bTrajectoryCost = true;
+    // bool g_bTrajectoryCost = true;
     int g_nTrajectoryCostSegments = 10;
-    int g_nIterationLimit = 10;
-    double g_dSuccessNorm = 2.0;
+    // int g_nIterationLimit = 10;
+    // // double g_dSuccessNorm = 2.0;
     bool bFlatten2Dcurves = false;
 
 private:
@@ -328,6 +328,8 @@ public:
     
     ros::NodeHandle* m_nh;
 
+    void SetStartState(VehicleState);
+    void SetGoalState(VehicleState);
     void SetTimeInterval(double);
     void SetParameterEpsilon(double);
     void SetPointWeights(Eigen::VectorXd weights);

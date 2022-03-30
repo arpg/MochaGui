@@ -54,7 +54,8 @@ MochaPlanner::MochaPlanner(ros::NodeHandle& private_nh, ros::NodeHandle& nh) :
     m_bSubToVehicleWp(true), 
     m_dWpLookupDuration(5.0),
     m_bPlanContinuously(false),
-    m_bIterateGN(true)
+    m_bIterateGN(true),
+    problem("PlanProblem")
 {
     ROS_INFO("[Planner] constructed.");
     Init();
@@ -184,8 +185,8 @@ void MochaPlanner::Init()
     m_nh.param("eps",              m_dEps           , m_dEps           );
     m_nh.param("dt",               m_dTimeInterval  , m_dTimeInterval  );
     m_nh.param("iteration_limit",  g_nIterationLimit, g_nIterationLimit  );
-    m_nh.param("success_norm",     g_dSuccessNorm,    g_dSuccessNorm  );
-    m_nh.param("disable_damping",  g_bDisableDamping, g_bDisableDamping);
+    m_nh.param("success_norm",     g_dSuccessNorm,    0.5  );
+    // m_nh.param("disable_damping",  g_bDisableDamping, g_bDisableDamping);
     m_nh.param("improvement_norm", g_dImprovementNorm, g_dImprovementNorm);
     m_nh.param("plan_continuously", m_bPlanContinuously, m_bPlanContinuously);
 
@@ -290,7 +291,7 @@ void MochaPlanner::dynReconfigCb(carplanner_msgs::MochaPlannerConfig &config, ui
     m_dTimeInterval = config.dt;
     g_nIterationLimit = config.iteration_limit;
     g_dSuccessNorm = config.success_norm;
-    g_bDisableDamping = config.disable_damping;
+    // g_bDisableDamping = config.disable_damping;
     g_dImprovementNorm = config.improvement_norm;
     m_bPlanContinuously = config.plan_continuously;
 }
@@ -2354,7 +2355,7 @@ bool MochaPlanner::replan()
                 goalState = b->state;
             }
 
-            ROS_INFO("[Planner] Replanning.");
+            ROS_INFO("[Planner] Replanning. Current soln has norm %f.", problem.m_CurrentSolution.m_dNorm);
             // ROS_INFO_NAMED("planner","Replanning\n from %s\n to   %s", startState.toString().c_str(), goalState.toString().c_str());
 
     //                //do pre-emptive calculation of start/end curvatures by looking at the prev/next states
@@ -2385,7 +2386,9 @@ bool MochaPlanner::replan()
             // ApplyVelocitiesFunctor5d f(Eigen::Vector3d::Zero(), NULL);
             // SetNoDelay(true);
             // ApplyVelocitiesClientFunctor avf(m_nh);
-            MochaProblem problem("PlanProblem", startState,goalState,m_dTimeInterval);
+            problem.SetStartState(startState);
+            problem.SetGoalState(goalState);
+            problem.SetTimeInterval(m_dTimeInterval);
             problem.Initialize(0,NULL,eCostPoint);
             problem.SetParameterEpsilon(m_dEps);
             problem.SetPointWeights(m_dPointWeight);
@@ -2412,7 +2415,7 @@ bool MochaPlanner::replan()
                 {
                     // DLOG(INFO) << problem.m_nPlanId << ":Succeeded to plan. Norm = " << problem.m_CurrentSolution.m_dNorm;
                     // ROS_DBG("Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
-                    ROS_INFO("[Planner] Met success norm with plan %d, norm %f", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm);
+                    ROS_INFO("[Planner] Met success norm with plan %d, norm %f(<%f)", problem.m_nPlanId, problem.m_CurrentSolution.m_dNorm, g_dSuccessNorm);
                     success = true;
                 }
                 else if(fabs(this_norm - last_norm)<g_dImprovementNorm)
@@ -2549,7 +2552,7 @@ bool MochaPlanner::_IteratePlanner(
             // pub path viz's
             m_vPotentialPaths.clear();
             problem.GetPotentialPaths(m_vPotentialPaths);
-            m_vPotentialPaths.push_back(sample);
+            // m_vPotentialPaths.push_back(sample);
             m_vPotentialNorms.clear();
             for(uint i=0; i<m_vPotentialPaths.size(); i++)
             {
@@ -2571,7 +2574,7 @@ bool MochaPlanner::_IteratePlanner(
 
             // pub path viz's
             m_vPotentialPaths.clear();
-            m_vPotentialPaths.push_back(sample);
+            // m_vPotentialPaths.push_back(sample);
             m_vPotentialNorms.clear();
             for(uint i=0; i<m_vPotentialPaths.size(); i++)
             {
@@ -2644,6 +2647,11 @@ void MochaPlanner::pubPotentialPathsViz()
 
     clearPotentialPathsViz();
 
+    int num_cd_paths = OPT_DIM*2;
+    int num_damp_paths = DAMPING_STEPS;
+    int num_paths = 1 + num_cd_paths + num_damp_paths + 1 + 1; // first 1 is "baseline" trajectory, second-to-last 1 is new trajectory, last 1 is best trajectory
+    if (m_vPotentialPaths.size() != num_paths) ROS_ERROR("[Planner] PotentialPaths size (%d) != num_paths (%d).", m_vPotentialPaths.size(), num_paths);
+
     //// pub norm viz
     int min_norm_idx = -1;
     float min_norm = FLT_MAX;
@@ -2691,36 +2699,44 @@ void MochaPlanner::pubPotentialPathsViz()
 
         pathviz_msg.markers[i].color.a = 0.9;
     }
+    int curr_idx = 0;
     // previous current solution is blue
-    pathviz_msg.markers[0].color.r = 0;
-    pathviz_msg.markers[0].color.g = 0;
-    pathviz_msg.markers[0].color.b = 1.0;
+    pathviz_msg.markers[curr_idx].color.r = 0;
+    pathviz_msg.markers[curr_idx].color.g = 0;
+    pathviz_msg.markers[curr_idx].color.b = 1.0;
+    curr_idx += 1;
     // coordinate descent solutions are purple
-    for (uint i=1; i<std::min(10,(int)pathviz_msg.markers.size()); i++)
+    for (uint i=curr_idx; i<curr_idx+num_cd_paths; i++)
     {
         pathviz_msg.markers[i].color.r = 0.5;
         pathviz_msg.markers[i].color.g = 0;
         pathviz_msg.markers[i].color.b = 0.5;
     }
+    curr_idx += num_cd_paths;
     // damped solutions are green
-    for (uint i=10; i<pathviz_msg.markers.size()-1; i++)
+    for (uint i=curr_idx; i<curr_idx+num_damp_paths; i++)
     {
         pathviz_msg.markers[i].color.r = 0;
         pathviz_msg.markers[i].color.g = 1.0;
         pathviz_msg.markers[i].color.b = 0;
     }
-    // final solution is light blue
-    pathviz_msg.markers[pathviz_msg.markers.size()-1].color.r = 0.0;
-    pathviz_msg.markers[pathviz_msg.markers.size()-1].color.g = 0.5;
-    pathviz_msg.markers[pathviz_msg.markers.size()-1].color.b = 1.0;
-    // best solution is red
-    if (min_norm_idx>-1)
+    curr_idx += num_damp_paths;
+    // new solution is light blue (only if available)
+    if (pathviz_msg.markers.size() == num_paths)
     {
-        pathviz_msg.markers[min_norm_idx].color.r = 1.0;
-        pathviz_msg.markers[min_norm_idx].color.g = 0.0;
-        pathviz_msg.markers[min_norm_idx].color.b = 0.0;
+        pathviz_msg.markers[curr_idx].color.r = 0.0;
+        pathviz_msg.markers[curr_idx].color.g = 0.5;
+        pathviz_msg.markers[curr_idx].color.b = 1.0;
+        curr_idx += 1;
+    }
+    // best solution is red 
+    // if (pathviz_msg.markers.size() >= 1+num_cd_paths+num_damp_paths+1)
+    {
+        pathviz_msg.markers[curr_idx].color.r = 1.0;
+        pathviz_msg.markers[curr_idx].color.g = 0.0;
+        pathviz_msg.markers[curr_idx].color.b = 0.0;
 
-        pathviz_msg.markers[min_norm_idx].pose.position.z += 0.01; // just make it slightly higher in case it's the same as any other paths
+        pathviz_msg.markers[curr_idx].pose.position.z += 0.01; // just make it slightly higher in case it's the same as any other paths
     }
     m_pubPotentialPaths.publish(pathviz_msg);
 }
