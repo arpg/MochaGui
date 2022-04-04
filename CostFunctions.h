@@ -2,7 +2,7 @@
 #define COSTFUNCTIONS_H
 
 #include "Eigen/Eigen"
-#include "CVars/CVar.h"
+#include "cvars/CVar.h"
 #include "sophus/se3.hpp"
 #include "SensorFusionCeres.h"
 

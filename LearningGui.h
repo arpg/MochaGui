@@ -17,7 +17,7 @@
 #include <CarPlanner/BulletCarModel.h>
 #include <CarPlanner/Localizer.h>
 #include <CarPlanner/CarRegressor.h>
-#include <Node/Node.h>
+#include <node/Node.h>
 #include <SensorFusionCeres.h>
 
 #include "JoystickHandler.h"
