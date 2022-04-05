@@ -15,7 +15,7 @@
 #include "CarMessages.pb.h"
 #include <CarPlanner/CarPlannerCommon.h>
 #include <CarPlanner/BulletCarModel.h>
-#include <CarPlanner/Localizer.h>
+#include <CarPlanner/HALLocalizer.h>
 #include <CarPlanner/CarRegressor.h>
 #include <node/Node.h>
 #include <SensorFusionCeres.h>
@@ -79,11 +79,11 @@ private:
 
     void _CommandHandler(const MochaCommands& command);
 
-    /// localizer reader
-    Localizer m_Localizer;
+    /// HALLocalizer reader
+    HALLocalizer m_Localizer;
     /// node for capturing IMU data from the car
     //node::node m_Node;
-    /// name of the car used for localizer tracking
+    /// name of the car used for HALLocalizer tracking
     std::string m_sCarObjectName;
 
     std::string m_sLearningParamsFile;

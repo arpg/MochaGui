@@ -7,7 +7,7 @@
 
 #include "CarMessages.pb.h"
 #include <CarPlanner/BulletCarModel.h>
-#include <CarPlanner/Localizer.h>
+#include <CarPlanner/HALLocalizer.h>
 #include <CarPlanner/SE3.h>
 
 #include "config.h"
@@ -17,7 +17,7 @@
 
 
 double g_dStartTime = Tic();
-Localizer g_localizer;
+HALLocalizer g_localizer;
 EventLogger logger;
 node::node g_node;
 bool g_bLog = false;
@@ -87,7 +87,7 @@ void LocalizerReadFunc()
         Eigen::Vector6d pose = fusion::T2Cart(Twb.matrix());
 
         if(g_bLog ){
-            std::cout << "Localizer pose received at:" << localizerTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
+            std::cout << "HALLocalizer pose received at:" << localizerTime-g_dStartTime << "seconds [" << pose[0] << " " <<  pose[1] << " " << pose[2] << "]" <<  std::endl;
             fflush(stdout);
             logger.LogLocalizerData(Tic(),localizerTime,Twb);
         }
@@ -127,7 +127,7 @@ int main( int argc, char** argv )
     g_node.init("logger");
 
     g_node.subscribe("herbie/Imu");
-    g_localizer.TrackObject("CAR", "posetonode",Sophus::SE3d(dT_localizer_ref).inverse(),true);
+    g_localizer.TrackObject("CAR", Sophus::SE3d(dT_localizer_ref).inverse(),true);
     g_localizer.Start();
 
     boost::thread* pImuThread = new boost::thread(boost::bind(ImuReadFunc));

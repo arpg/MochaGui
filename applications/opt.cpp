@@ -84,7 +84,7 @@ int main( int argc, char** argv )
     GetPot cl( argc, argv );
 
     std::string sMesh = cl.follow("/Users/crh/data/lab.ply",1,"-mesh");
-    bool bLocalizer = cl.search("-localizer");
+    bool bLocalizer = cl.search("-HALLocalizer");
 
     GLMesh terrainMesh;
     GLAxis endPosAxis;

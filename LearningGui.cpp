@@ -429,7 +429,7 @@ void LearningGui::Init(const std::string& sRefPlane, const std::string& sMeshNam
 
         //m_Node.subscribe("herbie/Imu");
         //dT_localizer_ref.block<3,3>(0,0).transposeInPlace();
-        m_Localizer.TrackObject(m_sCarObjectName, "posetonode",Sophus::SE3d(dT_localizer_ref).inverse(),true);
+        m_Localizer.TrackObject(m_sCarObjectName,Sophus::SE3d(dT_localizer_ref).inverse(),true);
         m_Localizer.Start();
 
         //m_pImuThread = new boost::thread(boost::bind(&LearningGui::_ImuReadFunc,this));

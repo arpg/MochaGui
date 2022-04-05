@@ -5,14 +5,14 @@
 #include <boost/lexical_cast.hpp>
 // #include <Node/Node.h>
 #include <CarPlanner/RpgUtils.h>
-#include <CarPlanner/Localizer.h>
+#include <CarPlanner/HALLocalizer.h>
 #include <CarPlanner/SE3.h>
 
 #include "config.h"
 #include "GetPot"
 #include "CarMessages.pb.h"
 
-Localizer g_localizer;
+HALLocalizer g_localizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv )

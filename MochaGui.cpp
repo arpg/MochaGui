@@ -483,11 +483,11 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_sCarObjectName = "Compass";
     if ( m_bSIL ) {
         // Changed "posetonode" to "BulletCarModel" to match BulletCarModel.cpp
-        m_Localizer.TrackObject( m_sCarObjectName, "BulletCarModel", Sophus::SE3d(dT_localizer_ref).inverse() );
+        m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
         LOG(INFO) << "Localizer initialized to track BulletCarModel at " << m_sCarObjectName;
     } else {
         // Changed "posetonode" to "NinjaCar" to match CarPosSim.cpp
-        m_Localizer.TrackObject( m_sCarObjectName, "NinjaCar", Sophus::SE3d(dT_localizer_ref).inverse() );
+        m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
         LOG(INFO) << "Localizer initialized to track NinjaCar at " << m_sCarObjectName;
     }
 
