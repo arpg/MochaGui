@@ -14,9 +14,13 @@ DEFINE_string(wheel,"", "File for wheel mesh.");            // /Users/corinsandf
 /////////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char* argv[] )
 {
+  ros::init(argc, argv, "gui");
 
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+
+  FLAGS_logtostderr=true;
+  FLAGS_minloglevel=0;
 
   if(FLAGS_params.empty()) {
     LOG(FATAL) << "Car parameters file not provided. Use parameter -params";

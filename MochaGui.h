@@ -23,6 +23,7 @@
 #include <CarPlanner/LocalPlanner.h>
 #include <CarPlanner/CarRegressor.h>
 #include <CarPlanner/HALLocalizer.h>
+#include <CarPlanner/TFLocalizer.h>
 #include <CarPlanner/CVarHelpers.h>
 
 #include "GLCar.h"
@@ -171,7 +172,7 @@ protected:
     Vector3dAlignedVec m_vFixGroundSamples;
     //Eigen::Matrix3d m_RfixGround;
 
-    HALLocalizer m_Localizer;
+    TFLocalizer m_Localizer;
     std::string m_sCarObjectName;
     //std::vector<MochaEntity> m_vEntities;
 

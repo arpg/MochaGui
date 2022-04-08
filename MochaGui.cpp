@@ -16,7 +16,7 @@ MochaGui *g_pMochaGuiInstance = NULL;
 static bool& g_bContinuousPathPlanning = CVarUtils::CreateGetUnsavedCVar("debug.ContinuousPathPlanning",false);
 static bool& g_bImuIntegrationOnly = CVarUtils::CreateGetUnsavedCVar("debug.ImuIntegrationOnly",false);
 static bool& g_bPlaybackControlPaths = CVarUtils::CreateGetUnsavedCVar("debug.PlaybackControlPaths",false);
-static bool& g_bProcessModelActive = CVarUtils::CreateGetUnsavedCVar("debug.ProcessModelActive",false);
+static bool& g_bProcessModelActive = CVarUtils::CreateGetUnsavedCVar("debug.ProcessModelActive",true);
 static int& g_nStartSegmentIndex = CVarUtils::CreateGetUnsavedCVar("debug.StartSegmentIndex",0);
 static bool& g_bFreezeControl(CVarUtils::CreateGetUnsavedCVar("debug.FreezeControl",false,""));
 static bool& g_bInertialControl = CVarUtils::CreateGetUnsavedCVar("debug.InertialControl",true);
@@ -412,6 +412,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
     /// Establish number of waypoints and where they are; set them to CVars.
+    Eigen::Vector3d offset(2.,2.,0.);
     int numWaypoints = 8;
     for(int ii = 0; ii < numWaypoints ; ii++){
         char buf[100];
@@ -423,10 +424,9 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
         /// Waypoints in a circle.
         /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, ?curvature
-        (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints),
-            cos(ii*2*M_PI/numWaypoints),
-            0, 0, 0, -ii*2*M_PI/numWaypoints, 1, 0;
-
+        (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints)+offset[0],
+            cos(ii*2*M_PI/numWaypoints)+offset[1],
+            0+offset[2], 0, 0, -ii*2*M_PI/numWaypoints, 1, 0;
         /// Load this segment ID into a vector that enumerates the path elements.
         m_Path.push_back(ii);
     }
@@ -480,16 +480,17 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     }
 
     // Changed "NinjaCar" to "Compass"
-    m_sCarObjectName = "Compass";
-    if ( m_bSIL ) {
-        // Changed "posetonode" to "BulletCarModel" to match BulletCarModel.cpp
-        m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
-        LOG(INFO) << "Localizer initialized to track BulletCarModel at " << m_sCarObjectName;
-    } else {
-        // Changed "posetonode" to "NinjaCar" to match CarPosSim.cpp
-        m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
-        LOG(INFO) << "Localizer initialized to track NinjaCar at " << m_sCarObjectName;
-    }
+    m_sCarObjectName = "N02";
+    // if ( m_bSIL ) {
+    //     // Changed "posetonode" to "BulletCarModel" to match BulletCarModel.cpp
+    //     m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
+    //     LOG(INFO) << "Localizer initialized to track BulletCarModel at " << m_sCarObjectName;
+    // } else {
+    //     // Changed "posetonode" to "NinjaCar" to match CarPosSim.cpp
+    //     m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
+    //     LOG(INFO) << "Localizer initialized to track NinjaCar at " << m_sCarObjectName;
+    // }        
+    m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
 
     //initialize the panel
     m_GuiPanel.Init();
@@ -560,7 +561,7 @@ void MochaGui::_StartThreads()
     }else{
         m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
         if(m_pLocalizerThread == NULL){
-            //LOG(INFO) << "Starting Localizer Thread";
+            LOG(INFO) << "Starting Localizer Thread";
             m_pLocalizerThread = new boost::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
         }
     }
