@@ -26,7 +26,7 @@ ENDIF()
 
 # TODO fix all these warnings instead of suppressing them!!
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual" )
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual -Wl,--verbose" )
 add_definitions(-DBT_USE_DOUBLE_PRECISION)
 add_definitions(-DBT_NO_PROFILE)
 
