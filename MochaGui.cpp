@@ -16,7 +16,7 @@ MochaGui *g_pMochaGuiInstance = NULL;
 static bool& g_bContinuousPathPlanning = CVarUtils::CreateGetUnsavedCVar("debug.ContinuousPathPlanning",false);
 static bool& g_bImuIntegrationOnly = CVarUtils::CreateGetUnsavedCVar("debug.ImuIntegrationOnly",false);
 static bool& g_bPlaybackControlPaths = CVarUtils::CreateGetUnsavedCVar("debug.PlaybackControlPaths",false);
-static bool& g_bProcessModelActive = CVarUtils::CreateGetUnsavedCVar("debug.ProcessModelActive",true);
+static bool& g_bProcessModelActive = CVarUtils::CreateGetUnsavedCVar("debug.ProcessModelActive",false);
 static int& g_nStartSegmentIndex = CVarUtils::CreateGetUnsavedCVar("debug.StartSegmentIndex",0);
 static bool& g_bFreezeControl(CVarUtils::CreateGetUnsavedCVar("debug.FreezeControl",false,""));
 static bool& g_bInertialControl = CVarUtils::CreateGetUnsavedCVar("debug.InertialControl",true);
@@ -917,6 +917,7 @@ void MochaGui::_LocalizerReadFunc()
    LOG(INFO) << "Starting Localizer Thread.";
 
     while(1){
+        boost::this_thread::interruption_point();
         //this is a blocking call
         double localizerTime;
         const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
@@ -967,6 +968,7 @@ void MochaGui::_ControlCommandFunc()
     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
     while(1)
     {
+        boost::this_thread::interruption_point();
         //only go ahead if the controller is running, and we are targeting the real vehicle
         if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false){
             //get commands from the controller, apply to the car and update the position
@@ -1033,7 +1035,6 @@ void MochaGui::_ControlCommandFunc()
                     if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
 
                 }
-
             }
 
             m_dControlDelay = Toc(time);
