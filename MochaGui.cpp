@@ -964,6 +964,7 @@ void MochaGui::_LocalizerReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlCommandFunc()
 {
+    HALCommander commander;
     double dLastTime = Tic();
     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
     while(1)
@@ -1003,38 +1004,13 @@ void MochaGui::_ControlCommandFunc()
 
             //send the commands to the car via udp
             m_nNumPoseUpdates++;
-            hal::CommanderMsg* Command = new hal::CommanderMsg();
-            CommandMsg Req;
-            CommandReply Rep;
-
-            Req.set_accel(std::max(std::min(m_ControlCommand.m_dForce,500.0),0.0));
-            Req.set_phi(m_ControlCommand.m_dPhi);
             double time = Tic();
-
 
             //if we are not currently simulating, send these to the ppm
             if( m_bSimulate3dPath == false )
             {
-                hal::WriteCommand( 0, std::max( std::min( m_ControlCommand.m_dForce, 500.0 ), 0.0 ), m_ControlCommand.m_dCurvature, m_ControlCommand.m_dTorque, m_ControlCommand.m_dT, m_ControlCommand.m_dPhi, false, true/*true*/, Command );
+                commander.SendCommand(m_ControlCommand, m_bSIL);
 
-
-                unsigned char buffer[Command->ByteSize() + 4];
-
-                google::protobuf::io::ArrayOutputStream aos( buffer, sizeof(buffer) );
-                google::protobuf::io::CodedOutputStream coded_output( &aos );
-                coded_output.WriteVarint32( Command->ByteSize() );
-                Command->SerializeToCodedStream( &coded_output );
-                if ( m_bSIL ) {
-                    //send Command to BulletCarModel
-                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&comAddr, addrLen ) < 0 ) { LOG(ERROR) << "Did not send message"; }
-                    //else { LOG(INFO) << "Sent Command"; }
-
-                }
-                else {
-                    //send Command to NinjaCar
-                    if ( sendto( sockFD, (char*)buffer, coded_output.ByteCount(), 0, (struct sockaddr*)&carAddr, addrLen ) < 0 ) LOG(ERROR) << "Did not send message";
-
-                }
             }
 
             m_dControlDelay = Toc(time);

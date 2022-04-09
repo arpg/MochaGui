@@ -24,6 +24,8 @@
 #include <CarPlanner/CarRegressor.h>
 #include <CarPlanner/HALLocalizer.h>
 #include <CarPlanner/ROSLocalizer.h>
+#include <CarPlanner/HALCommander.h>
+#include <CarPlanner/ROSCommander.h>
 #include <CarPlanner/CVarHelpers.h>
 
 #include "GLCar.h"
