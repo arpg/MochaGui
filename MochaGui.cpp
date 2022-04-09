@@ -55,29 +55,7 @@ MochaGui::MochaGui() :
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
     m_dPlanTime( Tic() ) //the size of the fusion sensor
 {
-    //m_Node.init( "MochaGui" ); // Node on which to receive information from the car
-    m_MochaPort = 1643;
-    m_ComPort = 1642;
-    m_CarPort = 1640;
-
-    if ( ( sockFD = socket( AF_INET, SOCK_DGRAM, 0 ) ) < 0 ) LOG(ERROR) << "Could not create socket";
-
-    memset( (char*)&mochAddr, 0, addrLen );
-    mochAddr.sin_family = AF_INET;
-    mochAddr.sin_addr.s_addr = htonl( INADDR_ANY );
-    mochAddr.sin_port = htons( m_MochaPort );
-
-    if ( ::bind( sockFD, (struct sockaddr*)&mochAddr, addrLen ) < 0 ) LOG(ERROR) << "Could not bind socket to port " << m_MochaPort;
-
-    memset( (char*)&comAddr, 0, addrLen );
-    comAddr.sin_family = AF_INET;
-    comAddr.sin_addr.s_addr = htonl( INADDR_ANY );
-    comAddr.sin_port = htons( m_ComPort );
-
-    memset( (char*)&carAddr, 0, addrLen );
-    carAddr.sin_family = AF_INET;
-    carAddr.sin_addr.s_addr = htonl( INADDR_ANY );
-    carAddr.sin_port = htons( m_CarPort );
+    
 }
 
 ////////////////////////////////////////////////////////////////
@@ -965,6 +943,10 @@ void MochaGui::_LocalizerReadFunc()
 void MochaGui::_ControlCommandFunc()
 {
     HALCommander commander;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 28b58be0707f8e0b1379d045a5ff281083766ef0
     double dLastTime = Tic();
     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
     while(1)
@@ -1004,6 +986,7 @@ void MochaGui::_ControlCommandFunc()
 
             //send the commands to the car via udp
             m_nNumPoseUpdates++;
+            
             double time = Tic();
 
             //if we are not currently simulating, send these to the ppm

@@ -22,6 +22,7 @@
 #include <CarPlanner/CarController.h>
 #include <CarPlanner/LocalPlanner.h>
 #include <CarPlanner/CarRegressor.h>
+#include <CarPlanner/HALCommander.h>
 #include <CarPlanner/HALLocalizer.h>
 #include <CarPlanner/ROSLocalizer.h>
 #include <CarPlanner/HALCommander.h>
@@ -98,19 +99,6 @@ protected:
     static bool SetWaypointVelHandler(std::vector<std::string> *vArgs) { return GetInstance()->_SetWaypointVel(vArgs); }
     static bool RefreshHandler(std::vector<std::string> *vArgs) { return GetInstance()->_Refresh(vArgs); }
     static bool CommandHandler(MochaCommands command) { return GetInstance()->_CommandFunc(command); }
-
-    // UDP values
-    unsigned m_MochaPort; // UDP port for this gui
-    unsigned m_ComPort; // UDP port for m_bSIL (unused)
-    unsigned m_CarPort; // UDP port of the ninja car
-    struct sockaddr_in mochAddr; // Address of this gui (for sending commands from)
-    struct sockaddr_in comAddr;  // Address for m_bSIL (currently not running 1/16/17)
-    struct sockaddr_in carAddr;  // Address of the car (for sending commands to)
-    socklen_t addrLen = sizeof(mochAddr);
-    int recvLen;
-    int sockFD;
-    unsigned char buf[2048];
-    unsigned int msgSize = 0;
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;
