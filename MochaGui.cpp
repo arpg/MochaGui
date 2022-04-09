@@ -942,11 +942,8 @@ void MochaGui::_LocalizerReadFunc()
 /////////////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_ControlCommandFunc()
 {
-    HALCommander commander;
-<<<<<<< HEAD
-=======
+    ROSCommander commander;
 
->>>>>>> 28b58be0707f8e0b1379d045a5ff281083766ef0
     double dLastTime = Tic();
     //if ( !m_Node.advertise( "Commands" ) ) LOG(ERROR) << "'Commands' topic not advertised on 'MochaGui' node.";
     while(1)
@@ -993,7 +990,6 @@ void MochaGui::_ControlCommandFunc()
             if( m_bSimulate3dPath == false )
             {
                 commander.SendCommand(m_ControlCommand, m_bSIL);
-
             }
 
             m_dControlDelay = Toc(time);
