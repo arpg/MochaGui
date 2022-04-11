@@ -21,6 +21,7 @@
 #include "tf/tfMessage.h"
 #include "tf/tf.h"
 
+#include <glog/logging.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -452,21 +453,41 @@ inline void convertMeshMsg2CollisionShape_Shared(const mesh_msgs::TriangleMeshSt
   return;
 }
 
-inline void convertMeshMsg2CollisionShape_Shared(const carplanner_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
-{  
-	btIndexedMesh mesh;
+inline void convertMeshMsg2TriangleMesh(const carplanner_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btTriangleMesh*& triangleMesh)
+{
+  triangleMesh = new btTriangleMesh();
+  // As each triangle is laid out contiguously in triangleVertices. 
+  // Iterate and remove duplicates.
+  for( unsigned i = 0; i < meshMsg->triangleVertices.size() / 9; i += 9) 
+  {
+    btVector3 vertex0(meshMsg->triangleVertices[9 * i], meshMsg->triangleVertices[9 * i + 1], meshMsg->triangleVertices[9 * i + 2]);
+    btVector3 vertex1(meshMsg->triangleVertices[9 * i + 3], meshMsg->triangleVertices[9 * i + 4], meshMsg->triangleVertices[9 * i + 5]);
+    btVector3 vertex2(meshMsg->triangleVertices[9 * i + 6], meshMsg->triangleVertices[9 * i + 7], meshMsg->triangleVertices[9 * i + 8]);
+
+    triangleMesh->addTriangle(vertex0, vertex1, vertex2, true);
+  }
+}
+
+inline void convertMeshMsg2TriangleIndexVertexArray(const carplanner_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btTriangleIndexVertexArray*& vertexArray)
+{
+  btIndexedMesh mesh;
 
 	mesh.m_numTriangles = meshMsg->triangleIndices.size() / 3;
 	mesh.m_triangleIndexBase = (const unsigned char*)meshMsg->triangleIndices.data();
-	mesh.m_triangleIndexStride = sizeof(int) * 3;
+	mesh.m_triangleIndexStride = sizeof(decltype(meshMsg->triangleIndices)::value_type)* 3;
 	mesh.m_numVertices = meshMsg->triangleVertices.size() / 3;
 	mesh.m_vertexBase = (const unsigned char*)meshMsg->triangleVertices.data();
-	mesh.m_vertexStride = sizeof(float) * 3;
+	mesh.m_vertexStride = sizeof(decltype(meshMsg->triangleVertices)::value_type) * 3;
   mesh.m_vertexType = PHY_FLOAT;
 
-  btTriangleIndexVertexArray* triangleMesh = new btTriangleIndexVertexArray();
-	triangleMesh->addIndexedMesh(mesh);
+  vertexArray = new btTriangleIndexVertexArray();
+	vertexArray->addIndexedMesh(mesh);
+}
 
+inline void convertMeshMsg2CollisionShape_Shared(const carplanner_msgs::TriangleMeshStamped::ConstPtr& meshMsg, btCollisionShape*& collisionShape)
+{  
+  btTriangleIndexVertexArray* triangleMesh;
+  convertMeshMsg2TriangleIndexVertexArray(meshMsg, triangleMesh);  
   collisionShape = new btBvhTriangleMeshShape(triangleMesh,true,true);
 }
 
@@ -487,6 +508,12 @@ inline std::vector<std::pair<uint32_t, uint32_t>> getMeshBorder(const btTriangle
     if (indexTwo > indexThree) std::swap(indexTwo, indexThree);
     if (indexOne > indexTwo) std::swap(indexOne, indexTwo);
 
+    // Guard to check that all indices are valid. 
+    // Index three is the largest
+    if (indexThree >= rawMesh.m_numVertices) {
+      continue;
+    }
+
     const auto edgeOne = std::make_pair<const uint32_t&, const uint32_t&>(indexOne, indexTwo);
     const auto edgeTwo = std::make_pair<const uint32_t&, const uint32_t&>(indexOne, indexThree);
     const auto edgeThree = std::make_pair<const uint32_t&, const uint32_t&>(indexTwo, indexThree);
@@ -506,12 +533,18 @@ inline std::vector<std::pair<uint32_t, uint32_t>> getMeshBorder(const btTriangle
   return borderEdges;
 }
 
-inline void mergeMeshes(const btTriangleIndexVertexArray* oldMesh, const btTriangleIndexVertexArray* newMesh)
+inline void mergeMeshes(btTriangleIndexVertexArray* oldMesh, const btTriangleIndexVertexArray* newMesh)
 {
   const std::vector<std::pair<uint32_t, uint32_t>> newBorder = getMeshBorder(newMesh);
+  // looks like an overflow problem. For some reason it thinks an index is ~3 trillion
+  ROS_INFO("[mesh_conversion_tools] border mesh has %d edges", newBorder.size());
+  for (int i = 0; i < 5; ++i) {
+    ROS_INFO("mesh_conversion_tools] edge %d: (%d, %d)", i, newBorder[i].first, newBorder[i].second);
+  }
 
-  const auto pointInsideBorder = [](const std::vector<std::pair<uint32_t, uint32_t>>& border, const btTriangleIndexVertexArray* oldMesh, float x, float y) {
-    const btIndexedMesh& rawMesh = oldMesh->getIndexedMeshArray()[0];
+
+  const auto pointInsideBorder = [](const std::vector<std::pair<uint32_t, uint32_t>>& border, const btTriangleIndexVertexArray* borderMesh, float x, float y) {
+    const btIndexedMesh& rawMesh = borderMesh->getIndexedMeshArray()[0];
     // Draw a line in the +x direction from the (x, y) point, counting the number of edges it crosses. 
     // The point is inside the border polygon iff it crosses an odd number of edges
     int crosses = 0;
@@ -555,6 +588,16 @@ inline void mergeMeshes(const btTriangleIndexVertexArray* oldMesh, const btTrian
       const uint32_t indexTwo = *(currentTriangle + sizeof(uint32_t));
       const uint32_t indexThree = *(currentTriangle + 2 * sizeof(uint32_t));
 
+      if (indexOne >= rawMesh.m_numVertices || indexTwo >= rawMesh.m_numVertices || indexThree >= rawMesh.m_numVertices) {
+        // On occasion the indices are outside the mesh. Should probably be removed. 
+        continue;
+      }
+
+      if (i % 100 == 0) {
+        ROS_INFO("[mesh_conversion_tools] Processing mesh triangle %d", i);
+      }
+
+
       std::vector<float*> vertexBases; 
       vertexBases.push_back((float *)(rawMesh.m_vertexBase + rawMesh.m_vertexStride * indexOne));
       vertexBases.push_back((float *)(rawMesh.m_vertexBase + rawMesh.m_vertexStride * indexTwo));
@@ -564,7 +607,7 @@ inline void mergeMeshes(const btTriangleIndexVertexArray* oldMesh, const btTrian
         float x = *vertexBase;
         float y = *(vertexBase + sizeof(float));
 
-        if (pointInsideBorder(border, oldMesh, x, y)) {
+        if (pointInsideBorder(border, newMesh, x, y)) {
           // Implementation: swap with last element and repeat this iteration. 
           // Removes the need to copy most triangles we're keeping
           uint32_t* lastTriangleBase = (uint32_t *)(rawMesh.m_triangleIndexBase + rawMesh.m_triangleIndexStride * rawMesh.m_numTriangles);
@@ -584,7 +627,8 @@ inline void mergeMeshes(const btTriangleIndexVertexArray* oldMesh, const btTrian
       }
     }
   };
-  
+
+  deleteInsideBorder(newBorder, oldMesh, newMesh);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1478,7 +1478,7 @@ void MochaVehicle::meshCb(const carplanner_msgs::TriangleMeshStamped::ConstPtr& 
     double t1 = Tic();
     ROS_INFO("[Vehicle::MeshCb] tform lookup took %fs", t1-t0);
 
-    btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+    btCollisionShape* meshShape;
     convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape);
 
     // btTriangleMesh* triangleMesh = new btTriangleMesh();
@@ -1542,25 +1542,26 @@ void MochaVehicle::partialMeshCb(const carplanner_msgs::TriangleMeshStamped::Con
     double t1 = Tic();
     ROS_INFO("[Vehicle::partialMeshCb] tform lookup took %fs", t1-t0);
 
-    btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
-    convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape);
+    if (!m_pMeshMsg) {
+        meshCb(mesh_msg);
+    }
+    else {
+        // Merge mesh with existing
+        BulletWorldInstance* pWorld = GetWorldInstance(0);
+        btTriangleIndexVertexArray* oldMesh = dynamic_cast<btTriangleIndexVertexArray*>(
+            dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainShape)->getMeshInterface());
+        
+        btTriangleMesh* newMesh;
+        convertMeshMsg2TriangleIndexVertexArray(mesh_msg, newMesh);
 
+        double t2 = Tic();
+        ROS_INFO("[Vehicle::partialMeshCb] Grabbing meshes took %fs", t2 - t1);
 
+        mergeMeshes(oldMesh, newMesh);
 
-    BulletWorldInstance* pWorld = GetWorldInstance(0);
-    btTriangleIndexVertexArray* oldMesh = dynamic_cast<btTriangleIndexVertexArray*>(
-        dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainShape)->getMeshInterface());
-    
-    btTriangleIndexVertexArray* newMesh = dynamic_cast<btTriangleIndexVertexArray*>(
-        dynamic_cast<btBvhTriangleMeshShape*>(meshShape)->getMeshInterface());
-
-    mergeMeshes(oldMesh, newMesh);
-
-    double t2 = Tic();
-    ROS_INFO("[Vehicle::partialMeshCb] Merge meshes took %fs", t2 - t1);
-
-    // temp to have a working mesh through the entire run as mergeMeshes deletes triangles in the old mesh
-    meshCb(mesh_msg);
+        double t3 = Tic();
+        ROS_INFO("[Vehicle::partialMeshCb] Merge meshes took %fs", t3 - t2);
+    }
 }
 
 
