@@ -387,8 +387,8 @@ void MochaVehicle::InitializeExternals()
     m_terrainMeshPub = m_nh.advertise<mesh_msgs::TriangleMeshStamped>("vehicle/output_terrain_mesh",1);
     m_vehiclePub = m_nh.advertise<visualization_msgs::MarkerArray>("vehicle/output_vehicle_shape",1);
  
-    // m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
-    m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::partialMeshCb, this);
+    m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::meshCb, this);
+    // m_terrainMeshSub = m_nh.subscribe<carplanner_msgs::TriangleMeshStamped>("vehicle/input_terrain_mesh", 1, &MochaVehicle::partialMeshCb, this);
 
     m_timerStatePubLoop = m_private_nh.createTimer(ros::Duration(1.0/m_dStatePubRate), &MochaVehicle::StatePubLoopFunc, this);
 
