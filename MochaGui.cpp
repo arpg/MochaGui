@@ -89,7 +89,7 @@ void MochaGui::Run() {
     LOG(INFO) << "Starting Threads";
     _StartThreads();
     double lastFrameTime = Tic();
-    while( !pangolin::ShouldQuit() )
+    while( !pangolin::ShouldQuit() && ros::ok() )
     {
 
       {
@@ -551,6 +551,7 @@ void MochaGui::_KillController()
 
     //reset the threads
     if(m_pControlThread) {
+        m_pControlThread->interrupt();
         m_pControlThread->join();
     }
     m_bControl3dPath = false;
@@ -565,22 +566,27 @@ void MochaGui::_KillThreads()
     m_StillRun = false;
 
     if(m_pPhysicsThread) {
+        m_pPhysicsThread->interrupt();
         m_pPhysicsThread->join();
     }
 
     if(m_pPlannerThread) {
+        m_pPlannerThread->interrupt();
         m_pPlannerThread->join();
     }
 
     if(m_pLearningThread){
+        m_pLearningThread->interrupt();
         m_pLearningThread->join();
     }
 
     if(m_pLocalizerThread) {
+        m_pLocalizerThread->interrupt();
         m_pLocalizerThread->join();
     }
 
     if(m_pCommandThread) {
+        m_pCommandThread->interrupt();
         m_pCommandThread->join();
     }
 
@@ -1017,8 +1023,8 @@ void MochaGui::_ControlFunc()
     {
         m_bControllerRunning = false;
 
-
         while(m_StillControl) {
+            boost::this_thread::interruption_point();
 
             m_pControlLine->Clear();
             for (GLCachedPrimitives*& pStrip: m_lPlanLineSegments) {
@@ -1036,6 +1042,7 @@ void MochaGui::_ControlFunc()
             //        dout("Waiting for control input and completed plan");
             while(m_bControl3dPath == false || m_bAllClean == false ||
                   (m_bSimulate3dPath == false && m_eControlTarget != eTargetExperiment)){
+                boost::this_thread::interruption_point();
                 usleep(1000);
             }
 
@@ -1084,8 +1091,10 @@ void MochaGui::_ControlFunc()
             VehicleState currentState;
             while(m_StillControl)
             {
+                boost::this_thread::interruption_point();
                 while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false
                        && m_StillControl )){
+                    boost::this_thread::interruption_point();
                     usleep(1000);
                 }
 
