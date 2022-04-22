@@ -905,6 +905,9 @@ void MochaGui::_LocalizerReadFunc()
         //this is a blocking call
         double localizerTime;
         const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
+        Sophus::Vector6d Vwb;
+        if (strcmp(m_Localizer.GetLocalizerType().c_str(),"ROSLocalizer"))
+            Vwb = m_Localizer.GetVelocity(m_sCarObjectName,false,&localizerTime);
 
         double sysTime = Tic();
 
@@ -930,7 +933,9 @@ void MochaGui::_LocalizerReadFunc()
                 }
                 m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
             }else{
-                m_Fusion.RegisterGlobalPose(Twb,sysTime,sysTime);
+                m_Fusion.RegisterGlobalPose(Twb,localizerTime,sysTime);
+                if (strcmp(m_Localizer.GetLocalizerType().c_str(),"ROSLocalizer"))
+                    m_Fusion.RegisterGlobalVelocity(Vwb);
                 //LOG(INFO) << "Set pose";
             }
             //dout("Fusion process took" << Toc(dTemp) << " seconds.");
