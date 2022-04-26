@@ -275,7 +275,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     // Moved this code to simulation/experiment since that what it seems to be
     // i.e. the localizer is running when in Experiment mode
-    /*if(bLocalizer){
+    if(bLocalizer){
         // Experiment?
         pScene->mRootNode->mTransformation = aiMatrix4x4(1,0,0,0,
                                                          0,-1,0,0,
@@ -287,20 +287,20 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
                                                          0,1,0,0,
                                                          0,0,-1,0,
                                                          0,0,0,1);
-    }*/
+    }
 
     if(sMode == "Simulation"){
         m_eControlTarget = eTargetSimulation;
-        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-                                                          0, 1, 0, 0,
-                                                          0, 0,-1, 0,
-                                                          0, 0, 0, 1 );
+    //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+    //                                                       0, 1, 0, 0,
+    //                                                       0, 0,-1, 0,
+    //                                                       0, 0, 0, 1 );
     }else{
         m_eControlTarget = eTargetExperiment;
-        pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
-                                                          0, 1, 0, 0,
-                                                          0, 0,-1, 0,
-                                                          0, 0, 0, 1 );
+    //     pScene->mRootNode->mTransformation = aiMatrix4x4( 1, 0, 0, 0,
+    //                                                       0, 1, 0, 0,
+    //                                                       0, 0,-1, 0,
+    //                                                       0, 0, 0, 1 );
     }
 
     btVector3 dMin(DBL_MAX,DBL_MAX,DBL_MAX);
@@ -390,7 +390,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
     /// Establish number of waypoints and where they are; set them to CVars.
-    Eigen::Vector3d offset(2.,2.,0.);
+    float radius = 1.5;
+    Eigen::Vector3d offset(0.,2.,0.);
     int numWaypoints = 8;
     for(int ii = 0; ii < numWaypoints ; ii++){
         char buf[100];
@@ -402,9 +403,9 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
         /// Waypoints in a circle.
         /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, ?curvature
-        (*m_vWayPoints.back()) << sin(ii*2*M_PI/numWaypoints)+offset[0],
-            cos(ii*2*M_PI/numWaypoints)+offset[1],
-            0+offset[2], 0, 0, -ii*2*M_PI/numWaypoints, 1, 0;
+        (*m_vWayPoints.back()) << radius*sin((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[0],
+            radius*cos((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[1],
+            0+offset[2], 0, 0, M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints, 1, 0;
         /// Load this segment ID into a vector that enumerates the path elements.
         m_Path.push_back(ii);
     }
@@ -906,7 +907,7 @@ void MochaGui::_LocalizerReadFunc()
         double localizerTime;
         const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
         Sophus::Vector6d Vwb;
-        if (strcmp(m_Localizer.GetLocalizerType().c_str(),"ROSLocalizer"))
+        if (m_Localizer.GetLocalizerType()=="ROSLocalizer")
             Vwb = m_Localizer.GetVelocity(m_sCarObjectName,false,&localizerTime);
 
         double sysTime = Tic();
@@ -934,7 +935,7 @@ void MochaGui::_LocalizerReadFunc()
                 m_Fusion.RegisterGlobalPoseWithProcessModel(Twb,sysTime,sysTime,command);
             }else{
                 m_Fusion.RegisterGlobalPose(Twb,localizerTime,sysTime);
-                if (strcmp(m_Localizer.GetLocalizerType().c_str(),"ROSLocalizer"))
+                if (m_Localizer.GetLocalizerType()=="ROSLocalizer")
                     m_Fusion.RegisterGlobalVelocity(Vwb);
                 //LOG(INFO) << "Set pose";
             }
