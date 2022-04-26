@@ -39,6 +39,9 @@
 #include "EventLogger.h"
 #include "ProcessModelFusion.h"
 
+#include <ros/ros.h>
+#include <carplanner_msgs/Waypoints.h>
+
 using namespace CVarUtils;
 using namespace std;
 using namespace Eigen;
@@ -55,11 +58,8 @@ public:
               const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
               const std::string& sCarMesh, const std::string& sWheelMesh);
 
-
     static MochaGui *GetInstance();
     ~MochaGui();
-
-
 
 protected:
     MochaGui();
@@ -85,6 +85,8 @@ protected:
     void _KillThreads();
     void _KillController();
     void _CreateLogFilesIfNeeded();
+    
+    void _LoadWaypointsFromMsg(const carplanner_msgs::Waypoints::ConstPtr wp_msg);
 
     void _PopulateSceneGraph();
     void _UpdateVehicleStateFromFusion(VehicleState& currentState);
@@ -99,6 +101,8 @@ protected:
     static bool SetWaypointVelHandler(std::vector<std::string> *vArgs) { return GetInstance()->_SetWaypointVel(vArgs); }
     static bool RefreshHandler(std::vector<std::string> *vArgs) { return GetInstance()->_Refresh(vArgs); }
     static bool CommandHandler(MochaCommands command) { return GetInstance()->_CommandFunc(command); }
+
+    ros::NodeHandle _nh;
 
     //car variables
     GLBulletDebugDrawer m_BulletDebugDrawer;

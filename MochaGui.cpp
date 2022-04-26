@@ -55,7 +55,7 @@ MochaGui::MochaGui() :
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
     m_dPlanTime( Tic() ) //the size of the fusion sensor
 {
-    
+    ros::Subscriber wp_sub = _nh.subscribe<carplanner_msgs::Waypoints>("waypoints", 1, std::bind(&MochaGui::_LoadWaypointsFromMsg, this, std::placeholders::_1));
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1536,6 +1536,35 @@ void MochaGui::_PlannerFunc() {
             usleep(10000);
         }
     }
+}
+
+////////////////////////////////////////////////////////////////
+void MochaGui::_LoadWaypointsFromMsg(const carplanner_msgs::Waypoints::ConstPtr wp_msg)
+{
+    m_vWayPoints.clear(); 
+
+    for(uint ii=0; ii<wp_msg->path.odoms.size(); ii++){
+        char buf[100];
+        snprintf( buf, 100, "waypnt.%d", ii );
+        m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, ?curvature
+        (*m_vWayPoints.back()) << wp_msg->path.odoms[ii].pose.pose.position.x, 
+                                  wp_msg->path.odoms[ii].pose.pose.position.y, 
+                                  wp_msg->path.odoms[ii].pose.pose.position.z, 
+                                  atan2(2*(wp_msg->path.odoms[ii].pose.pose.orientation.w*wp_msg->path.odoms[ii].pose.pose.orientation.x+wp_msg->path.odoms[ii].pose.pose.orientation.y*wp_msg->path.odoms[ii].pose.pose.orientation.z), 1-2*(pow(wp_msg->path.odoms[ii].pose.pose.orientation.x,2)+pow(wp_msg->path.odoms[ii].pose.pose.orientation.y,2))), 
+                                  asin(2*(wp_msg->path.odoms[ii].pose.pose.orientation.w*wp_msg->path.odoms[ii].pose.pose.orientation.y+wp_msg->path.odoms[ii].pose.pose.orientation.z*wp_msg->path.odoms[ii].pose.pose.orientation.x)), 
+                                  atan2(2*(wp_msg->path.odoms[ii].pose.pose.orientation.w*wp_msg->path.odoms[ii].pose.pose.orientation.z+wp_msg->path.odoms[ii].pose.pose.orientation.x*wp_msg->path.odoms[ii].pose.pose.orientation.y), 1-2*(pow(wp_msg->path.odoms[ii].pose.pose.orientation.y,2)+pow(wp_msg->path.odoms[ii].pose.pose.orientation.z,2))), 
+                                  sqrt(pow(wp_msg->path.odoms[ii].twist.twist.linear.x,2)+pow(wp_msg->path.odoms[ii].twist.twist.linear.y,2)+pow(wp_msg->path.odoms[ii].twist.twist.linear.z,2)),
+                                  0.f;
+        /// Load this segment ID into a vector that enumerates the path elements.
+        m_Path.push_back(ii);
+    }
+    if (wp_msg->loop)
+    {
+        //close the loop
+        m_Path.push_back(0);
+    }
+    _RefreshWaypoints();
 }
 
 ////////////////////////////////////////////////////////////////

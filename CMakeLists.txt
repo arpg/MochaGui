@@ -57,6 +57,10 @@ endif()
 find_package( Sophus REQUIRED )
 find_package( assimp REQUIRED )
 find_package( Node REQUIRED )
+find_package( catkin REQUIRED 
+  COMPONENTS
+  carplanner_msgs
+  )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
