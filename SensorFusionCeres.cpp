@@ -258,6 +258,15 @@ void SensorFusionCeres::RegisterGlobalPose(const Sophus::SE3d& dT_wc,
     }*/
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+void SensorFusionCeres::RegisterGlobalVelocity(const Sophus::Vector6d& dGlobalVel)
+{
+    m_CurrentPose.m_dV = dGlobalVel.head(3); 
+    m_CurrentPose.m_dW = dGlobalVel.tail(3); 
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
 void SensorFusionCeres::ResetCurrentPose(const Sophus::SE3d& pose, const Eigen::Vector3d& initV, const Eigen::Vector2d& initG)
 {
     std::unique_lock<std::mutex> lock(m_ImuLock, std::try_to_lock);

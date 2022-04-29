@@ -138,6 +138,7 @@ namespace fusion
                                 const double& time,
                                 const bool& bHastGlobalPose,
                                 const bool& bHasRelativePose);
+        void RegisterGlobalVelocity(const Sophus::Vector6d& dGlobalVel);
         PoseParameter GetCurrentPose();
         Sophus::SE3d GetCalibrationPose() { return m_dTic; }
         void SetCalibrationPose(const Sophus::SE3d &dTic);
