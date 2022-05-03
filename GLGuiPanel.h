@@ -20,11 +20,11 @@ public:
         delete[] m_pControlTargetLabels[0];
         delete[] m_pControlTargetLabels[1];
         delete[] m_pControlTargetLabels;
+
     }
 
     void Init()
     {
-
         //create the control labels
         m_pControlTargetLabels = new char*[2];
         m_pControlTargetLabels[0] = new char[100];
@@ -145,13 +145,33 @@ public:
                     m_Ui.endGroup();
                 m_Ui.endFrame();
 
+                // interfaces panel
+
+                m_Ui.beginFrame(nv::GroupFlags_GrowDownFromLeft,frameRect);
+                    m_Ui.doLabel(m_Rect, "Interfaces");
+                    m_Ui.beginGroup(nv::GroupFlags_GrowRightFromTop);
+                        m_Ui.beginGroup(nv::GroupFlags_GrowDownFromLeft);
+                            m_Ui.doLabel(m_Rect, "Localization Source");
+                            m_Ui.doCheckButton(m_Rect,"Physical",GetVar<bool*>("LocalizationSource:Physical"));
+                            m_Ui.doCheckButton(m_Rect,"Simulated",GetVar<bool*>("LocalizationSource:Simulated"));
+                            m_Ui.doCheckButton(m_Rect,"Planned",GetVar<bool*>("LocalizationSource:Planned"));
+                            m_Ui.doCheckButton(m_Rect,"None",GetVar<bool*>("LocalizationSource:None"));
+                        m_Ui.endGroup();
+                        m_Ui.beginGroup(nv::GroupFlags_GrowDownFromLeft);
+                            m_Ui.doLabel(m_Rect, "Control Target");
+                            m_Ui.doCheckButton(m_Rect,"Physical",GetVar<bool*>("ControlTarget:Physical"));
+                            m_Ui.doCheckButton(m_Rect,"Simulated",GetVar<bool*>("ControlTarget:Simulated"));
+                            m_Ui.doCheckButton(m_Rect,"None",GetVar<bool*>("ControlTarget:None"));
+                        m_Ui.endGroup();
+                    m_Ui.endGroup();
+                m_Ui.endFrame();
+
             m_Ui.endFrame();
         m_Ui.end();
 
     }
 
 private:
-
     char** m_pControlTargetLabels;
 
 };

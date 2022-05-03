@@ -59,8 +59,6 @@ public:
     static MochaGui *GetInstance();
     ~MochaGui();
 
-
-
 protected:
     MochaGui();
     bool _SetWaypointVel(std::vector<std::string> *vArgs);
@@ -85,6 +83,9 @@ protected:
     void _KillThreads();
     void _KillController();
     void _CreateLogFilesIfNeeded();
+
+
+    void _InterfacesFunc();
 
     void _PopulateSceneGraph();
     void _UpdateVehicleStateFromFusion(VehicleState& currentState);
@@ -173,6 +174,8 @@ protected:
     boost::thread* m_pLearningThread;
     boost::thread* m_pLocalizerThread;
 
+    boost::thread* m_pInterfacesThread;
+
     ControlCommand m_ControlCommand;
     double m_dTargetVel;
     double m_dPoseError;
@@ -230,6 +233,8 @@ protected:
     std::atomic<double> m_dPlanTime;
 
     GLAxis m_DestAxis;
+
+    bool &m_bLocalizationSourceNone, &m_bLocalizationSourcePlanned, &m_bLocalizationSourceSimulated, &m_bLocalizationSourcePhysical, &m_bControlTargetNone, &m_bControlTargetSimulated, &m_bControlTargetPhysical;
 };
 
 #endif	/* MOCHAGUI_H */

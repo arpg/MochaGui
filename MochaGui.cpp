@@ -53,7 +53,14 @@ MochaGui::MochaGui() :
     m_dPlaybackTimer( -1 ),
     m_Fusion( 30, &m_DriveCarModel ),
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
-    m_dPlanTime( Tic() ) //the size of the fusion sensor
+    m_dPlanTime( Tic() ), //the size of the fusion sensor
+    m_bLocalizationSourcePhysical( CreateUnsavedCVar("LocalizationSource.Physical", false, "Set localization source to come from a physical vehicle / external source via HAL or ROS.") ),
+    m_bLocalizationSourceSimulated( CreateUnsavedCVar("LocalizationSource.Simulated", false, "Set localization source to come from a simulated vehicle that is moved using simulated commands.") ),
+    m_bLocalizationSourcePlanned( CreateUnsavedCVar("LocalizationSource.Planned", false, "Set localization source to follow the planned path, as if on rails.") ),
+    m_bLocalizationSourceNone( CreateUnsavedCVar("LocalizationSource.None", true, "Disable localization.") ),
+    m_bControlTargetPhysical( CreateUnsavedCVar("ControlTarget.Physical", false, "Set control target to be a physical vehicle / external target via HAL or ROS.") ),
+    m_bControlTargetSimulated( CreateUnsavedCVar("ControlTarget.Simulated", false, "Set control target to be a simulated vehicle.") ),
+    m_bControlTargetNone( CreateUnsavedCVar("ControlTarget.None", true, "Disable control.") )
 {
     
 }
@@ -489,7 +496,14 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
               .SetVar("control:VelocityError",&m_dVelError)
               .SetVar("control:Accel", &m_ControlCommand.m_dForce)
               .SetVar("control:Steering", &m_ControlCommand.m_dPhi)
-              .SetVar("control:LookaheadTime",m_Controller.GetLookaheadTimePtr());
+              .SetVar("control:LookaheadTime",m_Controller.GetLookaheadTimePtr())
+              .SetVar("LocalizationSource:Physical",&m_bLocalizationSourcePhysical)
+              .SetVar("LocalizationSource:Simulated",&m_bLocalizationSourceSimulated)
+              .SetVar("LocalizationSource:Planned",&m_bLocalizationSourcePlanned)
+              .SetVar("LocalizationSource:None",&m_bLocalizationSourceNone)
+              .SetVar("ControlTarget:Physical",&m_bControlTargetPhysical)
+              .SetVar("ControlTarget:Simulated",&m_bControlTargetSimulated)
+              .SetVar("ControlTarget:None",&m_bControlTargetNone);
 
 
     //planner parameters
@@ -529,6 +543,8 @@ void MochaGui::_StartThreads()
     m_pPlannerThread = new boost::thread(std::bind(&MochaGui::_PlannerFunc,this));
     m_pPhysicsThread = new boost::thread(std::bind(&MochaGui::_PhysicsFunc,this));
     m_pControlThread = new boost::thread(std::bind(&MochaGui::_ControlFunc,this));
+
+    m_pInterfacesThread = new boost::thread(std::bind(&MochaGui::_InterfacesFunc,this));
 
     if(m_eControlTarget == eTargetSimulation){
         LOG(INFO) << "Stopping localizer thread";
@@ -763,7 +779,8 @@ bool MochaGui::_IteratePlanner(
     //m_Planner.StressTest(problem);
 
     if(only2d == false) {
-        if( m_bPlannerOn == true && m_bSimulate3dPath == false ){
+        // if( m_bPlannerOn == true && m_bSimulate3dPath == false ){
+        if( m_bPlannerOn == true ){
             res = m_Planner.Iterate(problem);            
             m_Planner.SimulateTrajectory(sample,problem,0,true);
         }else{
@@ -794,7 +811,8 @@ void MochaGui::_UpdateVisuals()
 {
     if(g_bPlaybackControlPaths == false || m_bPause == false){
         VehicleState state;
-        if(m_bSimulate3dPath == true ){
+        // if(m_bSimulate3dPath == true ){
+        if (m_bLocalizationSourcePlanned==true || m_bLocalizationSourceSimulated==true)
             //LOG(INFO) << "m_bSimulate3dPath == true";
             m_DriveCarModel.GetVehicleState(0,state);
         }else{
@@ -962,7 +980,8 @@ void MochaGui::_ControlCommandFunc()
     {
         boost::this_thread::interruption_point();
         //only go ahead if the controller is running, and we are targeting the real vehicle
-        if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false){
+        // if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false){
+        if(m_bControlTargetPhysical==true){
             //get commands from the controller, apply to the car and update the position
             //of the car in the controller
             {
@@ -999,7 +1018,8 @@ void MochaGui::_ControlCommandFunc()
             double time = Tic();
 
             //if we are not currently simulating, send these to the ppm
-            if( m_bSimulate3dPath == false )
+            // if( m_bSimulate3dPath == false )
+            if (m_bControlTargetPhysical==true)
             {
                 commander.SendCommand(m_ControlCommand, m_bSIL);
             }
@@ -1029,7 +1049,8 @@ void MochaGui::_ControlFunc()
     {
         m_bControllerRunning = false;
 
-        while(m_StillControl) {
+        // while(m_StillControl) {
+        while(m_bControlTargetNone!=true) {
             boost::this_thread::interruption_point();
 
             m_pControlLine->Clear();
@@ -1079,7 +1100,8 @@ void MochaGui::_ControlFunc()
             rm << cos(yaw), -sin(yaw),  0,
                   sin(yaw), cos(yaw),   0,
                   0,        0,          1;
-            if ( m_eControlTarget == eTargetExperiment ) startingState.m_dTwv.setRotationMatrix(rm);
+            // if ( m_eControlTarget == eTargetExperiment ) startingState.m_dTwv.setRotationMatrix(rm);
+            if ( m_bControlTargetPhysical==true ) startingState.m_dTwv.setRotationMatrix(rm);
             m_DriveCarModel.SetState(0,startingState);
             m_DriveCarModel.ResetCommandHistory(0);
 
@@ -1095,22 +1117,24 @@ void MochaGui::_ControlFunc()
             //m_ControlCommand = ControlCommand();
             m_bControllerRunning = true;
             VehicleState currentState;
-            while(m_StillControl)
+            // while(m_StillControl)
+            while (m_bControlTargetNone!=true)
             {
                 boost::this_thread::interruption_point();
-                while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false
-                       && m_StillControl )){
+                // while((m_eControlTarget != eTargetExperiment && m_bSimulate3dPath == false
+                //        && m_StillControl )){
+                while (m_bControlTargetSimulated==true){
                     boost::this_thread::interruption_point();
                     usleep(1000);
                 }
 
-
-
-                if(m_bSimulate3dPath ){
+                // if(m_bSimulate3dPath ){
+                if (m_bLocalizationSourceSimulated==true){                
                     m_DriveCarModel.GetVehicleState(0,currentState);
                     //get the current position and pass it to the controller
                     m_Controller.SetCurrentPoseFromCarModel(&m_DriveCarModel,0);
-                }else if(m_eControlTarget == eTargetExperiment){
+                // }else if(m_eControlTarget == eTargetExperiment){
+                }else if (m_bLocalizationSourcePhysical==true){
                     //get current pose from the Localizer
                     _UpdateVehicleStateFromFusion(currentState);
                     //set the command history and current pose on the controller
@@ -1158,7 +1182,8 @@ void MochaGui::_ControlFunc()
                 }
 
                 //if the controller has been terminated, exit the inner loop
-                if( m_bControl3dPath == false ){
+                // if( m_bControl3dPath == false ){
+                if( m_bControlTargetNone==true){
                     m_ControlCommand.m_dForce = m_mDefaultParameters[CarParameters::AccelOffset];
                     m_ControlCommand.m_dPhi = m_mDefaultParameters[CarParameters::SteeringOffset];
                     //close the log file if need be
@@ -1180,6 +1205,106 @@ void MochaGui::_ControlFunc()
         }
     }catch(...){
         dout("Control thread exception caught...");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_InterfacesFunc()
+{
+    bool bLastLocalizationSourcePhysical = m_bLocalizationSourcePhysical;
+    bool bLastLocalizationSourceSimulated = m_bLocalizationSourceSimulated;
+    bool bLastLocalizationSourcePlanned = m_bLocalizationSourcePlanned;
+    bool bLastLocalizationSourceNone = m_bLocalizationSourceNone;
+    bool bLastControlTargetPhysical = m_bControlTargetPhysical;
+    bool bLastControlTargetSimulated = m_bControlTargetSimulated;
+    bool bLastControlTargetNone = m_bControlTargetNone;
+
+    while (true) 
+    {
+        boost::this_thread::interruption_point();
+
+        if (bLastLocalizationSourcePhysical!=m_bLocalizationSourcePhysical && m_bLocalizationSourcePhysical==true)
+        {
+            // re-set synergistic variables
+            m_bLocalizationSourceSimulated = false;
+            m_bLocalizationSourcePlanned = false;
+            m_bLocalizationSourceNone = false;
+
+            // if localizer read thread isn't running, start it
+            if(m_pLocalizerThread == NULL) {
+                m_pLocalizerThread = new boost::thread(std::bind(&MochaGui::_LocalizerReadFunc,this));
+            }
+        }
+        else if (bLastLocalizationSourceSimulated!=m_bLocalizationSourceSimulated && m_bLocalizationSourceSimulated==true)
+        {
+            m_bLocalizationSourcePhysical = false;
+            m_bLocalizationSourcePlanned = false;
+            m_bLocalizationSourceNone = false;
+
+            if(m_pLocalizerThread) {
+                m_pLocalizerThread->interrupt();
+                m_pLocalizerThread->join();
+            }
+        }
+        else if (bLastLocalizationSourcePlanned!=m_bLocalizationSourcePlanned && m_bLocalizationSourcePlanned==true)
+        {
+            m_bLocalizationSourcePhysical = false;
+            m_bLocalizationSourceSimulated = false;
+            m_bLocalizationSourceNone = false;
+
+            if(m_pLocalizerThread) {
+                m_pLocalizerThread->interrupt();
+                m_pLocalizerThread->join();
+            }
+        }
+        // set to none if none else are selected
+        m_bLocalizationSourceNone = m_bLocalizationSourceNone || !(m_bLocalizationSourcePhysical || m_bLocalizationSourceSimulated || m_bLocalizationSourcePlanned);
+        if (m_bLocalizationSourceNone==true)
+        {
+            m_bLocalizationSourcePhysical = false;
+            m_bLocalizationSourceSimulated = false;
+            m_bLocalizationSourcePlanned = false;
+
+            if(m_pLocalizerThread) {
+                m_pLocalizerThread->interrupt();
+                m_pLocalizerThread->join();
+            }
+        }
+
+        if (bLastControlTargetPhysical!=m_bControlTargetPhysical && m_bControlTargetPhysical==true)
+        {
+            m_bControlTargetNone = false;
+
+            if(m_pCommandThread == NULL) {
+                m_pCommandThread = new boost::thread(std::bind(&MochaGui::_ControlCommandFunc,this));
+            }
+        }
+        else if (bLastControlTargetSimulated!=m_bControlTargetSimulated && m_bControlTargetSimulated==true)
+        {
+            m_bControlTargetNone = false;
+        }
+        // set to none if none else are selected
+        m_bControlTargetNone = m_bControlTargetNone || !(m_bControlTargetPhysical || m_bControlTargetSimulated);
+        if (m_bControlTargetNone==true)
+        {
+            m_bControlTargetPhysical = false;
+            m_bControlTargetSimulated = false;
+
+            if(m_pCommandThread) {
+                m_pCommandThread->interrupt();
+                m_pCommandThread->join();
+            }
+        }
+
+        bLastLocalizationSourcePhysical = m_bLocalizationSourcePhysical;
+        bLastLocalizationSourceSimulated = m_bLocalizationSourceSimulated;
+        bLastLocalizationSourcePlanned = m_bLocalizationSourcePlanned;
+        bLastLocalizationSourceNone = m_bLocalizationSourceNone;
+        bLastControlTargetPhysical = m_bControlTargetPhysical;
+        bLastControlTargetSimulated = m_bControlTargetSimulated;
+        bLastControlTargetNone = m_bControlTargetNone;
+
+        sleep(0.1);
     }
 }
 
@@ -1216,7 +1341,8 @@ void MochaGui::_PhysicsFunc()
 
     while(m_StillRun){
 
-        while(m_bSimulate3dPath == false && m_StillRun){
+        // while(m_bSimulate3dPath == false && m_StillRun){
+        while(m_bLocalizationSourcePlanned!=true && m_StillRun){
             dCurrentTic = Tic();
             usleep(10000);
         }
@@ -1254,11 +1380,13 @@ void MochaGui::_PhysicsFunc()
         }
         dCurrentTic += Toc(pauseStartTime); //subtract the pause time
 
-        if(m_bSimulate3dPath == true) {
+        // if(m_bSimulate3dPath == true) {
+        if(m_bLocalizationSourcePlanned == true) {
             //m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
             //calculate the current dT
-            if(dCurrentTic < 0  && m_bControl3dPath == false ) {
+            // if(dCurrentTic < 0  && m_bControl3dPath == false ) {
+            if(dCurrentTic < 0 ) {
                 dCurrentTic = Tic();
                 VehicleState startState = m_vSegmentSamples[0].m_vStates[0];
                 //startState.m_dV = Eigen::Vector3d::Zero();
@@ -1269,7 +1397,8 @@ void MochaGui::_PhysicsFunc()
 
             //update the drive car position based on the car model
             ControlCommand currentCommand;
-            if(m_bControl3dPath) {
+            // if(m_bControl3dPath) {
+            if (m_bControlTargetSimulated==true) {
                 if(m_bControllerRunning){
 
                     while((Toc(dCurrentTic)) < 0.002) {
