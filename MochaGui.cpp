@@ -812,7 +812,7 @@ void MochaGui::_UpdateVisuals()
     if(g_bPlaybackControlPaths == false || m_bPause == false){
         VehicleState state;
         // if(m_bSimulate3dPath == true ){
-        if (m_bLocalizationSourcePlanned==true || m_bLocalizationSourceSimulated==true)
+        if (m_bLocalizationSourcePhysical!=true){
             //LOG(INFO) << "m_bSimulate3dPath == true";
             m_DriveCarModel.GetVehicleState(0,state);
         }else{
@@ -1067,8 +1067,9 @@ void MochaGui::_ControlFunc()
 
             //wait for the start command
             //        dout("Waiting for control input and completed plan");
-            while(m_bControl3dPath == false || m_bAllClean == false ||
-                  (m_bSimulate3dPath == false && m_eControlTarget != eTargetExperiment)){
+            // while(m_bControl3dPath == false || m_bAllClean == false ||
+            //       (m_bSimulate3dPath == false && m_eControlTarget != eTargetExperiment)){
+            while(m_bControlTargetNone==true) {
                 boost::this_thread::interruption_point();
                 usleep(1000);
             }
@@ -1349,7 +1350,7 @@ void MochaGui::_PhysicsFunc()
 
         //this is so pausing doesn't shoot the car in the air
         double pauseStartTime = Tic();
-        while(m_bPause == true && m_bSimulate3dPath == true && m_StillRun) {
+        while(m_bPause == true && (m_bLocalizationSourcePlanned==true || m_bLocalizationSourceSimulated==true) && m_StillRun) {
             usleep(1000);
 
             //This section will play back control paths, if the user has elected to do so
@@ -1381,12 +1382,12 @@ void MochaGui::_PhysicsFunc()
         dCurrentTic += Toc(pauseStartTime); //subtract the pause time
 
         // if(m_bSimulate3dPath == true) {
-        if(m_bLocalizationSourcePlanned == true) {
+        if(m_bLocalizationSourcePlanned==true || m_bLocalizationSourceSimulated==true) {
             //m_Gui.SetCarVisibility(m_nDriveCarId,true);
 
             //calculate the current dT
             // if(dCurrentTic < 0  && m_bControl3dPath == false ) {
-            if(dCurrentTic < 0 ) {
+            if(dCurrentTic < 0 && m_bControlTargetNone==true) {
                 dCurrentTic = Tic();
                 VehicleState startState = m_vSegmentSamples[0].m_vStates[0];
                 //startState.m_dV = Eigen::Vector3d::Zero();
@@ -1398,7 +1399,7 @@ void MochaGui::_PhysicsFunc()
             //update the drive car position based on the car model
             ControlCommand currentCommand;
             // if(m_bControl3dPath) {
-            if (m_bControlTargetSimulated==true) {
+            if (m_bControlTargetNone!=true) {
                 if(m_bControllerRunning){
 
                     while((Toc(dCurrentTic)) < 0.002) {
@@ -1536,7 +1537,8 @@ void MochaGui::_PlannerFunc() {
                 allClean = false;
                 //if the controller is running, we have to stop it
                 if(m_bControllerRunning){
-                    m_bControl3dPath = false;
+                    // m_bControl3dPath = false;
+                    m_bControlTargetNone = true;
                     while(m_bControllerRunning == true) {
                         usleep(1000);
                     }
