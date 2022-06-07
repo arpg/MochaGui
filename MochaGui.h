@@ -39,12 +39,20 @@
 #include "EventLogger.h"
 #include "ProcessModelFusion.h"
 
+#include <nav_msgs/Path.h>
+#include <mesh_msgs/TriangleMeshStamped.h>
+#include <carplanner_msgs/WayPoints.h>
+#include <carplanner_tools/mesh_conversion_tools.hpp>
+#include <carplanner_tools/mocha_conversions.hpp>
+
+typedef Eigen::Transform<double, 3, Eigen::TransformTraits::Affine> EigenTransform;
+
 using namespace CVarUtils;
 using namespace std;
 using namespace Eigen;
 
-extern float g_fTurnrate;
-extern float g_fSpeed;
+// extern float g_fTurnrate;
+// extern float g_fSpeed;
 
 class MochaGui {
 public:
@@ -64,7 +72,10 @@ public:
 protected:
     MochaGui();
     bool _SetWaypointVel(std::vector<std::string> *vArgs);
+    bool _SetWaypointVel(uint idx, float speed);
+    bool _SetWaypointVel(float speed);
     bool _Refresh(std::vector<std::string> *vArgs);
+    bool _Refresh();
     void _RefreshWaypoints();
     bool _CommandFunc(MochaCommands command);
     bool _IteratePlanner(LocalProblem& problem,
@@ -134,6 +145,12 @@ protected:
 
     //CVars
     vector<int>& m_Path;
+#define WAYPOINT_X_INDEX 0
+#define WAYPOINT_Y_INDEX 1
+#define WAYPOINT_Z_INDEX 2
+#define WAYPOINT_ROLL_INDEX 3
+#define WAYPOINT_PITCH_INDEX 4
+#define WAYPOINT_YAW_INDEX 5
 #define WAYPOINT_VEL_INDEX 6
 #define WAYPOINT_AIR_INDEX 7
 
@@ -230,7 +247,57 @@ protected:
     std::atomic<double> m_dPlanTime;
 
     GLAxis m_DestAxis;
-};
 
+    boost::mutex m_mutexWaypoints;
+
+    void SE3dFromWaypoint(Sophus::SE3d& , const Eigen::MatrixXd& );
+    void WaypointFromOdomMsg(Eigen::MatrixXd& , const nav_msgs::Odometry& );
+
+    double raycast_len = 0.2;
+    bool Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool &biDirectional, int index = 0);
+
+    ros::NodeHandle* m_nh;
+    tf::TransformListener m_tflistener;
+    
+    boost::thread* m_pStatePubThread;
+    void _StatePubFunc();
+    ros::Publisher m_statePub;
+    void _pubState();
+    void _pubState(VehicleState& );
+
+    ros::Subscriber m_terrainMeshSub;
+    void _terrainMeshCallback(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
+
+    ros::Subscriber m_waypointsSub;
+    void _waypointsCb(const carplanner_msgs::WayPoints&);
+    bool _SetWaypoint(uint idx, Eigen::MatrixXd& wp, bool raycast=true);
+    bool _AddWaypoint(Eigen::MatrixXd& wp, std::vector<Eigen::MatrixXd*> & wp_arr, bool raycast=true);
+
+    boost::thread* m_pMeshPubThread;
+    void _MeshPubFunc();
+    ros::Publisher m_terrainMeshPub;
+    ros::Publisher m_groundplaneMeshPub;
+    void _pubTerrainMesh(uint nWorldId);
+    void _pubMesh(btCollisionShape* collisionShape, ros::Publisher* pub);
+    void _pubMesh(btCollisionShape* collisionShape, btTransform* parentTransform, ros::Publisher* pub);
+
+    boost::thread* m_pPathPubThread;
+    void _PathPubFunc();
+    // ros::Publisher m_pathPub;
+    ros::Publisher m_simPathPub;
+    ros::Publisher m_ctrlPathPub;
+    void _pubPath();
+    void _pubPath(ros::Publisher*, std::list<std::vector<VehicleState> *>&);
+    void _pubPathArr(ros::Publisher*, std::list<std::vector<VehicleState> *>&);
+    void _pubPath(ros::Publisher*, Eigen::Vector3dAlignedVec&);
+    void _pubPath(ros::Publisher*, std::vector<MotionSample>&);
+    void _pubPathArr(ros::Publisher*, std::vector<MotionSample>&);
+
+    boost::thread* m_pWaypointPubThread;
+    void _WaypointPubFunc();
+    ros::Publisher m_waypointPub;
+    void _pubWaypoints();
+    void _pubWaypoints(std::vector<Eigen::MatrixXd*> );
+};
 #endif	/* MOCHAGUI_H */
 

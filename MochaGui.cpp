@@ -2,8 +2,8 @@
 #include "MochaGui.h"
 
 //car control variables
-float g_fTurnrate = 0;
-float g_fSpeed = 0;
+// float g_fTurnrate = 0;
+// float g_fSpeed = 0;
 using namespace SceneGraph;
 using namespace pangolin;
 #define WINDOW_WIDTH 1024
@@ -53,7 +53,12 @@ MochaGui::MochaGui() :
     m_dPlaybackTimer( -1 ),
     m_Fusion( 30, &m_DriveCarModel ),
     m_bLoadWaypoints( CreateCVar("planner:LoadWaypoints", false, "Load waypoints on start.") ),
-    m_dPlanTime( Tic() ) //the size of the fusion sensor
+    m_dPlanTime( Tic() ), //the size of the fusion sensor
+    m_vLearningParams( std::vector<RegressionParameter>() ),
+    m_vControlParams( std::vector<RegressionParameter>() ),
+    m_vPlannerParams( std::vector<RegressionParameter>() ),
+    m_vDriveParams( std::vector<RegressionParameter>() ),
+    m_mDefaultParameters( CarParameterMap() )
 {
     
 }
@@ -389,9 +394,12 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //initialize the debug drawer
     m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
+    {
+    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
     /// Establish number of waypoints and where they are; set them to CVars.
-    float radius = 1.5;
-    Eigen::Vector3d offset(0.,2.,0.);
+    /*
+    float radius = 1.25;
+    Eigen::Vector3d offset(1.,0.,0.);
     int numWaypoints = 8;
     for(int ii = 0; ii < numWaypoints ; ii++){
         char buf[100];
@@ -402,7 +410,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
         //    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
 
         /// Waypoints in a circle.
-        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, ?curvature
+        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, air?
         (*m_vWayPoints.back()) << radius*sin((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[0],
             radius*cos((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[1],
             0+offset[2], 0, 0, M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints, 1, 0;
@@ -411,6 +419,28 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     }
     //close the loop
     m_Path.push_back(0);
+    */
+    Eigen::Vector3d offset(1.,0.,0.);
+    int numWaypoints = 2;
+    for(int ii = 0; ii < numWaypoints ; ii++){
+        char buf[100];
+        snprintf( buf, 100, "waypnt.%d", ii );
+        m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+
+        /// Linear waypoints.
+        (*m_vWayPoints.back()) << ii*1+offset(0), 0+offset(1), 0+offset(2), 0, 0, 0, 1, 0;
+
+        /// Waypoints in a circle.
+        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, air?
+        // (*m_vWayPoints.back()) << radius*sin((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[0],
+        //     radius*cos((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[1],
+        //     0+offset[2], 0, 0, M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints, 1, 0;
+        /// Load this segment ID into a vector that enumerates the path elements.
+        m_Path.push_back(ii);
+    }
+    //close the loop
+    // m_Path.push_back(0);
+    }
 
     m_nStateStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
     m_nLearningStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
@@ -520,6 +550,562 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_Fusion.SetCalibrationActive(false);
     //dout("Sucessfully initialized MochaGui object.");
     m_pControlLine = new GLCachedPrimitives();
+
+    m_nh = new ros::NodeHandle("~");  
+
+    ros::param::param<double>("raycast_len", raycast_len, raycast_len);
+
+    m_terrainMeshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("/input_terrain_mesh", 1, boost::bind(&MochaGui::_terrainMeshCallback, this, _1));
+    m_waypointsSub = m_nh->subscribe("/input_waypoints", 1, &MochaGui::_waypointsCb, this);
+
+    m_pMeshPubThread = new boost::thread(std::bind(&MochaGui::_MeshPubFunc,this));
+    m_pStatePubThread = new boost::thread(std::bind(&MochaGui::_StatePubFunc,this));
+    m_pWaypointPubThread = new boost::thread(std::bind(&MochaGui::_WaypointPubFunc,this));
+    m_pPathPubThread = new boost::thread(std::bind(&MochaGui::_PathPubFunc,this));
+
+    m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
+    m_terrainMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("/output_terrain_mesh",1);
+    m_groundplaneMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("/output_groundplane_mesh",1);
+    m_simPathPub = m_nh->advertise<visualization_msgs::MarkerArray>("sim_path",1);
+    m_ctrlPathPub = m_nh->advertise<visualization_msgs::MarkerArray>("ctrl_path",1);
+    m_waypointPub = m_nh->advertise<geometry_msgs::PoseArray>("waypoints",1);
+}
+
+///////////////////////////////////////////////////////////////
+void MochaGui::_pubTerrainMesh(uint nWorldId)
+{
+
+    BulletWorldInstance* pWorld = m_DriveCarModel.GetWorldInstance(nWorldId);
+    boost::unique_lock<boost::mutex> lock(*pWorld);
+    // time_t t0 = clock();
+
+    if (pWorld->m_pTerrainBody != NULL)
+        _pubMesh(pWorld->m_pTerrainBody->getCollisionShape(), &(pWorld->m_pTerrainBody->getWorldTransform()), &m_terrainMeshPub);
+    
+    if (pWorld->m_pGroundplaneBody != NULL)
+        _pubMesh(pWorld->m_pGroundplaneBody->getCollisionShape(), &(pWorld->m_pGroundplaneBody->getWorldTransform()), &m_groundplaneMeshPub);
+    
+    // time_t t1 = clock();
+    // uint num_tri = dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainBody->getCollisionShape())->getMeshInterface())->getNumTriangles();
+    // ROS_INFO_THROTTLE(0.5,"pubbing mesh, %d triangles, %.2f sec", num_tri, std::difftime(t1,t0)/CLOCKS_PER_SEC); 
+}
+
+/////////////////////////////////////////////////////////////////
+void MochaGui::_pubMesh(btCollisionShape* collisionShape, ros::Publisher* pub)
+{
+    btTransform* parentTransform = new btTransform(btQuaternion(0,0,0,1),btVector3(0,0,0));
+    _pubMesh(collisionShape, parentTransform, pub);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubMesh(btCollisionShape* collisionShape, btTransform* parentTransform, ros::Publisher* pub)
+{
+     // ROS_INFO("about to pub mesh with %d faces", dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(collisionShape)->getMeshInterface())->getNumTriangles());
+
+      time_t t0 = std::clock();
+
+      btTransform x180(
+        btQuaternion(1.0, 0.0, 0.0, 0.0),
+        btVector3(0.0, 0.0, 0.0)
+      );
+    //   (*parentTransform) = x180 * (*parentTransform);// * x180;
+      btTransform* tr = new btTransform(btQuaternion(1,0,0,0),btVector3(0,0,0)); // rot 180 x
+      (*tr) = (*tr) * (*parentTransform);
+
+      mesh_msgs::TriangleMesh* mesh = new mesh_msgs::TriangleMesh();
+      convertCollisionShape2MeshMsg(collisionShape, tr, &mesh);
+
+      mesh_msgs::TriangleMeshStamped::Ptr mesh_stamped(new mesh_msgs::TriangleMeshStamped);
+      mesh_stamped->mesh = *mesh;
+      mesh_stamped->header.frame_id = "map";
+      mesh_stamped->header.stamp = ros::Time::now();
+
+      time_t t1 = std::clock();
+
+      pub->publish(mesh_stamped);
+      // ros::Rate(10).sleep();
+    //   ROS_INFO("pub'ed mesh, %d faces, %d vertices, %.2f sec", mesh->triangles.size(), mesh->vertices.size(), std::difftime(t1,t0)/CLOCKS_PER_SEC); 
+}
+
+void MochaGui::_terrainMeshCallback(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
+{
+  static tf::StampedTransform Twm;
+  try
+  {
+    m_tflistener.waitForTransform("map", "infinitam", ros::Time::now(), ros::Duration(1.0));
+    m_tflistener.lookupTransform("map", "infinitam", ros::Time(0), Twm);
+  }
+  catch (tf::TransformException ex)
+  {
+    ROS_ERROR("%s",ex.what());
+    usleep(10000);
+    return;
+  }
+
+  tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+  Twm.setData(rot_180_x*Twm);
+
+  time_t t0 = std::clock();
+
+  btCollisionShape* meshShape;// = new btBvhTriangleMeshShape(pTriangleMesh,true,true);
+  convertMeshMsg2CollisionShape_Shared(mesh_msg, meshShape);
+
+  for (uint i=0; i<m_PlanCarModel.GetWorldCount(); i++)
+  {
+    m_PlanCarModel.setTerrainMesh(i, meshShape, Twm);
+  }
+  for (uint i=0; i<m_LearningCarModel.GetWorldCount(); i++)
+  {
+    m_LearningCarModel.setTerrainMesh(i, meshShape, Twm);
+  }
+  for (uint i=0; i<m_DriveCarModel.GetWorldCount(); i++)
+  {
+    m_DriveCarModel.setTerrainMesh(i, meshShape, Twm);
+  }
+  for (uint i=0; i<m_ControlCarModel.GetWorldCount(); i++)
+  {
+    m_ControlCarModel.setTerrainMesh(i, meshShape, Twm);
+  }
+
+//   aiMesh* sceneMesh;
+//   convertMeshMsgToAssimpMesh(mesh_msg, sceneMesh);
+//   m_TerrainMesh.Init(scene);
+//   m_TerrainMesh.SetAlpha(1.0);
+//   m_Gui.Init(&m_TerrainMesh);
+
+  time_t t1 = std::clock();
+  ROS_INFO("got mesh, %d faces, %d vertices, %.2f sec", mesh_msg->mesh.triangles.size(), mesh_msg->mesh.vertices.size(), difftime(t1,t0)/CLOCKS_PER_SEC);
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+bool MochaGui::Raycast(const Eigen::Vector3d& dSource,const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool& biDirectional, int index /*= 0*/)
+{
+    btVector3 source(dSource[0],dSource[1],dSource[2]);
+    btVector3 vec(dRayVector[0],dRayVector[1],dRayVector[2]);
+    btVector3 target = source + vec;
+    BulletWorldInstance* pInstance = m_DriveCarModel.GetWorldInstance(index);
+
+    btVehicleRaycaster::btVehicleRaycasterResult results,results2;
+    if( biDirectional ){
+        source = source - vec;
+    }
+
+    if(pInstance->m_pVehicleRayCaster->castRay(source,target,results) == 0){
+        return false;
+    }else{
+        Eigen::Vector3d dNewSource(source[0],source[1],source[2]);
+        dIntersect = dNewSource + results.m_distFraction* (biDirectional ? (Eigen::Vector3d)(dRayVector*2) : dRayVector);
+        return true;
+    }
+}
+
+////////////////////////////////////////////////////////////////////
+void MochaGui::SE3dFromWaypoint(Sophus::SE3d& Twv, const Eigen::MatrixXd& wp)
+{
+    std::cout << "getting se3d from wp: " << wp << std::endl;
+    Eigen::AngleAxisd rollAngle(wp.col(0)[WAYPOINT_ROLL_INDEX], Eigen::Vector3d::UnitX());
+    Eigen::AngleAxisd pitchAngle(wp.col(0)[WAYPOINT_PITCH_INDEX], Eigen::Vector3d::UnitY());
+    Eigen::AngleAxisd yawAngle(wp.col(0)[WAYPOINT_YAW_INDEX], Eigen::Vector3d::UnitZ());
+    Eigen::Quaterniond quat = rollAngle * pitchAngle * yawAngle;
+    Eigen::Matrix3d mat = quat.matrix();
+
+    Twv.translation() = wp.col(0).head(3);
+    Twv.setRotationMatrix(mat);
+}
+
+/////////////////////////////////////////////////////////////////////////
+void MochaGui::WaypointFromOdomMsg(Eigen::MatrixXd & wp, const nav_msgs::Odometry & odom_msg)
+{
+    Eigen::Quaterniond quat(odom_msg.pose.pose.orientation.w,
+                            odom_msg.pose.pose.orientation.x,
+                            odom_msg.pose.pose.orientation.y,
+                            odom_msg.pose.pose.orientation.z);
+    Eigen::Vector3d eul = quat.toRotationMatrix().eulerAngles(0, 1, 2);
+
+    wp.col(0)[WAYPOINT_X_INDEX] = odom_msg.pose.pose.position.x;
+    wp.col(0)[WAYPOINT_Y_INDEX] = odom_msg.pose.pose.position.y;
+    wp.col(0)[WAYPOINT_Z_INDEX] = odom_msg.pose.pose.position.z;
+    wp.col(0)[WAYPOINT_ROLL_INDEX] = eul[0];
+    wp.col(0)[WAYPOINT_PITCH_INDEX] = eul[1];
+    wp.col(0)[WAYPOINT_YAW_INDEX] = eul[2];
+    wp.col(0)[WAYPOINT_VEL_INDEX] = odom_msg.twist.twist.linear.x;
+    wp.col(0)[WAYPOINT_AIR_INDEX] = 0;
+}
+
+////////////////////////////////////////////////////////////////////
+void MochaGui::_waypointsCb(const carplanner_msgs::WayPoints& wp_msg)
+{
+    // if (!m_bServersInitialized) { DLOG(INFO) << "Aborting waypoints callback bc servers not initialized."; return; }
+
+    if (wp_msg.odom_arr.odoms.size() != 2)
+        ROS_WARN("Tried to set waypoints of length %d. Need 2. Ignoring...", wp_msg.odom_arr.odoms.size());
+
+    // ROS_INFO("Got %d waypoints. Replacing %d.", wp_msg.odom_arr.odoms.size(), m_vWayPoints.size());
+
+    EigenTransform x180 = EigenTransform::Identity();
+    x180.translate(Eigen::Vector3d(0.0, 0.0, 0.0));
+    x180.rotate(Eigen::Quaterniond(0.0, 1.0, 0.0, 0.0));
+        
+    boost::mutex::scoped_lock lock( m_DrawMutex );
+    for (uint idx=0; idx<2; idx++) {
+        // Eigen::MatrixXd wp(8,1);
+        // WaypointFromOdomMsg(wp, wp_msg.odom_arr.odoms[idx]);
+        nav_msgs::Odometry odom_msg = wp_msg.odom_arr.odoms[idx];
+        EigenTransform wpt = EigenTransform::Identity();
+        wpt.translate(Eigen::Vector3d(odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y, odom_msg.pose.pose.position.z));
+        wpt.rotate(Eigen::Quaterniond(odom_msg.pose.pose.orientation.w, odom_msg.pose.pose.orientation.x, odom_msg.pose.pose.orientation.y, odom_msg.pose.pose.orientation.z));
+        wpt = x180 * wpt * x180;
+        // m_Gui.GetWaypoint(idx)->m_Waypoint.SetPose(Eigen::Vector6d(wp.col(0).head(6)));        
+        m_Gui.GetWaypoint(idx)->m_Waypoint.SetPose(wpt.matrix());
+
+        Eigen::Vector3d dIntersect;
+        Sophus::SE3d pose( m_Gui.GetWaypoint(idx)->m_Waypoint.GetPose4x4_po() );
+        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
+            pose.translation() = dIntersect;
+            m_Gui.GetWaypoint(idx)->m_Waypoint.SetPose( pose.matrix() );
+        }
+
+        *m_vWayPoints[idx] << m_Gui.GetWaypoint(idx)->m_Waypoint.GetPose(), 
+                              m_Gui.GetWaypoint(idx)->m_Waypoint.GetVelocity(), 
+                              m_Gui.GetWaypoint(idx)->m_Waypoint.GetAerial();
+
+        m_Gui.GetWaypoint(idx)->m_Waypoint.SetDirty(true);
+    }
+    
+
+    // // std::vector<Eigen::MatrixXd*> vWayPoints;
+    // // std::vector<int> Path;
+    // m_vWayPoints.clear();
+    // m_Path.clear();
+    // for(uint i=0; i<wp_msg.odom_arr.odoms.size(); i++)
+    // {
+    //     ROS_INFO("adding waypoint %d", i);
+    //     float s = sqrt(wp_msg.odom_arr.odoms[i].pose.pose.orientation.x*wp_msg.odom_arr.odoms[i].pose.pose.orientation.x +
+    //                     wp_msg.odom_arr.odoms[i].pose.pose.orientation.y*wp_msg.odom_arr.odoms[i].pose.pose.orientation.y +
+    //                     wp_msg.odom_arr.odoms[i].pose.pose.orientation.z*wp_msg.odom_arr.odoms[i].pose.pose.orientation.z +
+    //                     wp_msg.odom_arr.odoms[i].pose.pose.orientation.w*wp_msg.odom_arr.odoms[i].pose.pose.orientation.w);
+    //     if (s>.1)
+    //     {
+    //         Eigen::MatrixXd wp(8,1);
+    //         WaypointFromOdomMsg(wp, wp_msg.odom_arr.odoms[i]);
+    //         if (!_AddWaypoint(wp, m_vWayPoints))
+    //         {
+    //             ROS_ERROR("Failed to add waypoint.");
+    //             return;
+    //         }
+    //         m_Path.push_back(i);
+    //     }
+    //     else
+    //     {
+    //         ROS_ERROR("Failed to add waypoints bc of zero norm quaternion.");
+    //         return;
+    //     }
+        
+    // }
+    
+    // if (wp_msg.loop)
+    //     m_Path.push_back(0);
+
+    // m_vSegmentSamples.resize(m_vWaypoints.size()-1);
+
+    // ROS_INFO("transfering");
+
+    // {
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+    // m_vWayPoints = vWayPoints;
+    // m_Path = Path;
+
+    // ROS_INFO("Refreshing wps... wps %d path %d", m_vWayPoints.size(), m_Path.size());
+
+    // {
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+    // boost::mutex::scoped_lock lock(m_DrawMutex);
+    // // _RefreshWaypoints();
+    // _PopulateSceneGraph();
+    // }
+
+    // ROS_INFO("Done setting %d waypoints with loop %s.", m_vWayPoints.size(), (wp_msg.loop?"enabled":"disabled"));
+}
+
+bool MochaGui::_AddWaypoint(Eigen::MatrixXd& wp, std::vector<Eigen::MatrixXd*> & wp_arr, bool raycast)
+{
+    std::cout << "adding wp: " << wp << std::endl;
+    Sophus::SE3d Twv;
+    SE3dFromWaypoint(Twv, wp);
+    Eigen::Vector3d dIntersect;
+    if (raycast && Raycast(wp.col(0).head(3), -GetBasisVector(Twv,2)*raycast_len, dIntersect, true))
+    {
+        wp.col(0).head(3) = dIntersect;// + Eigen::Vector3d(0,0,-0.1); // in ned
+    }
+
+    char buf[100];
+    snprintf( buf, 100, "waypnt.%d", wp_arr.size());
+    wp_arr.push_back(&CreateGetCVar(std::string(buf), wp));
+
+    // ROS_INFO("Added %dth waypoint:\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
+    //     m_vWaypoints.size(), 
+    //     wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
+    //     wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
+    //     wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
+    //     wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
+
+    return true;
+}
+
+bool MochaGui::_SetWaypoint(uint idx, Eigen::MatrixXd& wp, bool raycast)
+{
+    if (idx >= m_vWayPoints.size())
+        return false; 
+
+    Sophus::SE3d Twv;
+    SE3dFromWaypoint(Twv, wp);
+    Eigen::Vector3d dIntersect;
+    if (raycast && Raycast(wp.col(0).head(3), -GetBasisVector(Twv,2)*raycast_len, dIntersect, true))
+    {
+        wp.col(0).head(3) = dIntersect;// + Eigen::Vector3d(0,0,-0.1); // in ned
+    }
+
+    char buf[100];
+    snprintf( buf, 100, "waypnt.%d", idx);
+    m_vWayPoints.at(idx) = &CreateGetCVar(std::string(buf), wp);
+
+    // ROS_INFO("Setting %dth waypoint to\n Pwv %.2f %.2f %.2f\n Qwv %.2f %.2f %.2f %.2f\n Vwv %.2f %.2f %.2f\n Wwv %.2f %.2f %.2f", 
+    //     idx+1, 
+    //     wp_ptr->state.m_dTwv.translation().x(), wp_ptr->state.m_dTwv.translation().y(), wp_ptr->state.m_dTwv.translation().z(),
+    //     wp_ptr->state.m_dTwv.unit_quaternion().x(), wp_ptr->state.m_dTwv.unit_quaternion().y(), wp_ptr->state.m_dTwv.unit_quaternion().z(), wp_ptr->state.m_dTwv.unit_quaternion().w(),
+    //     wp_ptr->state.m_dV[0], wp_ptr->state.m_dV[1], wp_ptr->state.m_dV[2], 
+    //     wp_ptr->state.m_dW[0], wp_ptr->state.m_dW[1], wp_ptr->state.m_dW[2]);
+
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////////
+void MochaGui::_MeshPubFunc()
+{
+    std::cout << "Starting Mesh Publisher Thread" << std::endl;
+    while( ros::ok() && m_StillRun )
+    {
+        _pubTerrainMesh(0);
+        ros::Rate(100).sleep();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+void MochaGui::_StatePubFunc()
+{
+    std::cout << "Starting State Publisher Thread" << std::endl;
+    while( ros::ok() && m_StillRun )
+    {
+        _pubState();
+        ros::Rate(100).sleep();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+void MochaGui::_WaypointPubFunc()
+{
+    std::cout << "Starting Waypoint Publisher Thread" << std::endl;
+    while( ros::ok() && m_StillRun )
+    {
+        _pubWaypoints();
+        ros::Rate(100).sleep();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
+void MochaGui::_PathPubFunc()
+{
+    std::cout << "Starting Path Publisher Thread" << std::endl;
+    while( ros::ok() )
+    {
+        _pubPath();
+        ros::Rate(100).sleep();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+// void MochaGui::_pubCommand()
+// {
+//     _pubCommand(m_ControlCommand);
+// }
+
+// //////////////////////////////////////////////////////////////////////////////////
+// void MochaGui::_pubCommand(ControlCommand& cmd)
+// {
+//     carplanner_msgs::Command cmd_msg;
+//     cmd_msg.force       = cmd.m_dForce;
+//     cmd_msg.curvature   = cmd.m_dCurvature;
+//     cmd_msg.dt          = cmd.m_dTime;
+//     cmd_msg.phi         = cmd.m_dPhi;
+//     for(unsigned int i=0; i<3; i++)
+//     {
+//         cmd_msg.torques.push_back(cmd.m_dTorque[i]);
+//     }
+
+//     m_commandPub.publish(cmd_msg);
+//     ros::spinOnce();
+// }
+
+////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPath()
+{
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+
+    // if(!m_lPlanStates.empty())
+    // {
+    //     _pubPath(m_lPlanStates);
+    // }
+    // if(!m_vTerrainLineSegments.empty())
+    // {
+    //     _pubPath(m_vTerrainLineSegments);
+    // }
+    /* Publish path as produced by PlannerThread for whole trajectory.
+       When planning is off, the traj is slightly inward of circular. When planning is on, it becomes circular. */
+    if(!m_vSegmentSamples.empty())
+    {
+        // ROS_INFO("Pubbing m_vSegmentSamples of size %d", m_vSegmentSamples.size());
+        _pubPathArr(&m_simPathPub, m_vSegmentSamples);
+    }
+    if(!m_lPlanStates.empty())
+    {
+        // ROS_INFO("Pubbing m_lPlanStates of size %d", m_lPlanStates.size());
+        _pubPathArr(&m_ctrlPathPub, m_lPlanStates);
+    }
+    /* Same as above except only 1 path segment that iterates through all segments until the end during planning. 
+       When planning is off, the traj is slightly inward of circular. When planning is on, it becomes circular. */
+    // if(!m_vActualTrajectory.empty())
+    // {
+    //     _pubPath(&m_pathPub, m_vActualTrajectory);
+    // }
+    /* Same as above except When planning is off, the traj is circular. When planning is on, it is slightly outward of circular. */
+    // if(!m_vControlTrajectory.empty())
+    // {
+    //     _pubPath(&m_pathPub, m_vControlTrajectory);
+    // }
+    
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPath(ros::Publisher* pub, list<std::vector<VehicleState> *>& path_in)
+{   
+    list<std::vector<VehicleState> *> some_path = path_in;
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(some_path, &path_msg);
+    pub->publish(path_msg);
+    ros::spinOnce();
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPathArr(ros::Publisher* pub, list<std::vector<VehicleState> *>& path_in)
+{   
+    list<std::vector<VehicleState> *> some_path = path_in;
+    carplanner_msgs::PathArray patharr_msg;
+    convertSomePath2PathArrayMsg(some_path, &patharr_msg);
+    visualization_msgs::MarkerArray markarr_msg;
+    carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("",0.01,0,0,0.0,0.0,1.0,1.0);
+    convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg,markarr_config);
+    pub->publish(markarr_msg);
+    ros::spinOnce();
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPath(ros::Publisher* pub, Eigen::Vector3dAlignedVec& path_in)
+{   
+    Eigen::Vector3dAlignedVec some_path = path_in;
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(some_path, &path_msg);
+    pub->publish(path_msg);
+    ros::spinOnce();
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPath(ros::Publisher* pub, std::vector<MotionSample>& path_in)
+{   
+    std::vector<MotionSample> some_path = path_in;
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(some_path, &path_msg);
+    pub->publish(path_msg);
+    ros::spinOnce();
+}
+
+/////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPathArr(ros::Publisher* pub, std::vector<MotionSample>& path_in)
+{   
+    std::vector<MotionSample> some_path = path_in;
+    carplanner_msgs::PathArray patharr_msg;
+    convertSomePath2PathArrayMsg(some_path, &patharr_msg);
+    visualization_msgs::MarkerArray markarr_msg;
+    carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("",0.01,0,0,0.0,1.0,0.0,1.0);
+    convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg, markarr_config);
+    pub->publish(markarr_msg);
+    ros::spinOnce();
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubState()
+{
+    // ROS_INFO("Pubbing state");
+    VehicleState state;
+    m_DriveCarModel.GetVehicleState(0,state);
+    state.FlipCoordFrame();
+    _pubState(state);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubState(VehicleState& state)
+{
+  carplanner_msgs::VehicleState state_msg = state.toROS();
+
+  m_statePub.publish(state_msg);
+  // m_tfcaster.sendTransform(state_msg.pose);
+  ros::spinOnce();
+}
+
+////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubWaypoints()
+{
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+    _pubWaypoints(m_vWayPoints);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+void MochaGui::_pubWaypoints(std::vector<Eigen::MatrixXd*> pts)
+{
+  tf::Transform rot_180_x(tf::Quaternion(1,0,0,0),tf::Vector3(0,0,0));
+
+  geometry_msgs::PoseArray pts_msg;
+  pts_msg.header.frame_id = "map";
+  pts_msg.header.stamp = ros::Time::now();
+
+  for( uint ii=0; ii<pts.size(); ii++ )
+  {
+    Eigen::MatrixXd* pt = pts[ii];
+    double roll =   (*pt)(3);
+    double pitch =  (*pt)(4);
+    double yaw =    (*pt)(5);
+    Eigen::Quaterniond quat;
+    convertRPY2Quat(Eigen::Vector3d(roll, pitch, yaw), &quat);
+
+    tf::Transform pt_tf(tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()),
+                        tf::Vector3((*pt)(0),(*pt)(1),(*pt)(2)));
+    pt_tf = rot_180_x*pt_tf*rot_180_x;
+
+    geometry_msgs::Pose pt_msg;
+    pt_msg.position.x = pt_tf.getOrigin().x();
+    pt_msg.position.y = pt_tf.getOrigin().y();
+    pt_msg.position.z = pt_tf.getOrigin().z();
+    pt_msg.orientation.x = pt_tf.getRotation().x();
+    pt_msg.orientation.y = pt_tf.getRotation().y();
+    pt_msg.orientation.z = pt_tf.getRotation().z();
+    pt_msg.orientation.w = pt_tf.getRotation().w();
+
+    pts_msg.poses.push_back(pt_msg);
+  }
+
+  m_waypointPub.publish(pts_msg);
+  // m_tfcaster.sendTransform(state_msg.pose);
+  ros::spinOnce();
 }
 
 ////////////////////////////////////////////////////////////////
@@ -611,6 +1197,7 @@ bool MochaGui::_SetWaypointVel(std::vector<std::string> *vArgs)
     if(vArgs->size() == 0){
         return false;
     }
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
     double dNewSpeed = atof(vArgs->at(0).c_str());
     //go through all the waypoints and sset the speed
     for (size_t ii = 0; ii < m_Path.size() - 1; ii++) {
@@ -620,7 +1207,42 @@ bool MochaGui::_SetWaypointVel(std::vector<std::string> *vArgs)
 }
 
 ////////////////////////////////////////////////////////////////
+bool MochaGui::_SetWaypointVel(float speed)
+{
+    // boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
+    //go through all the waypoints and sset the speed
+    for (size_t ii = 0; ii < m_Path.size() - 1; ii++) {
+        m_Gui.GetWaypoint(ii)->m_Waypoint.SetVelocity(speed);
+    }
+    return true;
+}
+
+////////////////////////////////////////////////////////////////
+bool MochaGui::_SetWaypointVel(uint idx, float speed)
+{
+    if(idx >= m_Path.size()){
+        return false;
+    }
+    m_Gui.GetWaypoint(idx)->m_Waypoint.SetVelocity(speed);
+    return true;
+}
+
+////////////////////////////////////////////////////////////////
 bool MochaGui::_Refresh(std::vector<std::string> *vArgs)
+{
+
+    _KillThreads();
+
+    //refresh the waypoints first
+    _RefreshWaypoints();
+
+    m_Gui.SetWaypointDirtyFlag(true);
+
+    _StartThreads();
+    return true;
+}
+
+bool MochaGui::_Refresh()
 {
 
     _KillThreads();
@@ -874,7 +1496,7 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
     currentState.m_dW[0] = currentState.m_dW[1] = 0;
 
     Eigen::Vector3d dIntersect;
-    if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*0.2,dIntersect,true)){
+    if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*raycast_len,dIntersect,true)){
        currentState.m_dTwv.translation() = dIntersect;
     }
 
@@ -962,7 +1584,7 @@ void MochaGui::_ControlCommandFunc()
     {
         boost::this_thread::interruption_point();
         //only go ahead if the controller is running, and we are targeting the real vehicle
-        if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true && m_bSimulate3dPath == false){
+        if(m_eControlTarget == eTargetExperiment && m_bControllerRunning == true/* && m_bSimulate3dPath == false*/){
             //get commands from the controller, apply to the car and update the position
             //of the car in the controller
             {
@@ -999,10 +1621,10 @@ void MochaGui::_ControlCommandFunc()
             double time = Tic();
 
             //if we are not currently simulating, send these to the ppm
-            if( m_bSimulate3dPath == false )
-            {
+            // if( m_bSimulate3dPath == false )
+            // {
                 commander.SendCommand(m_ControlCommand, m_bSIL);
-            }
+            // }
 
             m_dControlDelay = Toc(time);
         }
@@ -1422,7 +2044,7 @@ void MochaGui::_PlannerFunc() {
                     boost::mutex::scoped_lock lock( m_DrawMutex );
                     if( a->GetDirty() ) {
                         Sophus::SE3d pose( a->GetPose4x4_po() );
-                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
                             pose.translation() = dIntersect;
                             a->SetPose( pose.matrix() );
                         }
@@ -1430,7 +2052,7 @@ void MochaGui::_PlannerFunc() {
                     }
                     if( b->GetDirty() ) {
                         Sophus::SE3d pose( b->GetPose4x4_po() );
-                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*0.2, dIntersect, true) ){
+                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
                             pose.translation() = dIntersect;
                             b->SetPose( pose.matrix() );
                         }

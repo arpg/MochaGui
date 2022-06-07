@@ -57,6 +57,25 @@ endif()
 find_package( Sophus REQUIRED )
 find_package( assimp REQUIRED )
 find_package( Node REQUIRED )
+find_package(catkin REQUIRED
+  COMPONENTS
+    roscpp
+    std_msgs
+    # tf
+    # carplanner_msgs
+    # pcl_ros
+    # pcl_conversions
+    # nav_msgs
+    # nodelet
+    mesh_msgs
+    # actionlib
+    # mt_actionlib
+    )
+
+catkin_package(
+  INCLUDE_DIRS .
+  #CATKIN_DEPENDS roscpp std_msgs tf carplanner_msgs
+  )
 
 link_directories( ${Pangolin_LIBRARY_DIRS} )
 link_directories( ${Boost_LIBRARY_DIRS} )
@@ -87,6 +106,7 @@ set( _INCLUDE_DIRS
             ${assimp_INCLUDE_DIRS}
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_BINARY_DIR}
+            ${catkin_INCLUDE_DIRS}
        )
 
 set( LIBRARIES
@@ -104,6 +124,7 @@ set( LIBRARIES
                nvwidgets #this is built with MochaGui. No finding is required
                Gamepad # this is also built with the solution
                ${assimp_LIBRARIES}
+               ${catkin_LIBRARIES}
         )
 
     message(STATUS ${assimp_LIBRARIES})
@@ -147,26 +168,26 @@ set( LEARNING_HDRS  config.h.in
 set( LEARNING_SRC
                   LearningGui.cpp )
 
-add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
-target_link_libraries( logger ${LIBRARIES} )
+# add_executable(  logger applications/logger.cpp CarMessages.pb.cc ${SHARED_HDRS} ${SHARED_SRC} )
+# target_link_libraries( logger ${LIBRARIES} )
 
-add_executable(  refplane applications/refplane.cpp ${SHARED_HDRS} ${SHARED_SRC} )
-target_link_libraries( refplane ${LIBRARIES} )
+# add_executable(  refplane applications/refplane.cpp ${SHARED_HDRS} ${SHARED_SRC} )
+# target_link_libraries( refplane ${LIBRARIES} )
 
-add_executable(  learning applications/learning.cpp ${SHARED_HDRS} ${LEARNING_HDRS} ${SHARED_SRC} ${LEARNING_SRC} )
-target_link_libraries( learning ${LIBRARIES} )
+# add_executable(  learning applications/learning.cpp ${SHARED_HDRS} ${LEARNING_HDRS} ${SHARED_SRC} ${LEARNING_SRC} )
+# target_link_libraries( learning ${LIBRARIES} )
 
-#add_executable(  opt applications/opt.cpp ${SHARED_HDRS} ${SHARED_SRC} )
-#target_link_libraries( opt ${LIBRARIES} )
+# #add_executable(  opt applications/opt.cpp ${SHARED_HDRS} ${SHARED_SRC} )
+# #target_link_libraries( opt ${LIBRARIES} )
 
 add_executable(  gui applications/gui.cpp ${SHARED_HDRS} ${GUI_HDRS} ${SHARED_SRC} ${GUI_SRC} )
 target_link_libraries( gui ${LIBRARIES} )
 
-add_executable(  control-daemon applications/control-daemon.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
-target_link_libraries( control-daemon ${LIBRARIES} )
+# add_executable(  control-daemon applications/control-daemon.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
+# target_link_libraries( control-daemon ${LIBRARIES} )
 
-add_executable( fusion applications/fusion.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
-target_link_libraries( fusion ${LIBRARIES} )
+# add_executable( fusion applications/fusion.cpp ${SHARED_HDRS} ${SHARED_SRC}  )
+# target_link_libraries( fusion ${LIBRARIES} )
 
 
 
