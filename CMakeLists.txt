@@ -61,6 +61,7 @@ find_package(catkin REQUIRED
   COMPONENTS
     roscpp
     std_msgs
+    std_srvs
     # tf
     # carplanner_msgs
     # pcl_ros
@@ -70,6 +71,7 @@ find_package(catkin REQUIRED
     mesh_msgs
     # actionlib
     # mt_actionlib
+    vicon_tools
     )
 
 catkin_package(

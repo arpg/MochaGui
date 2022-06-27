@@ -44,8 +44,7 @@
 #include <carplanner_msgs/WayPoints.h>
 #include <carplanner_tools/mesh_conversion_tools.hpp>
 #include <carplanner_tools/mocha_conversions.hpp>
-
-typedef Eigen::Transform<double, 3, Eigen::TransformTraits::Affine> EigenTransform;
+#include <std_srvs/Trigger.h>
 
 using namespace CVarUtils;
 using namespace std;
@@ -133,6 +132,7 @@ protected:
     vector<GLCachedPrimitives> m_vTerrainLineSegments;
     list<GLCachedPrimitives*> m_lPlanLineSegments;
     list<std::vector<VehicleState> *> m_lPlanStates;
+    list<double> m_lPlanNorms;
     GLCachedPrimitives* m_pControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
 
@@ -253,8 +253,10 @@ protected:
     void SE3dFromWaypoint(Sophus::SE3d& , const Eigen::MatrixXd& );
     void WaypointFromOdomMsg(Eigen::MatrixXd& , const nav_msgs::Odometry& );
 
-    double raycast_len = 0.2;
+    double raycast_len = 1.0;
     bool Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool &biDirectional, int index = 0);
+
+    ros::AsyncSpinner *m_spinner;
 
     ros::NodeHandle* m_nh;
     tf::TransformListener m_tflistener;
@@ -273,6 +275,17 @@ protected:
     bool _SetWaypoint(uint idx, Eigen::MatrixXd& wp, bool raycast=true);
     bool _AddWaypoint(Eigen::MatrixXd& wp, std::vector<Eigen::MatrixXd*> & wp_arr, bool raycast=true);
 
+    boost::mutex m_mutexMeshMsg;
+    mesh_msgs::TriangleMeshStamped::ConstPtr m_meshMsg;
+    boost::thread* m_pProcessMeshThread;
+    void _ProcessMeshFunc();
+    bool processMesh(const mesh_msgs::TriangleMeshStamped::ConstPtr&);
+
+    ros::ServiceServer m_resetMeshSrv;
+    bool ResetMeshFunc(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
+    void ResetTerrainMeshes();
+
+    double mesh_import_rate;
     boost::thread* m_pMeshPubThread;
     void _MeshPubFunc();
     ros::Publisher m_terrainMeshPub;
@@ -281,14 +294,19 @@ protected:
     void _pubMesh(btCollisionShape* collisionShape, ros::Publisher* pub);
     void _pubMesh(btCollisionShape* collisionShape, btTransform* parentTransform, ros::Publisher* pub);
 
+    // boost::mutex m_mutexPath;
+    double m_dPathZOffset;
     boost::thread* m_pPathPubThread;
     void _PathPubFunc();
     // ros::Publisher m_pathPub;
     ros::Publisher m_simPathPub;
     ros::Publisher m_ctrlPathPub;
+    ros::Publisher m_actualTrajPub;
+    ros::Publisher m_controlTrajPub;
     void _pubPath();
     void _pubPath(ros::Publisher*, std::list<std::vector<VehicleState> *>&);
     void _pubPathArr(ros::Publisher*, std::list<std::vector<VehicleState> *>&);
+    void _pubPathArr(ros::Publisher*, std::list<std::vector<VehicleState> *>&, list<double>& );
     void _pubPath(ros::Publisher*, Eigen::Vector3dAlignedVec&);
     void _pubPath(ros::Publisher*, std::vector<MotionSample>&);
     void _pubPathArr(ros::Publisher*, std::vector<MotionSample>&);
