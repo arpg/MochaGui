@@ -23,6 +23,7 @@
     <build_depend>roscpp</build_depend>
     <build_depend>rospy</build_depend>
     <build_depend>mesh_msgs</build_depend>
+    <build_depend>vicon_tools</build_depend>
 
 
 

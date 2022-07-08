@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "MochaGui.h"
 
+#include <vicon_tools/tf_utils.h>
+
 //car control variables
 // float g_fTurnrate = 0;
 // float g_fSpeed = 0;
@@ -240,6 +242,29 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
                     const std::string sMode, const std::string sLogFile, const std::string& sParamsFile,
                     const std::string& sCarMesh, const std::string& sWheelMesh)
 {
+    // m_spinner = new ros::AsyncSpinner(8);
+    // m_spinner->start();
+
+    m_nh = new ros::NodeHandle("~");  
+
+    // m_Planner.SetNodeHandle(m_nh);
+    // m_Controller.SetNodeHandle(m_nh);
+
+    m_nh->param<double>("raycast_len", raycast_len, raycast_len);
+    m_nh->param<double>("mesh_import_rate", mesh_import_rate, INFINITY);
+    std::string waypoints_config, waypoints_offset;
+    m_nh->param<std::string>("waypoints_config", waypoints_config, "circle"); // ellipse, segment, circle, eight
+    tf_utils::tolower(waypoints_config);
+    m_nh->param<std::string>("waypoints_offset", waypoints_offset, "0 0 0 0 0 0"); // x y z r p y 
+    double waypoints_vel_min, waypoints_vel_max;
+    m_nh->param<double>("waypoints_vel_min", waypoints_vel_min, 1.0);
+    m_nh->param<double>("waypoints_vel_max", waypoints_vel_max, 1.0);
+    double waypoints_radius, waypoints_offset_x, waypoints_offset_y, waypoints_offset_z;
+    m_nh->param<double>("waypoints_radius", waypoints_radius, 1.5);
+    m_nh->param<double>("waypoints_offset_x", waypoints_offset_x, 0.0);
+    m_nh->param<double>("waypoints_offset_y", waypoints_offset_y, 0.0);
+    m_nh->param<double>("waypoints_offset_z", waypoints_offset_z, 0.3); 
+
     m_sPlaybackLogFile = sLogFile;
     m_sParamsFile = sParamsFile;
     m_bSIL = false;
@@ -394,52 +419,187 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //initialize the debug drawer
     m_BulletDebugDrawer.Init(&m_DriveCarModel);
 
+    // setup waypoints
+    if (tf_utils::tolower(waypoints_config) == "eight")
     {
-    boost::mutex::scoped_lock waypointMutex(m_mutexWaypoints);
-    /// Establish number of waypoints and where they are; set them to CVars.
-    /*
-    float radius = 1.25;
-    Eigen::Vector3d offset(1.,0.,0.);
-    int numWaypoints = 8;
-    for(int ii = 0; ii < numWaypoints ; ii++){
-        char buf[100];
-        snprintf( buf, 100, "waypnt.%d", ii );
-        m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-
-        /// Linear waypoints.
-        //    (*m_vWayPoints.back()) << ii*0.5,ii*0.5,0,0,0,0, 1,0;
-
-        /// Waypoints in a circle.
-        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, air?
-        (*m_vWayPoints.back()) << radius*sin((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[0],
-            radius*cos((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[1],
-            0+offset[2], 0, 0, M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints, 1, 0;
-        /// Load this segment ID into a vector that enumerates the path elements.
-        m_Path.push_back(ii);
+        // FIGURE EIGHT ****************************/  
+        float radius = static_cast<float>(waypoints_radius);
+        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
+        float vel  = static_cast<float>(waypoints_vel_min);
+        int ii=0;
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << 0.0+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << radius+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI/2.f, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << 0.0+offset[0], 2*radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << -radius+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, 3*M_PI/2.f, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            // 4
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << 0.0+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            // 4
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << radius+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, -M_PI/2.f, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            // 5
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << 0.0+offset[0], -2*radius+offset[1], 0.0+offset[2], 0.0, 0.0, -M_PI, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << -radius+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, -3*M_PI/2.f, vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        m_Path.push_back(0);
     }
-    //close the loop
-    m_Path.push_back(0);
-    */
-    Eigen::Vector3d offset(1.,0.,0.);
-    int numWaypoints = 2;
-    for(int ii = 0; ii < numWaypoints ; ii++){
-        char buf[100];
-        snprintf( buf, 100, "waypnt.%d", ii );
-        m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
-
-        /// Linear waypoints.
-        (*m_vWayPoints.back()) << ii*1+offset(0), 0+offset(1), 0+offset(2), 0, 0, 0, 1, 0;
-
-        /// Waypoints in a circle.
-        /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, air?
-        // (*m_vWayPoints.back()) << radius*sin((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[0],
-        //     radius*cos((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[1],
-        //     0+offset[2], 0, 0, M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints, 1, 0;
-        /// Load this segment ID into a vector that enumerates the path elements.
-        m_Path.push_back(ii);
+    else if (tf_utils::tolower(waypoints_config) == "ellipse")
+    {
+        // ELLIPSE ****************************/   
+        float a = 10.f;
+        float b = 4.f;
+        float radius = b/2.f;
+        float focal = a-(2.f*radius);
+        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
+        float low_vel  = static_cast<float>(waypoints_vel_min);
+        float high_vel = static_cast<float>(waypoints_vel_max);
+        int ii=0;
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << 0.0+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, high_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << focal/2.f+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, low_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << a/2.f+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI/2.f, low_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << focal/2.f+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, low_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            // 4
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << 0.0+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, high_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << -focal/2.f+offset[0], radius+offset[1], 0.0+offset[2], 0.0, 0.0, M_PI, low_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            // 6
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << -a/2.f+offset[0], 0.0+offset[1], 0.0+offset[2], 0.0, 0.0, 3*M_PI/2.f, low_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        {
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+            (*m_vWayPoints.back()) << -focal/2.f+offset[0], -radius+offset[1], 0.0+offset[2], 0.0, 0.0, 0.0, low_vel, 0.0;
+            m_Path.push_back(ii++);
+        }
+        m_Path.push_back(0);
     }
-    //close the loop
-    // m_Path.push_back(0);
+    else if (tf_utils::tolower(waypoints_config) == "segment")
+    {
+        // ONE SEGMENT ****************************
+        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
+        int numWaypoints = 2;
+        for(int ii = 0; ii < numWaypoints ; ii++){
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+
+            /// Linear waypoints.
+            (*m_vWayPoints.back()) << ii*1+offset(0), 0+offset(1), 0+offset(2), 0, 0, 0, 1, 0;
+
+            m_Path.push_back(ii);
+        }
+    }
+    else if (waypoints_config == "circle")
+    {
+        // CIRCLE ****************************
+        float radius = static_cast<float>(waypoints_radius);
+        Eigen::Vector3d offset(waypoints_offset_x, waypoints_offset_y, waypoints_offset_z);
+        int numWaypoints = 8;
+        float vel = static_cast<float>(waypoints_vel_min);
+        for(int ii = 0; ii < numWaypoints ; ii++){
+            char buf[100];
+            snprintf( buf, 100, "waypnt.%d", ii );
+            m_vWayPoints.push_back(&CreateGetCVar(std::string(buf), MatrixXd(8,1)));
+
+            /// 8-vector < x, y, z, roll, pitch, yaw (radians), velocity, air
+            (*m_vWayPoints.back()) << radius*sin((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[0],
+                radius*cos((numWaypoints-ii-1)*2*M_PI/numWaypoints)+offset[1],
+                0+offset[2], 0, 0, M_PI-(numWaypoints-ii-1)*2*M_PI/numWaypoints, vel, 0;
+            /// Load this segment ID into a vector that enumerates the path elements.
+            m_Path.push_back(ii);
+        }
+        //close the loop
+        m_Path.push_back(0);
+    }
+    else
+    {
+        ROS_FATAL("Invalid waypoint configuration.");
     }
 
     m_nStateStatusId = m_Gui.AddStatusLine(PlannerGui::eTopLeft);
@@ -551,24 +711,28 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     //dout("Sucessfully initialized MochaGui object.");
     m_pControlLine = new GLCachedPrimitives();
 
-    m_nh = new ros::NodeHandle("~");  
-
-    ros::param::param<double>("raycast_len", raycast_len, raycast_len);
-
-    m_terrainMeshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("/input_terrain_mesh", 1, boost::bind(&MochaGui::_terrainMeshCallback, this, _1));
     m_waypointsSub = m_nh->subscribe("/input_waypoints", 1, &MochaGui::_waypointsCb, this);
+
+    m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
+    m_terrainMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("output_terrain_mesh",1);
+    m_groundplaneMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("output_groundplane_mesh",1);
+    m_simPathPub = m_nh->advertise<visualization_msgs::MarkerArray>("sim_path",1);
+    m_ctrlPathPub = m_nh->advertise<visualization_msgs::MarkerArray>("ctrl_path",1);
+    m_actualTrajPub = m_nh->advertise<nav_msgs::Path>("actual_traj",1);
+    m_controlTrajPub = m_nh->advertise<nav_msgs::Path>("control_traj",1);
+    m_waypointPub = m_nh->advertise<geometry_msgs::PoseArray>("waypoints",1);
+
+    m_resetMeshSrv = m_nh->advertiseService("reset_mesh", &MochaGui::ResetMeshFunc, this);
 
     m_pMeshPubThread = new boost::thread(std::bind(&MochaGui::_MeshPubFunc,this));
     m_pStatePubThread = new boost::thread(std::bind(&MochaGui::_StatePubFunc,this));
     m_pWaypointPubThread = new boost::thread(std::bind(&MochaGui::_WaypointPubFunc,this));
     m_pPathPubThread = new boost::thread(std::bind(&MochaGui::_PathPubFunc,this));
-
-    m_statePub = m_nh->advertise<carplanner_msgs::VehicleState>("state",1);
-    m_terrainMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("/output_terrain_mesh",1);
-    m_groundplaneMeshPub = m_nh->advertise<mesh_msgs::TriangleMeshStamped>("/output_groundplane_mesh",1);
-    m_simPathPub = m_nh->advertise<visualization_msgs::MarkerArray>("sim_path",1);
-    m_ctrlPathPub = m_nh->advertise<visualization_msgs::MarkerArray>("ctrl_path",1);
-    m_waypointPub = m_nh->advertise<geometry_msgs::PoseArray>("waypoints",1);
+    if (mesh_import_rate > 0.f)
+    {    
+        m_terrainMeshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("/input_terrain_mesh", 1, boost::bind(&MochaGui::_terrainMeshCallback, this, _1));
+        // m_pProcessMeshThread = new boost::thread(std::bind(&MochaGui::_ProcessMeshFunc,this));
+    }
 }
 
 ///////////////////////////////////////////////////////////////
@@ -676,6 +840,33 @@ void MochaGui::_terrainMeshCallback(const mesh_msgs::TriangleMeshStamped::ConstP
   time_t t1 = std::clock();
   ROS_INFO("got mesh, %d faces, %d vertices, %.2f sec", mesh_msg->mesh.triangles.size(), mesh_msg->mesh.vertices.size(), difftime(t1,t0)/CLOCKS_PER_SEC);
 
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+bool MochaGui::ResetMeshFunc(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& resp)
+{
+    ResetTerrainMeshes();
+    return true;
+}
+
+void MochaGui::ResetTerrainMeshes()
+{
+    for (uint i=0; i<m_PlanCarModel.GetWorldCount(); i++)
+    {
+        m_PlanCarModel.resetTerrainMesh(i);
+    }
+    // for (uint i=0; i<m_LearningCarModel.GetWorldCount(); i++)
+    // {
+    //     m_LearningCarModel.setTerrainMesh(i, meshShape, Twm);
+    // }
+    for (uint i=0; i<m_DriveCarModel.GetWorldCount(); i++)
+    {
+        m_DriveCarModel.resetTerrainMesh(i);
+    }
+    for (uint i=0; i<m_ControlCarModel.GetWorldCount(); i++)
+    {
+        m_ControlCarModel.resetTerrainMesh(i);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1008,6 +1199,55 @@ void MochaGui::_pubPathArr(ros::Publisher* pub, list<std::vector<VehicleState> *
     pub->publish(markarr_msg);
     ros::spinOnce();
 }
+///////////////////////////////////////////////////////////////////////////////////
+
+void MochaGui::_pubPathArr(ros::Publisher* pub, list<std::vector<VehicleState> *>& path_in, list<double>& norm_in)
+{   
+    if (path_in.size() != norm_in.size())
+        return;
+    list<std::vector<VehicleState> *> some_path = path_in;
+    carplanner_msgs::PathArray patharr_msg;
+    convertSomePath2PathArrayMsg(some_path, &patharr_msg);
+    visualization_msgs::MarkerArray markarr_msg;
+    carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("path", 0.02, 0, 0, 1.0, 0.0, 0.0, 1.0);
+    convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg,markarr_config, Eigen::Vector3d(0.0, 0.0, m_dPathZOffset));
+
+    // visualization_msgs::MarkerArray normviz_msg;
+    // normviz_msg.markers.resize(m_vPotentialPaths.size());
+    // normviz_msg.markers[i].action = visualization_msgs::Marker::DELETE;
+    int path_idx = 0;
+    for (std::list<double>::iterator it=norm_in.begin(); it!=norm_in.end(); advance(it,1))
+    {   
+        visualization_msgs::Marker marker;
+        marker.header = patharr_msg.header;
+        marker.ns = "norm";
+        marker.id = markarr_msg.markers.size();
+        marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+        if (path_idx >= patharr_msg.paths.size())
+            continue;
+        nav_msgs::Path path_msg = patharr_msg.paths[path_idx];
+        int pose_idx = path_msg.poses.size()-1; 
+        if (pose_idx < 0)
+            continue;
+        geometry_msgs::Point pos_msg = path_msg.poses[pose_idx].pose.position;
+        marker.pose.position = pos_msg;
+        marker.pose.position.x += 0.0;
+        marker.pose.position.y += 0.0;
+        marker.pose.position.z += 0.2;
+        marker.scale.z = 0.1;
+        marker.color.r = 0.8;
+        marker.color.g = 0.8;
+        marker.color.b = 0.8;
+        marker.color.a = 1.0;
+        marker.text = std::to_string(*it);
+        marker.action = visualization_msgs::Marker::ADD;
+        markarr_msg.markers.push_back(marker);
+        path_idx++;
+    }
+
+    pub->publish(markarr_msg);
+    ros::spinOnce();
+}
 
 ///////////////////////////////////////////////////////////////////////////////////
 void MochaGui::_pubPath(ros::Publisher* pub, Eigen::Vector3dAlignedVec& path_in)
@@ -1038,6 +1278,53 @@ void MochaGui::_pubPathArr(ros::Publisher* pub, std::vector<MotionSample>& path_
     visualization_msgs::MarkerArray markarr_msg;
     carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("",0.01,0,0,0.0,1.0,0.0,1.0);
     convertPathArrayMsg2LineStripArrayMsg(patharr_msg,&markarr_msg, markarr_config);
+    pub->publish(markarr_msg);
+    ros::spinOnce();
+}
+
+/////////////////////////////////////////////////////////////////////
+void MochaGui::_pubPath(ros::Publisher* pub, std::vector<VehicleState>& path_in, double norm_in)
+{   
+    if (path_in.empty())
+        return;
+
+    visualization_msgs::MarkerArray markarr_msg;
+
+    std::vector<VehicleState> some_path = path_in;
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(some_path, &path_msg);
+    visualization_msgs::Marker mark_msg;
+    carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("path", 0.02, 0, 0, 1.0, 0.0, 0.0, 1.0);
+    convertPathMsg2LineStripMsg(path_msg,&mark_msg,markarr_config, Eigen::Vector3d(0.0, 0.0, m_dPathZOffset));
+    mark_msg.id = 0;
+    markarr_msg.markers.push_back(mark_msg);
+
+    // visualization_msgs::MarkerArray normviz_msg;
+    // normviz_msg.markers.resize(m_vPotentialPaths.size());
+    // normviz_msg.markers[i].action = visualization_msgs::Marker::DELETE;
+    int path_idx = 0;
+    visualization_msgs::Marker marker;
+    marker.header = path_msg.header;
+    marker.ns = "norm";
+    marker.id = 1;
+    marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+    int pose_idx = path_msg.poses.size()-1; 
+    if (pose_idx < 0)
+        return;
+    geometry_msgs::Point pos_msg = path_msg.poses[pose_idx].pose.position;
+    marker.pose.position = pos_msg;
+    marker.pose.position.x += 0.0;
+    marker.pose.position.y += 0.0;
+    marker.pose.position.z += 0.2;
+    marker.scale.z = 0.1;
+    marker.color.r = 0.8;
+    marker.color.g = 0.8;
+    marker.color.b = 0.8;
+    marker.color.a = 1.0;
+    marker.text = std::to_string(norm_in);
+    marker.action = visualization_msgs::Marker::ADD;
+    markarr_msg.markers.push_back(marker);
+
     pub->publish(markarr_msg);
     ros::spinOnce();
 }
@@ -1527,7 +1814,13 @@ void MochaGui::_LocalizerReadFunc()
         boost::this_thread::interruption_point();
         //this is a blocking call
         double localizerTime;
-        const Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
+        Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
+
+        Eigen::Vector3d dIntersect;
+        if( m_DriveCarModel.RayCast(Twb.translation(), GetBasisVector(Twb,2)*raycast_len, dIntersect, true) ){
+            Twb.translation() = dIntersect;
+        }
+
         Sophus::Vector6d Vwb;
         if (m_Localizer.GetLocalizerType()=="ROSLocalizer")
             Vwb = m_Localizer.GetVelocity(m_sCarObjectName,false,&localizerTime);

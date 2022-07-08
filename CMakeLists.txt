@@ -68,6 +68,7 @@ find_package(catkin REQUIRED
     # nav_msgs
     # nodelet
     mesh_msgs
+    vicon_tools
     # actionlib
     # mt_actionlib
     )
