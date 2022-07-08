@@ -245,12 +245,13 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
                     const std::string& sCarMesh, const std::string& sWheelMesh)
 {
     // init first ros items
-    m_spinner = new ros::AsyncSpinner(6);
+    m_spinner = new ros::AsyncSpinner(8);
     m_spinner->start();
 
     m_nh = new ros::NodeHandle("~");  
 
     m_Planner.SetNodeHandle(m_nh);
+    m_Controller.SetNodeHandle(m_nh);
 
     std::string waypoints_config, waypoints_offset;
     m_nh->param<std::string>("waypoints_config", waypoints_config, "circle"); // ellipse, segment, circle, eight
@@ -655,8 +656,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     }
 
     // Changed "NinjaCar" to "Compass"
-    // m_sCarObjectName = "footprint_link";
-    m_sCarObjectName = "base_link";
+    m_sCarObjectName = "footprint_link";
+    // m_sCarObjectName = "base_link";
     // if ( m_bSIL ) {
     //     // Changed "posetonode" to "BulletCarModel" to match BulletCarModel.cpp
     //     m_Localizer.TrackObject( m_sCarObjectName, Sophus::SE3d(dT_localizer_ref).inverse() );
@@ -719,14 +720,8 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
     m_pControlLine = new GLCachedPrimitives();
 
     // init last ros items
-    // m_spinner = new ros::AsyncSpinner(6);
-    // m_spinner->start();
-
-    // m_nh = new ros::NodeHandle("~"); 
 
     m_nh->param<double>("raycast_len", raycast_len, raycast_len);
-
-    m_nh->param<double>("mesh_import_rate", mesh_import_rate, INFINITY);
 
     m_nh->param<double>("mesh_import_rate", mesh_import_rate, INFINITY);
 
@@ -1220,13 +1215,13 @@ void MochaGui::_pubPath()
     //     auto segmentSamples = m_vSegmentSamples;
     //     _pubPathArr(&m_simPathPub, segmentSamples);
     // }
-    // if(!m_lPlanStates.empty())
-    // {
-    //     boost::mutex::scoped_lock lock(m_DrawMutex);
-    //     // ROS_INFO("Pubbing m_lPlanStates of size %d", m_lPlanStates.size());
-    //     auto planStates = m_lPlanStates;
-    //     _pubPathArr(&m_ctrlPathPub, planStates);
-    // }
+    if(!m_lPlanStates.empty())
+    {
+        // boost::mutex::scoped_lock lock(m_DrawMutex);
+        // boost::mutex::scoped_lock lock(m_ControlPlanMutex);
+        // ROS_INFO("Pubbing m_lPlanStates of size %d", m_lPlanStates.size());
+        _pubPath(&m_ctrlPathPub, m_lPlanStatesViz, m_lPlanNormViz);
+    }
     /* Same as above except only 1 path segment that iterates through all segments until the end during planning. 
        When planning is off, the traj is slightly inward of circular. When planning is on, it becomes circular. */
     // if(!m_vActualTrajectory.empty())
@@ -1307,6 +1302,55 @@ void MochaGui::_pubPathArr(ros::Publisher* pub, list<std::vector<VehicleState> *
         markarr_msg.markers.push_back(marker);
         path_idx++;
     }
+
+    pub->publish(markarr_msg);
+    ros::spinOnce();
+}
+
+////////////////////////////////////////////
+
+
+void MochaGui::_pubPath(ros::Publisher* pub, std::vector<VehicleState>& path_in, double norm_in)
+{   
+    if (path_in.empty())
+        return;
+
+    visualization_msgs::MarkerArray markarr_msg;
+
+    std::vector<VehicleState> some_path = path_in;
+    nav_msgs::Path path_msg;
+    convertSomePath2PathMsg(some_path, &path_msg);
+    visualization_msgs::Marker mark_msg;
+    carplanner_msgs::MarkerArrayConfig markarr_config = carplanner_msgs::MarkerArrayConfig("path", 0.02, 0, 0, 1.0, 0.0, 0.0, 1.0);
+    convertPathMsg2LineStripMsg(path_msg,&mark_msg,markarr_config, Eigen::Vector3d(0.0, 0.0, m_dPathZOffset));
+    mark_msg.id = 0;
+    markarr_msg.markers.push_back(mark_msg);
+
+    // visualization_msgs::MarkerArray normviz_msg;
+    // normviz_msg.markers.resize(m_vPotentialPaths.size());
+    // normviz_msg.markers[i].action = visualization_msgs::Marker::DELETE;
+    int path_idx = 0;
+    visualization_msgs::Marker marker;
+    marker.header = path_msg.header;
+    marker.ns = "norm";
+    marker.id = 1;
+    marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+    int pose_idx = path_msg.poses.size()-1; 
+    if (pose_idx < 0)
+        return;
+    geometry_msgs::Point pos_msg = path_msg.poses[pose_idx].pose.position;
+    marker.pose.position = pos_msg;
+    marker.pose.position.x += 0.0;
+    marker.pose.position.y += 0.0;
+    marker.pose.position.z += 0.2;
+    marker.scale.z = 0.1;
+    marker.color.r = 0.8;
+    marker.color.g = 0.8;
+    marker.color.b = 0.8;
+    marker.color.a = 1.0;
+    marker.text = std::to_string(norm_in);
+    marker.action = visualization_msgs::Marker::ADD;
+    markarr_msg.markers.push_back(marker);
 
     pub->publish(markarr_msg);
     ros::spinOnce();
@@ -1742,6 +1786,7 @@ void MochaGui::_UpdateVisuals()
 bool MochaGui::_UpdateControlPathVisuals(const ControlPlan* pPlan)
 {
     //boost::mutex::scoped_lock lock(m_DrawMutex);
+    // boost::mutex::scoped_lock lock(m_ControlPlanMutex);
     //get the current plans and draw them
     Sophus::SE3d dTwv1,dTwv2;
     *m_lPlanStates.front() = pPlan->m_Sample.m_vStates;
@@ -2069,11 +2114,14 @@ void MochaGui::_ControlFunc()
                 if(m_bPause == false && g_bInfiniteTime == false){
                     m_dPlanTime = Tic();
                 }
-                m_Controller.PlanControl(m_dPlanTime,pPlan);
+                // {
+                //     boost::mutex::scoped_lock lock(m_ControlPlanMutex);
+                    m_Controller.PlanControl(m_dPlanTime,pPlan);
 
-                if(pPlan != NULL && m_bLoggerEnabled && m_Logger.IsReady()){
-                    m_Logger.LogControlPlan(*pPlan);
-                }
+                    if(pPlan != NULL && m_bLoggerEnabled && m_Logger.IsReady()){
+                        m_Logger.LogControlPlan(*pPlan);
+                    }
+                // }
 
 
 
@@ -2089,13 +2137,21 @@ void MochaGui::_ControlFunc()
                 if(pPlan != NULL) {
                     _UpdateControlPathVisuals(pPlan);
 
-                    if(!m_lPlanStates.empty())
-                    {
-                        // boost::mutex::scoped_lock lock(m_DrawMutex);
-                        // ROS_INFO("Pubbing m_lPlanStates of size %d", m_lPlanStates.size());
-                        // auto planStates = m_lPlanStates;
-                        _pubPathArr(&m_ctrlPathPub, m_lPlanStates, m_lPlanNorms);
-                    }
+                    // {
+                    //     boost::mutex::scoped_lock lock(m_ControlPlanMutex);
+                        // m_lPlanStatesViz = pPlan->m_Sample.m_vStates;
+                        // m_lPlanNormViz = pPlan->m_dNorm;
+                    // }
+\
+                    _pubPath(&m_ctrlPathPub, pPlan->m_Sample.m_vStates, pPlan->m_dNorm);
+
+                    // if(!m_lPlanStates.empty())
+                    // {
+                    //     // boost::mutex::scoped_lock lock(m_DrawMutex);
+                    //     // ROS_INFO("Pubbing m_lPlanStates of size %d", m_lPlanStates.size());
+                    //     // auto planStates = m_lPlanStates;
+                    //     _pubPathArr(&m_ctrlPathPub, m_lPlanStates, m_lPlanNorms);
+                    // }
 
                     //update control plan statistics if there is a new control plan available
                     nNumControlPlans++;

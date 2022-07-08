@@ -1,5 +1,5 @@
-WheelBase,0.270000000
-Width,0.210000000
+WheelBase,0.17150000000
+Width,0.140000000
 Height,0.030000000
 DynamicFrictionCoef,0.166336000
 StaticSideFrictionCoef,1.353970000
@@ -18,7 +18,7 @@ CompDamping,10.000000000
 ExpDamping,0.000000000
 RollInfluence,1.000000000
 SteeringCoef,-1.200000000
-MaxSteering,0.3
+MaxSteering,0.4
 MaxSteeringRate,13.000000000
 AccelOffset,0.469000000
 SteeringOffset,0.480091000

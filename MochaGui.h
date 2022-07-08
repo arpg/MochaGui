@@ -136,6 +136,9 @@ protected:
     GLCachedPrimitives* m_pControlLine;
     std::vector<MotionSample> m_vSegmentSamples;
 
+    std::vector<VehicleState> m_lPlanStatesViz;
+    double m_lPlanNormViz;
+
     LocalPlanner m_Planner; // Car planner for trajectory plotting
     CarController m_Controller;
     BulletCarModel m_PlanCarModel;
@@ -250,6 +253,8 @@ protected:
 
     boost::mutex m_mutexWaypoints;
 
+    boost::mutex m_ControlPlanMutex;
+
     void SE3dFromWaypoint(Sophus::SE3d& , const Eigen::MatrixXd& );
     void WaypointFromOdomMsg(Eigen::MatrixXd& , const nav_msgs::Odometry& );
 
@@ -310,6 +315,7 @@ protected:
     void _pubPath(ros::Publisher*, Eigen::Vector3dAlignedVec&);
     void _pubPath(ros::Publisher*, std::vector<MotionSample>&);
     void _pubPathArr(ros::Publisher*, std::vector<MotionSample>&);
+    void _pubPath(ros::Publisher*, std::vector<VehicleState>&, double );
 
     boost::thread* m_pWaypointPubThread;
     void _WaypointPubFunc();

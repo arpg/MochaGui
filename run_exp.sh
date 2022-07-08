@@ -1,1 +1,2 @@
-./build/gui -params ./learning_params.csv -mesh ./labLoop.ply -localizer true -mode Experiment -logfile 1.log -car ./herbie/herbie.blend -wheel ./herbie/wheel.blend
+#!/bin/bash
+cd "$(dirname "$0")"; ./build/devel/lib/MochaGui/gui -params ./N02_params.csv -mesh ./disk.ply -localizer true -mode Experiment -logfile 1.log -car ./herbie/herbie.blend -wheel ./herbie/wheel.blend
