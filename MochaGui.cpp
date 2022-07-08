@@ -724,7 +724,7 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     m_resetMeshSrv = m_nh->advertiseService("reset_mesh", &MochaGui::ResetMeshFunc, this);
 
-    m_pMeshPubThread = new boost::thread(std::bind(&MochaGui::_MeshPubFunc,this));
+    // m_pMeshPubThread = new boost::thread(std::bind(&MochaGui::_MeshPubFunc,this));
     m_pStatePubThread = new boost::thread(std::bind(&MochaGui::_StatePubFunc,this));
     m_pWaypointPubThread = new boost::thread(std::bind(&MochaGui::_WaypointPubFunc,this));
     m_pPathPubThread = new boost::thread(std::bind(&MochaGui::_PathPubFunc,this));
@@ -793,6 +793,12 @@ void MochaGui::_pubMesh(btCollisionShape* collisionShape, btTransform* parentTra
 
 void MochaGui::_terrainMeshCallback(const mesh_msgs::TriangleMeshStamped::ConstPtr& mesh_msg)
 {
+    static ros::Time time_of_last_mesh = ros::Time(0);
+    ros::Time now = ros::Time::now();
+    if ((now-time_of_last_mesh).toSec()<=1.f/mesh_import_rate)
+        return;
+    time_of_last_mesh = now;
+
   static tf::StampedTransform Twm;
   try
   {
@@ -1100,7 +1106,7 @@ void MochaGui::_WaypointPubFunc()
     while( ros::ok() && m_StillRun )
     {
         _pubWaypoints();
-        ros::Rate(100).sleep();
+        ros::Rate(10).sleep();
     }
 }
 
@@ -1111,7 +1117,7 @@ void MochaGui::_PathPubFunc()
     while( ros::ok() )
     {
         _pubPath();
-        ros::Rate(100).sleep();
+        ros::Rate(10).sleep();
     }
 }
 
