@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC  -std=c++11 -Wall -Wno-deprecated-declarations -Wno-unused-private-field -Wno-unused-value -Wno-overloaded-virtual -Wl,--verbose -shared -Wl,-soname,libGamepad.so -o ../devel/lib/libGamepad.so CMakeFiles/Gamepad.dir/EventDispatcher.cpp.o CMakeFiles/Gamepad.dir/Gamepad_linux.cpp.o 

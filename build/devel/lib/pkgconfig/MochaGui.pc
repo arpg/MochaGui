@@ -1,8 +1,0 @@
-prefix=/home/arpg/mocha_ws/src/mochagui/build/devel
-
-Name: MochaGui
-Description: Description of MochaGui
-Version: 0.0.0
-Cflags: -I/home/arpg/mocha_ws/src/mochagui/.
-Libs: -L${prefix}/lib 
-Requires: 
