@@ -259,7 +259,8 @@ protected:
     void WaypointFromOdomMsg(Eigen::MatrixXd& , const nav_msgs::Odometry& );
 
     double raycast_len = 1.0;
-    bool Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool &biDirectional, int index = 0);
+    bool Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, uint radial_num_rings = 2, double radius_spacing = 0.005, const bool &biDirectional = true, int index = 0);
+    bool RaycastSingle(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool &biDirectional = true, int index = 0);
 
     ros::AsyncSpinner *m_spinner;
 

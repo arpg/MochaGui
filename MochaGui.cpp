@@ -738,10 +738,16 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 
     m_resetMeshSrv = m_nh->advertiseService("reset_mesh", &MochaGui::ResetMeshFunc, this);
 
-    // m_pMeshPubThread = new boost::thread(std::bind(&MochaGui::_MeshPubFunc,this));
+    // if (m_terrainMeshPub.getNumSubscribers()>0 || m_groundplaneMeshPub.getNumSubscribers()>0) 
+    {
+        m_pMeshPubThread = new boost::thread(std::bind(&MochaGui::_MeshPubFunc,this));
+    }
     m_pStatePubThread = new boost::thread(std::bind(&MochaGui::_StatePubFunc,this));
     m_pWaypointPubThread = new boost::thread(std::bind(&MochaGui::_WaypointPubFunc,this));
-    // m_pPathPubThread = new boost::thread(std::bind(&MochaGui::_PathPubFunc,this));
+    // if (m_simPathPub.getNumSubscribers()>0 || m_ctrlPathPub.getNumSubscribers()>0) 
+    {
+        m_pPathPubThread = new boost::thread(std::bind(&MochaGui::_PathPubFunc,this));
+    }
     if (mesh_import_rate > 0.f)
     {    
         m_terrainMeshSub = m_nh->subscribe<mesh_msgs::TriangleMeshStamped>("/input_terrain_mesh", 1, boost::bind(&MochaGui::_terrainMeshCallback, this, _1));
@@ -752,16 +758,26 @@ void MochaGui::Init(const std::string& sRefPlane, const std::string& sMesh, bool
 ///////////////////////////////////////////////////////////////
 void MochaGui::_pubTerrainMesh(uint nWorldId)
 {
-
-    BulletWorldInstance* pWorld = m_DriveCarModel.GetWorldInstance(nWorldId);
-    boost::unique_lock<boost::mutex> lock(*pWorld);
     // time_t t0 = clock();
+    BulletWorldInstance* pWorld = m_DriveCarModel.GetWorldInstance(nWorldId);
 
-    if (pWorld->m_pTerrainBody != NULL)
+    if (pWorld->m_pTerrainBody != NULL && m_terrainMeshPub.getNumSubscribers()>0) {
+        boost::unique_lock<boost::mutex> lock(*pWorld);
+        ROS_INFO("Pubbing Terrain Mesh");
         _pubMesh(pWorld->m_pTerrainBody->getCollisionShape(), &(pWorld->m_pTerrainBody->getWorldTransform()), &m_terrainMeshPub);
+    }
     
-    if (pWorld->m_pGroundplaneBody != NULL)
+    if (pWorld->m_pGroundplaneBody != NULL && m_groundplaneMeshPub.getNumSubscribers()>0) {
+        boost::unique_lock<boost::mutex> lock(*pWorld);
+        ROS_INFO("Pubbing Ground Mesh");
         _pubMesh(pWorld->m_pGroundplaneBody->getCollisionShape(), &(pWorld->m_pGroundplaneBody->getWorldTransform()), &m_groundplaneMeshPub);
+    }
+    else if (pWorld->m_pGroundplaneBody == NULL) {
+        ROS_WARN("Ground Mesh is NULL");
+    }
+    else if (m_groundplaneMeshPub.getNumSubscribers()>0) {
+        ROS_WARN("Ground Mesh has no Subscribers");
+    }
     
     // time_t t1 = clock();
     // uint num_tri = dynamic_cast<btTriangleMesh*>(dynamic_cast<btBvhTriangleMeshShape*>(pWorld->m_pTerrainBody->getCollisionShape())->getMeshInterface())->getNumTriangles();
@@ -917,7 +933,29 @@ void MochaGui::ResetTerrainMeshes()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-bool MochaGui::Raycast(const Eigen::Vector3d& dSource,const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool& biDirectional, int index /*= 0*/)
+bool MochaGui::Raycast(const Eigen::Vector3d& dSource, const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, uint radial_num_rings /*= 2*/, double radius_spacing /*= 0.005*/, const bool& biDirectional /*= true*/, int index /*= 0*/)
+{
+    dIntersect = Eigen::Vector3d(std::numeric_limits<double>::max(),std::numeric_limits<double>::max(),std::numeric_limits<double>::max());
+    ROS_INFO("casting gui ray... from %f %f %f in dir %f %f %f", dSource[0], dSource[1], dSource[2], dRayVector[0], dRayVector[1], dRayVector[2]);
+    for (std::size_t ring = 0; ring < radial_num_rings; ring++) {
+        double circumference = 2 * 3.14159265 * radius_spacing;
+        uint num_points_in_ring = round(circumference / radius_spacing);
+        double radius = circumference / num_points_in_ring;
+        for (std::size_t index_in_ring = 0; index_in_ring < num_points_in_ring; index_in_ring++) {
+            double alpha = radius*index_in_ring/num_points_in_ring*2*3.14159265;
+            double polar = acos(dRayVector[2]);
+            Eigen::Vector3d delta(radius*sin(polar)*cos(alpha), radius*sin(polar)*sin(alpha), radius*cos(polar));  
+            Eigen::Vector3d source = dSource + delta;
+            ROS_INFO("casting ray from %f %f %f in dir %f %f %f", source[0], source[1], source[2], dRayVector[0], dRayVector[1], dRayVector[2]);
+            Eigen::Vector3d intersect;
+            RaycastSingle(source, dRayVector, intersect, biDirectional, index);
+            if (intersect[2]<dIntersect[2])
+                dIntersect = intersect;
+        }
+    }
+}
+
+bool MochaGui::RaycastSingle(const Eigen::Vector3d& dSource,const Eigen::Vector3d& dRayVector, Eigen::Vector3d& dIntersect, const bool& biDirectional /*= true*/, int index /*= 0*/)
 {
     btVector3 source(dSource[0],dSource[1],dSource[2]);
     btVector3 vec(dRayVector[0],dRayVector[1],dRayVector[2]);
@@ -1208,18 +1246,18 @@ void MochaGui::_pubPath()
     // }
     /* Publish path as produced by PlannerThread for whole trajectory.
        When planning is off, the traj is slightly inward of circular. When planning is on, it becomes circular. */
-    // if(!m_vSegmentSamples.empty())
-    // {
+    if(!m_vSegmentSamples.empty())
+    {
     //     boost::mutex::scoped_lock lock(m_DrawMutex);
-    //     // ROS_INFO("Pubbing m_vSegmentSamples of size %d", m_vSegmentSamples.size());
+        ROS_INFO("Pubbing m_vSegmentSamples of size %d", m_vSegmentSamples.size());
     //     auto segmentSamples = m_vSegmentSamples;
-    //     _pubPathArr(&m_simPathPub, segmentSamples);
-    // }
+        _pubPathArr(&m_simPathPub, m_vSegmentSamples);
+    }
     if(!m_lPlanStates.empty())
     {
         // boost::mutex::scoped_lock lock(m_DrawMutex);
         // boost::mutex::scoped_lock lock(m_ControlPlanMutex);
-        // ROS_INFO("Pubbing m_lPlanStates of size %d", m_lPlanStates.size());
+        ROS_INFO("Pubbing m_lPlanStates of size %d", m_lPlanStates.size());
         _pubPath(&m_ctrlPathPub, m_lPlanStatesViz, m_lPlanNormViz);
     }
     /* Same as above except only 1 path segment that iterates through all segments until the end during planning. 
