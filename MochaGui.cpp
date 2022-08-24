@@ -967,7 +967,7 @@ bool MochaGui::RaycastSingle(const Eigen::Vector3d& dSource,const Eigen::Vector3
         source = source - vec;
     }
 
-    if(pInstance->m_pVehicleRayCaster->castRay(source,target,results) == 0){
+    if(pInstance->m_pVehicleRaycaster->castRay(source,target,results) == 0){
         return false;
     }else{
         Eigen::Vector3d dNewSource(source[0],source[1],source[2]);
@@ -1042,7 +1042,7 @@ void MochaGui::_waypointsCb(const carplanner_msgs::WayPoints& wp_msg)
 
         Eigen::Vector3d dIntersect;
         Sophus::SE3d pose( m_Gui.GetWaypoint(idx)->m_Waypoint.GetPose4x4_po() );
-        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
+        if( m_DriveCarModel.Raycast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
             pose.translation() = dIntersect;
             m_Gui.GetWaypoint(idx)->m_Waypoint.SetPose( pose.matrix() );
         }
@@ -1892,7 +1892,7 @@ void MochaGui::_UpdateVehicleStateFromFusion(VehicleState& currentState)
     currentState.m_dW[0] = currentState.m_dW[1] = 0;
 
     Eigen::Vector3d dIntersect;
-    if(m_DriveCarModel.RayCast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*raycast_len,dIntersect,true)){
+    if(m_DriveCarModel.Raycast(currentState.m_dTwv.translation(),GetBasisVector(currentState.m_dTwv,2)*raycast_len,dIntersect,true)){
        currentState.m_dTwv.translation() = dIntersect;
     }
 
@@ -1926,7 +1926,7 @@ void MochaGui::_LocalizerReadFunc()
         Sophus::SE3d Twb = m_Localizer.GetPose(m_sCarObjectName,true,&localizerTime);
 
         Eigen::Vector3d dIntersect;
-        if( m_DriveCarModel.RayCast(Twb.translation(), GetBasisVector(Twb,2)*raycast_len, dIntersect, true) ){
+        if( m_DriveCarModel.Raycast(Twb.translation(), GetBasisVector(Twb,2)*raycast_len, dIntersect, true) ){
             Twb.translation() = dIntersect;
         }
 
@@ -2465,7 +2465,7 @@ void MochaGui::_PlannerFunc() {
                     boost::mutex::scoped_lock lock( m_DrawMutex );
                     if( a->GetDirty() ) {
                         Sophus::SE3d pose( a->GetPose4x4_po() );
-                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
+                        if( m_DriveCarModel.Raycast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
                             pose.translation() = dIntersect;
                             a->SetPose( pose.matrix() );
                         }
@@ -2473,7 +2473,7 @@ void MochaGui::_PlannerFunc() {
                     }
                     if( b->GetDirty() ) {
                         Sophus::SE3d pose( b->GetPose4x4_po() );
-                        if( m_DriveCarModel.RayCast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
+                        if( m_DriveCarModel.Raycast(pose.translation(), GetBasisVector(pose,2)*raycast_len, dIntersect, true) ){
                             pose.translation() = dIntersect;
                             b->SetPose( pose.matrix() );
                         }
