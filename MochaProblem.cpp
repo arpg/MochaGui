@@ -491,6 +491,8 @@ Eigen::VectorXd MochaProblem::_GetTrajectoryError(const MotionSample& sample,
     error[3] = rpg::AngleWrap(minPose[3] - endPose[3]);
     error[4] = minPose[5] - endPose[5];
 
+    error[5] = sample.GetTiltCost();
+
     //now calculate the distance on both sides and find the minimum
     double dInterpolationFactor;
     Eigen::VectorXd beforeError;

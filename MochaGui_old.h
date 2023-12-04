@@ -18,7 +18,7 @@
 #include <carplanner_msgs/Command.h>
 #include <carplanner_msgs/VehicleState.h>
 #include <carplanner_msgs/PathArray.h>
-#include <carplanner_msgs/mocha_conversions.hpp>
+#include <carplanner_tools/mocha_conversions.hpp>
 #include <tf/transform_broadcaster.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -27,7 +27,7 @@
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include "mesh_conversion_tools.hpp"
+#include <carplanner_tools/mesh_conversion_tools.hpp>
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -38,7 +38,7 @@
 #include <boost/thread/mutex.hpp>
 #include <glog/logging.h>
 
-#include "CarMessages.pb.h"
+// #include "CarMessages.pb.h"
 
 #include <CarPlanner/CarController.h>
 #include <CarPlanner/LocalPlanner.h>
